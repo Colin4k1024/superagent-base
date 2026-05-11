@@ -1,0 +1,36 @@
+name: superagent-dev
+services:
+  mysql:
+    image: mysql:8.4.5
+    container_name: sa-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: opencoze
+      MYSQL_USER: coze
+      MYSQL_PASSWORD: coze123
+    ports:
+      - "3306:3306"
+    volumes:
+      - ./data/mysql-dev:/var/lib/mysql
+      - ./volumes/mysql/schema.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-ucoze", "-pcoze123"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+
+  redis:
+    image: redis:7-alpine
+    container_name: sa-redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 3s
+      retries: 5
+
+networks:
+  default:
+    name: superagent-dev

@@ -1,0 +1,94 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "superagent.fullname" . }}-agents
+  labels:
+    {{- include "superagent.labels" . | nindent 4 }}
+  annotations:
+    # Update this annotation to trigger pod restarts when agent configs change
+    checksum/agents: "agent-configs-v1"
+data:
+  code-assistant.yaml: |
+    apiVersion: superagent/v1
+    kind: Agent
+    metadata:
+      name: code-assistant
+      description: A software engineering assistant specialising in code review, debugging, and implementation.
+      labels:
+        team: engineering
+        tier: production
+    spec:
+      model:
+        id: Qwen3-Coder-Next-4bit
+        temperature: 0.1
+        maxTokens: 8192
+      prompt:
+        system: |
+          You are an expert software engineer. You:
+          - Write clean, idiomatic code that follows project conventions.
+          - Explain code changes clearly with reasoning and trade-offs.
+          - Identify bugs and propose minimal, targeted fixes.
+          - Prefer small, reviewable diffs over large rewrites.
+          - Ask clarifying questions before making assumptions about requirements.
+      tools:
+        - code_exec
+        - web_search
+      memory:
+        backend: builtin
+        maxMessages: 30
+      maxTurns: 15
+
+  research-agent.yaml: |
+    apiVersion: superagent/v1
+    kind: Agent
+    metadata:
+      name: research-agent
+      description: A research agent that gathers and synthesises information.
+      labels:
+        team: engineering
+        tier: production
+    spec:
+      model:
+        id: Qwen3-Coder-Next-4bit
+        temperature: 0.3
+        maxTokens: 4096
+      prompt:
+        system: |
+          You are a research assistant. You:
+          - Search for accurate and up-to-date information.
+          - Synthesise findings into clear, concise summaries.
+          - Cite sources and highlight uncertainties.
+      tools:
+        - web_search
+      memory:
+        backend: builtin
+        maxMessages: 20
+      maxTurns: 10
+
+  code-review-agent.yaml: |
+    apiVersion: superagent/v1
+    kind: Agent
+    metadata:
+      name: code-review-agent
+      description: A code review agent that provides detailed feedback on pull requests.
+      labels:
+        team: engineering
+        tier: production
+    spec:
+      model:
+        id: Qwen3-Coder-Next-4bit
+        temperature: 0.1
+        maxTokens: 8192
+      prompt:
+        system: |
+          You are a senior code reviewer. You:
+          - Review code for correctness, security, and maintainability.
+          - Provide actionable, specific feedback with examples.
+          - Prioritise critical issues over style nitpicks.
+          - Suggest improvements with clear reasoning.
+      tools:
+        - code_exec
+      memory:
+        backend: builtin
+        maxMessages: 25
+      maxTurns: 12

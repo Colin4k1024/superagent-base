@@ -1,0 +1,26 @@
+apiVersion: superagent/v1
+kind: Agent
+metadata:
+  name: code-review-agent
+  version: "1.0.0"
+  tags: [coding, review]
+  labels:
+    team: engineering
+    tier: production
+spec:
+  type: chat_model_agent
+  model:
+    router: capability-based
+    primary: claude-sonnet
+    fallback: deepseek-r1
+  system_prompt: |
+    You are a senior code reviewer. Analyze code for bugs, security issues,
+    performance problems, and suggest improvements.
+  tools:
+    - ref: builtin/code_execute
+  memory:
+    backend: builtin
+  observability:
+    tracing: true
+    metrics: true
+    log_level: info

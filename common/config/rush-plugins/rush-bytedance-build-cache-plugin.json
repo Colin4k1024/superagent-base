@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.bytedance.net/rush-plugins/rush-build-cache-plugin-options.schema.json",
+  "key": "Wek6C-xcBtNNroagxV305NFAcmXOriQRps64",
+  "envList": [
+    // BUILD_TYPE in SCM should be offline, test, online [Witty]
+    "BUILD_TYPE",
+    // When building bot studio, it needs to be packaged according to the region environment
+    "REGION",
+    // Used to differentiate inhouse/release environments
+    "CUSTOM_VERSION",
+    "CI",
+    "CI_LIGHTING",
+    // Coze cli builds need to differentiate between inhouse/release environments
+    "PUBLIC_INHOUSE"
+  ]
+}

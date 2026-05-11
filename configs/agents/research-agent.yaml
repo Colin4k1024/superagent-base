@@ -1,0 +1,29 @@
+apiVersion: superagent/v1
+kind: Agent
+metadata:
+  name: research-agent
+  version: "1.0.0"
+  tags: [research, analysis]
+  labels:
+    team: core
+    tier: production
+spec:
+  type: chat_model_agent
+  model:
+    router: capability-based
+    primary: deepseek-r1
+    fallback: gpt-4o
+  system_prompt: |
+    You are a professional research assistant. Help users analyze topics,
+    find information, and provide well-structured summaries.
+  tools:
+    - ref: builtin/web_search
+    - ref: builtin/http_request
+  memory:
+    backend: mem0
+    config:
+      session_window: 20
+  observability:
+    tracing: true
+    metrics: true
+    log_level: info

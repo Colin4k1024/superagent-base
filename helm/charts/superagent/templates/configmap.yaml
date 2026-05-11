@@ -1,0 +1,27 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "superagent.fullname" . }}-config
+  labels:
+    {{- include "superagent.labels" . | nindent 4 }}
+data:
+  # Application environment configuration
+  LISTEN_ADDR: ":8888"
+  GRPC_LISTEN_ADDR: ":50051"
+  LOG_LEVEL: "info"
+  MAX_REQUEST_BODY_SIZE: "209715200"
+  AGENT_CONFIG_DIR: {{ .Values.agentConfigDir | quote }}
+  MODEL_BASE_URL_0: {{ .Values.model.baseURL | quote }}
+  MODEL_ID_0: {{ .Values.model.modelID | quote }}
+  # MySQL connection
+  MYSQL_HOST: {{ .Values.mysql.host | quote }}
+  MYSQL_PORT: {{ .Values.mysql.port | quote }}
+  MYSQL_DATABASE: {{ .Values.mysql.database | quote }}
+  MYSQL_USER: {{ .Values.mysql.user | quote }}
+  # Redis connection
+  REDIS_ADDR: {{ .Values.redis.addr | quote }}
+  # Observability
+  {{- if .Values.observability.tracing.enabled }}
+  OTEL_EXPORTER_OTLP_ENDPOINT: {{ .Values.observability.tracing.endpoint | quote }}
+  OTEL_TRACES_EXPORTER: "otlp"
+  {{- end }}

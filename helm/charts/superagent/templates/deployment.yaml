@@ -1,0 +1,56 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "superagent.fullname" . }}
+  labels:
+    {{- include "superagent.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "superagent.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "superagent.selectorLabels" . | nindent 8 }}
+    spec:
+      containers:
+        - name: superagent
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8888
+              protocol: TCP
+            - name: grpc
+              containerPort: 50051
+              protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: {{ include "superagent.fullname" . }}-config
+            - secretRef:
+                name: {{ if .Values.mysql.existingSecret }}{{ .Values.mysql.existingSecret }}{{ else }}{{ include "superagent.fullname" . }}-secret{{ end }}
+          volumeMounts:
+            - name: agent-configs
+              mountPath: /app/configs/agents
+              readOnly: true
+          livenessProbe:
+            httpGet:
+              path: /metrics
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /metrics
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            failureThreshold: 3
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      volumes:
+        - name: agent-configs
+          configMap:
+            name: {{ include "superagent.fullname" . }}-agents

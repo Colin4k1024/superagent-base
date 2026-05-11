@@ -1,0 +1,84 @@
+syntax = "proto3";
+
+package model.v1;
+
+option go_package = "github.com/superagent-ai/superagent-base/backend/api/grpc/gen/model/v1;modelv1";
+
+import "google/protobuf/struct.proto";
+
+// ModelService manages LLM model configurations.
+service ModelService {
+  // ListModels lists all available models.
+  rpc ListModels(ListModelsRequest) returns (ListModelsResponse);
+
+  // GetModel retrieves a model by ID.
+  rpc GetModel(GetModelRequest) returns (GetModelResponse);
+
+  // CreateModel registers a new model configuration.
+  rpc CreateModel(CreateModelRequest) returns (CreateModelResponse);
+
+  // TestModel tests connectivity to a model endpoint.
+  rpc TestModel(TestModelRequest) returns (TestModelResponse);
+}
+
+message Model {
+  string id = 1;
+  string name = 2;
+  // provider: "openai" | "anthropic" | "google" | "custom" etc.
+  string provider = 3;
+  string description = 4;
+  // capabilities: "chat" | "embedding" | "rerank" etc.
+  repeated string capabilities = 5;
+  // config holds provider-specific configuration (base_url, api_key reference, etc.)
+  google.protobuf.Struct config = 6;
+  bool enabled = 7;
+  // context_length in tokens.
+  int32 context_length = 8;
+}
+
+message ListModelsRequest {
+  // filter_provider filters by provider name.
+  string filter_provider = 1;
+  // filter_capability filters models by a required capability.
+  string filter_capability = 2;
+}
+
+message ListModelsResponse {
+  repeated Model models = 1;
+  int32 total = 2;
+}
+
+message GetModelRequest {
+  string model_id = 1;
+}
+
+message GetModelResponse {
+  Model model = 1;
+}
+
+message CreateModelRequest {
+  string name = 1;
+  string provider = 2;
+  string description = 3;
+  repeated string capabilities = 4;
+  google.protobuf.Struct config = 5;
+  int32 context_length = 6;
+}
+
+message CreateModelResponse {
+  Model model = 1;
+}
+
+message TestModelRequest {
+  string model_id = 1;
+  // prompt is the test prompt to send.
+  string prompt = 2;
+}
+
+message TestModelResponse {
+  bool success = 1;
+  string response = 2;
+  // latency_ms is the response latency in milliseconds.
+  int64 latency_ms = 3;
+  string error = 4;
+}

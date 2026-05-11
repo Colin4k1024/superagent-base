@@ -1,0 +1,71 @@
+syntax = "proto3";
+
+package tool.v1;
+
+option go_package = "github.com/superagent-ai/superagent-base/backend/api/grpc/gen/tool/v1;toolv1";
+
+import "google/protobuf/struct.proto";
+
+// ToolService manages agent tools (plugins).
+service ToolService {
+  // ListTools lists available tools for an agent or space.
+  rpc ListTools(ListToolsRequest) returns (ListToolsResponse);
+
+  // GetTool retrieves tool details including parameter schema.
+  rpc GetTool(GetToolRequest) returns (GetToolResponse);
+
+  // InvokeTool executes a tool with the provided parameters.
+  rpc InvokeTool(InvokeToolRequest) returns (InvokeToolResponse);
+}
+
+message Tool {
+  string id = 1;
+  string name = 2;
+  string description = 3;
+  // plugin_id is the parent plugin this tool belongs to.
+  int64 plugin_id = 4;
+  // parameters_schema is the JSON Schema describing the tool's input.
+  google.protobuf.Struct parameters_schema = 5;
+  // output_schema is the JSON Schema describing the tool's output.
+  google.protobuf.Struct output_schema = 6;
+  bool enabled = 7;
+}
+
+message ListToolsRequest {
+  // agent_id filters tools bound to a specific agent.
+  int64 agent_id = 1;
+  // space_id filters tools available in a space.
+  int64 space_id = 2;
+  string keyword = 3;
+}
+
+message ListToolsResponse {
+  repeated Tool tools = 1;
+  int32 total = 2;
+}
+
+message GetToolRequest {
+  string tool_id = 1;
+}
+
+message GetToolResponse {
+  Tool tool = 1;
+}
+
+message InvokeToolRequest {
+  string tool_id = 1;
+  int64 agent_id = 2;
+  // parameters maps parameter names to values.
+  google.protobuf.Struct parameters = 3;
+  // context carries request-scoped data (user_id, trace_id, etc.)
+  google.protobuf.Struct context = 4;
+}
+
+message InvokeToolResponse {
+  bool success = 1;
+  // output is the tool's result payload.
+  google.protobuf.Struct output = 2;
+  string error = 3;
+  // execution_ms is the tool execution time in milliseconds.
+  int64 execution_ms = 4;
+}

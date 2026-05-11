@@ -1,0 +1,6 @@
+apiVersion: v2
+name: superagent
+description: Superagent Base - AI Agent Development Platform
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

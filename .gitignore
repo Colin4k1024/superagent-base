@@ -1,0 +1,46 @@
+# Binaries
+bin/
+*.exe
+*.dylib
+*.so
+*.dll
+
+# Go
+vendor/
+
+# Backend
+backend/.env
+backend/.env.*
+!backend/.env.example
+crash.log
+
+# Docker data
+docker/data/
+
+# Frontend
+web/node_modules/
+web/dist/
+web/.next/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Test
+coverage.out
+*.test
+
+# Temp
+tmp/
+.tmp/

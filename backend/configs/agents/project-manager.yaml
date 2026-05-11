@@ -1,0 +1,24 @@
+apiVersion: superagent/v1
+kind: Agent
+metadata:
+  name: project-manager
+  version: "1.0.0"
+  tags:
+    - orchestration
+    - management
+spec:
+  type: supervisor
+  model:
+    primary: Qwen3-Coder-Next-4bit
+  system_prompt: |
+    You are a project manager. You coordinate sub-agents to complete complex tasks.
+    When the user asks something, decide which sub-agent is best suited to handle it.
+    You can delegate to multiple sub-agents if needed.
+  sub_agents:
+    - ref: research-agent
+      role: Research and information gathering
+  orchestration:
+    mode: supervisor
+    max_rounds: 5
+  observability:
+    log_level: info

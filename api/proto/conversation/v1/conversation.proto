@@ -1,0 +1,100 @@
+syntax = "proto3";
+
+package conversation.v1;
+
+option go_package = "github.com/superagent-ai/superagent-base/backend/api/grpc/gen/conversation/v1;conversationv1";
+
+import "google/protobuf/struct.proto";
+import "google/protobuf/timestamp.proto";
+
+// ConversationService manages conversations and chat interactions.
+service ConversationService {
+  // Chat sends a message and streams the agent response.
+  rpc Chat(ChatRequest) returns (stream ChatResponse);
+
+  // CreateConversation creates a new conversation.
+  rpc CreateConversation(CreateConversationRequest) returns (CreateConversationResponse);
+
+  // GetConversation retrieves a conversation by ID.
+  rpc GetConversation(GetConversationRequest) returns (GetConversationResponse);
+
+  // ListConversations lists conversations for an agent.
+  rpc ListConversations(ListConversationsRequest) returns (ListConversationsResponse);
+}
+
+message Conversation {
+  int64 id = 1;
+  int64 agent_id = 2;
+  int64 user_id = 3;
+  string title = 4;
+  google.protobuf.Timestamp created_at = 5;
+  google.protobuf.Timestamp updated_at = 6;
+}
+
+message Message {
+  int64 id = 1;
+  int64 conversation_id = 2;
+  // role: "user" | "assistant" | "system"
+  string role = 3;
+  string content = 4;
+  // content_type: "text" | "image" | "file"
+  string content_type = 5;
+  google.protobuf.Timestamp created_at = 6;
+  // extra holds additional metadata.
+  google.protobuf.Struct extra = 7;
+}
+
+message ChatRequest {
+  int64 conversation_id = 1;
+  int64 agent_id = 2;
+  int64 user_id = 3;
+  string content = 4;
+  string content_type = 5;
+  // extra holds optional metadata for the request.
+  google.protobuf.Struct extra = 6;
+}
+
+message ChatResponse {
+  // event_type: "message" | "done" | "error"
+  string event_type = 1;
+  // delta is the incremental content chunk.
+  string delta = 2;
+  // message is the full message when event_type == "done".
+  Message message = 3;
+  // error contains error details when event_type == "error".
+  string error = 4;
+  // usage contains token usage info on completion.
+  google.protobuf.Struct usage = 5;
+}
+
+message CreateConversationRequest {
+  int64 agent_id = 1;
+  int64 user_id = 2;
+  string title = 3;
+}
+
+message CreateConversationResponse {
+  Conversation conversation = 1;
+}
+
+message GetConversationRequest {
+  int64 conversation_id = 1;
+}
+
+message GetConversationResponse {
+  Conversation conversation = 1;
+  repeated Message messages = 2;
+}
+
+message ListConversationsRequest {
+  int64 agent_id = 1;
+  int64 user_id = 2;
+  int32 page = 3;
+  int32 page_size = 4;
+}
+
+message ListConversationsResponse {
+  repeated Conversation conversations = 1;
+  int32 total = 2;
+  bool has_more = 3;
+}

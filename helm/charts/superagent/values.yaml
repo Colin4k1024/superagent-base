@@ -1,0 +1,61 @@
+replicaCount: 1
+
+image:
+  repository: superagent-ai/superagent-base
+  tag: "latest"
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  httpPort: 8888
+  grpcPort: 50051
+
+ingress:
+  enabled: false
+  className: nginx
+  hosts:
+    - host: superagent.local
+      paths:
+        - path: /
+          pathType: Prefix
+
+resources:
+  limits:
+    cpu: "2"
+    memory: 2Gi
+  requests:
+    cpu: 500m
+    memory: 512Mi
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 5
+  targetCPUUtilization: 70
+
+model:
+  baseURL: "http://model-service:8000/v1"
+  apiKey: ""
+  modelID: "Qwen3-Coder-Next-4bit"
+
+agentConfigDir: /app/configs/agents
+
+mysql:
+  host: mysql
+  port: 3306
+  database: opencoze
+  user: coze
+  password: ""
+  existingSecret: ""
+
+redis:
+  addr: "redis:6379"
+  password: ""
+
+observability:
+  tracing:
+    enabled: false
+    endpoint: "otel-collector:4317"
+  metrics:
+    enabled: true
+    serviceMonitor: false

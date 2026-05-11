@@ -1,0 +1,107 @@
+syntax = "proto3";
+
+package agent.v1;
+
+option go_package = "github.com/superagent-ai/superagent-base/backend/api/grpc/gen/agent/v1;agentv1";
+
+import "google/protobuf/struct.proto";
+import "google/protobuf/timestamp.proto";
+
+// AgentService manages AI agent lifecycle.
+service AgentService {
+  // CreateAgent creates a new agent.
+  rpc CreateAgent(CreateAgentRequest) returns (CreateAgentResponse);
+
+  // GetAgent retrieves an agent by ID.
+  rpc GetAgent(GetAgentRequest) returns (GetAgentResponse);
+
+  // ListAgents lists agents for a space.
+  rpc ListAgents(ListAgentsRequest) returns (ListAgentsResponse);
+
+  // UpdateAgent updates an existing agent.
+  rpc UpdateAgent(UpdateAgentRequest) returns (UpdateAgentResponse);
+
+  // DeleteAgent deletes an agent.
+  rpc DeleteAgent(DeleteAgentRequest) returns (DeleteAgentResponse);
+
+  // LoadAgentFromYAML creates or updates an agent from a YAML definition.
+  rpc LoadAgentFromYAML(LoadAgentFromYAMLRequest) returns (LoadAgentFromYAMLResponse);
+}
+
+message Agent {
+  int64 id = 1;
+  string name = 2;
+  string description = 3;
+  int64 space_id = 4;
+  int64 owner_id = 5;
+  // configuration holds agent-specific JSON configuration.
+  google.protobuf.Struct configuration = 6;
+  google.protobuf.Timestamp created_at = 7;
+  google.protobuf.Timestamp updated_at = 8;
+  string status = 9;
+  string icon_url = 10;
+}
+
+message CreateAgentRequest {
+  string name = 1;
+  string description = 2;
+  int64 space_id = 3;
+  google.protobuf.Struct configuration = 4;
+  string icon_url = 5;
+}
+
+message CreateAgentResponse {
+  Agent agent = 1;
+}
+
+message GetAgentRequest {
+  int64 agent_id = 1;
+}
+
+message GetAgentResponse {
+  Agent agent = 1;
+}
+
+message ListAgentsRequest {
+  int64 space_id = 1;
+  int32 page = 2;
+  int32 page_size = 3;
+  string keyword = 4;
+}
+
+message ListAgentsResponse {
+  repeated Agent agents = 1;
+  int32 total = 2;
+  bool has_more = 3;
+}
+
+message UpdateAgentRequest {
+  int64 agent_id = 1;
+  string name = 2;
+  string description = 3;
+  google.protobuf.Struct configuration = 4;
+  string icon_url = 5;
+}
+
+message UpdateAgentResponse {
+  Agent agent = 1;
+}
+
+message DeleteAgentRequest {
+  int64 agent_id = 1;
+}
+
+message DeleteAgentResponse {
+  bool success = 1;
+}
+
+message LoadAgentFromYAMLRequest {
+  // yaml_content is the raw YAML string defining the agent.
+  string yaml_content = 1;
+  int64 space_id = 2;
+}
+
+message LoadAgentFromYAMLResponse {
+  Agent agent = 1;
+  bool created = 2;
+}

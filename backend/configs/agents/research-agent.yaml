@@ -1,0 +1,19 @@
+apiVersion: superagent/v1
+kind: Agent
+metadata:
+  name: research-agent
+  version: "1.0.0"
+  tags:
+    - research
+    - general
+spec:
+  type: chat_model_agent
+  model:
+    primary: Qwen3-Coder-Next-4bit
+  system_prompt: |
+    You are a helpful research assistant. You answer questions clearly, concisely,
+    and accurately. When you don't know something, you say so.
+  memory:
+    backend: builtin
+  observability:
+    log_level: info
