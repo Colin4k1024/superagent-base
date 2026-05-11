@@ -35,7 +35,8 @@ Thumbs.db
 
 # Logs
 *.log
-logs/
+/logs/
+!pkg/logs/
 
 # Test
 coverage.out

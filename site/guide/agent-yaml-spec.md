@@ -210,7 +210,7 @@ tools:
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
-| `name` | string | 变量名，下游节点通过 `{{.name}}` 引用 |
+| `name` | string | 变量名，下游节点通过 `\{{.name}}` 引用 |
 | `from` | string | 来源格式：`node_id.output` 或 `node_id.field` |
 
 ---
@@ -436,7 +436,7 @@ spec:
 
       - id: quality_check
         type: condition
-        condition: "{{.summarize.output}}"
+        condition: "\{{.summarize.output}}"
 
     edges:
       - from: START
