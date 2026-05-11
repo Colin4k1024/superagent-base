@@ -75,6 +75,62 @@ type AgentSpec struct {
 	SubAgents     []SubAgentRef      `yaml:"sub_agents,omitempty"    json:"sub_agents,omitempty"`
 	// Orchestration defines the multi-agent coordination strategy.
 	Orchestration *OrchestrationSpec `yaml:"orchestration,omitempty" json:"orchestration,omitempty"`
+	// Workflow defines a graph-based workflow for type=workflow.
+	Workflow      *WorkflowSpec      `yaml:"workflow,omitempty"      json:"workflow,omitempty"`
+	// Interrupt controls interrupt/resume behaviour for this agent.
+	Interrupt     *InterruptConfig   `yaml:"interrupt,omitempty"     json:"interrupt,omitempty"`
+}
+
+// WorkflowSpec defines a graph-based workflow composed of nodes and edges.
+type WorkflowSpec struct {
+	// Nodes are the processing steps in the workflow.
+	Nodes     []WorkflowNode     `yaml:"nodes"               json:"nodes"`
+	// Edges define the directed connections between nodes.
+	Edges     []WorkflowEdge     `yaml:"edges"               json:"edges"`
+	// Variables declare named references to node outputs for use in downstream nodes.
+	Variables []WorkflowVariable `yaml:"variables,omitempty" json:"variables,omitempty"`
+}
+
+// WorkflowNode is a single processing step within a workflow.
+type WorkflowNode struct {
+	// ID is the unique identifier for this node within the workflow.
+	ID           string            `yaml:"id"                       json:"id"`
+	// Type is the node execution mode: llm_call, agent_call, tool_call, code, condition.
+	Type         string            `yaml:"type"                     json:"type"`
+	// Agent is the name of the agent to invoke for agent_call nodes.
+	Agent        string            `yaml:"agent,omitempty"          json:"agent,omitempty"`
+	// Tool is the tool reference URI for tool_call nodes.
+	Tool         string            `yaml:"tool,omitempty"           json:"tool,omitempty"`
+	// Prompt is the system/instruction prompt for llm_call nodes.
+	Prompt       string            `yaml:"prompt,omitempty"         json:"prompt,omitempty"`
+	// Code is the code to execute for code nodes.
+	Code         string            `yaml:"code,omitempty"           json:"code,omitempty"`
+	// Language is the programming language for code nodes (e.g. "python", "javascript").
+	Language     string            `yaml:"language,omitempty"       json:"language,omitempty"`
+	// Condition is a boolean expression for condition nodes.
+	Condition    string            `yaml:"condition,omitempty"      json:"condition,omitempty"`
+	// InputMapping maps node input fields to state expressions.
+	InputMapping map[string]string `yaml:"input_mapping,omitempty"  json:"input_mapping,omitempty"`
+}
+
+// WorkflowEdge is a directed connection between two workflow nodes.
+type WorkflowEdge struct {
+	// From is the source node ID, or "START" to mark the workflow entry point.
+	From      string `yaml:"from"                json:"from"`
+	// To is the destination node ID, or "END" to mark the workflow exit point.
+	To        string `yaml:"to"                  json:"to"`
+	// Condition is an optional expression; when non-empty the edge is only
+	// followed when the expression evaluates to true.
+	Condition string `yaml:"condition,omitempty" json:"condition,omitempty"`
+}
+
+// WorkflowVariable declares a named alias that maps a node output to a
+// state key consumable by downstream nodes via {{.name}} template syntax.
+type WorkflowVariable struct {
+	// Name is the template variable name.
+	Name string `yaml:"name" json:"name"`
+	// From identifies the source value as "node_id.output" or "node_id.field".
+	From string `yaml:"from" json:"from"`
 }
 
 // SubAgentRef references another agent by name for use in orchestration.
@@ -143,4 +199,15 @@ type ObsSpec struct {
 	Metrics  bool   `yaml:"metrics,omitempty"   json:"metrics,omitempty"`
 	// LogLevel sets the log verbosity: trace, debug, info, warn, error.
 	LogLevel string `yaml:"log_level,omitempty" json:"log_level,omitempty"`
+}
+
+// InterruptConfig controls interrupt/resume behaviour for an agent.
+type InterruptConfig struct {
+	// Enabled activates the interrupt/resume wrapper around the agent.
+	Enabled bool `yaml:"enabled" json:"enabled"`
+	// CheckpointBackend selects the persistence store: "redis" or "memory" (default).
+	CheckpointBackend string `yaml:"checkpoint_backend,omitempty" json:"checkpoint_backend,omitempty"`
+	// TimeoutSeconds controls how long an interrupt state is retained.
+	// Defaults to 300 (5 minutes) when zero.
+	TimeoutSeconds int `yaml:"timeout_seconds,omitempty" json:"timeout_seconds,omitempty"`
 }

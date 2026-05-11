@@ -18,6 +18,7 @@ package coze
 
 import (
 	"context"
+	"encoding/json"
 
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/protocol/sse"
@@ -48,9 +49,14 @@ type chatStreamRequest struct {
 // POST /api/v1/chat/stream
 // Body: {"agent_id": "research-agent", "session_id": "s1", "message": "hello"}
 //
-// Response: text/event-stream
-//   data: <token>\n\n  (one per streaming token)
-//   data: [DONE]\n\n   (signals end of stream)
+// Legacy mode (default):
+//
+//	data: <token>\n\n  (one per streaming token)
+//	data: [DONE]\n\n   (signals end of stream)
+//
+// A2UI mode (header X-A2UI: true or query param a2ui=true):
+//
+//	event: <type>\ndata: <json>\n\n
 func (h *ChatSSEHandler) HandleChatStream(ctx context.Context, c *app.RequestContext) {
 	var req chatStreamRequest
 	if err := c.BindJSON(&req); err != nil {
@@ -79,11 +85,9 @@ func (h *ChatSSEHandler) HandleChatStream(ctx context.Context, c *app.RequestCon
 		return
 	}
 
-	ch, err := agent.Chat(ctx, req.SessionID, req.Message)
-	if err != nil {
-		c.JSON(500, map[string]string{"error": err.Error()})
-		return
-	}
+	// Detect A2UI mode from request header or query parameter.
+	useA2UI := string(c.GetHeader("X-A2UI")) == "true" ||
+		string(c.QueryArgs().Peek("a2ui")) == "true"
 
 	// Set SSE-specific headers before writing the first byte.
 	c.Response.Header.Set("Cache-Control", "no-cache")
@@ -94,6 +98,28 @@ func (h *ChatSSEHandler) HandleChatStream(ctx context.Context, c *app.RequestCon
 	w := sse.NewWriter(c)
 	defer func() { _ = w.Close() }()
 
+	if useA2UI {
+		eventAgent := agentdef.NewEventAgent(agent)
+		stream, _ := eventAgent.ChatWithEvents(ctx, req.SessionID, req.Message)
+		for evt := range stream.Chan() {
+			data, _ := json.Marshal(evt)
+			if writeErr := w.WriteEvent("", string(evt.Type), data); writeErr != nil {
+				go func() {
+					for range stream.Chan() {
+					}
+				}()
+				return
+			}
+		}
+		return
+	}
+
+	// Legacy mode: plain text tokens.
+	ch, err := agent.Chat(ctx, req.SessionID, req.Message)
+	if err != nil {
+		c.JSON(500, map[string]string{"error": err.Error()})
+		return
+	}
 	for token := range ch {
 		if writeErr := w.WriteEvent("", "message", []byte(token)); writeErr != nil {
 			// Client disconnected; drain the channel and return.
@@ -106,6 +132,123 @@ func (h *ChatSSEHandler) HandleChatStream(ctx context.Context, c *app.RequestCon
 	}
 	// Signal stream completion.
 	_ = w.WriteEvent("", "message", []byte("[DONE]"))
+}
+
+// chatResumeRequest is the JSON body for POST /api/v1/chat/resume.
+type chatResumeRequest struct {
+	AgentID   string         `json:"agent_id"`
+	SessionID string         `json:"session_id"`
+	Input     map[string]any `json:"input"`
+}
+
+// HandleChatResume resumes an interrupted agent conversation.
+//
+// POST /api/v1/chat/resume
+// Body: {"agent_id": "approval-agent", "session_id": "s1", "input": {"confirm": true}}
+//
+// Streams the resumed response as plain SSE tokens followed by [DONE].
+// Returns 404 if the agent is not found or not interruptable.
+// Returns 409 if there is no pending interrupt for the given session.
+func (h *ChatSSEHandler) HandleChatResume(ctx context.Context, c *app.RequestContext) {
+	var req chatResumeRequest
+	if err := c.BindJSON(&req); err != nil {
+		c.JSON(400, map[string]string{"error": "invalid request body: " + err.Error()})
+		return
+	}
+	if req.AgentID == "" {
+		c.JSON(400, map[string]string{"error": "agent_id is required"})
+		return
+	}
+	if req.SessionID == "" {
+		c.JSON(400, map[string]string{"error": "session_id is required"})
+		return
+	}
+
+	if h.runtime == nil {
+		c.JSON(503, map[string]string{"error": "agent runtime not available"})
+		return
+	}
+
+	rawAgent, ok := h.runtime.GetAgent(req.AgentID)
+	if !ok {
+		c.JSON(404, map[string]string{"error": "agent not found: " + req.AgentID})
+		return
+	}
+
+	interruptable, ok := rawAgent.(agentdef.Interruptable)
+	if !ok {
+		c.JSON(404, map[string]string{"error": "agent does not support interrupt/resume: " + req.AgentID})
+		return
+	}
+
+	// Verify a pending interrupt exists before streaming.
+	if _, hasPending := interruptable.GetInterruptState(ctx, req.SessionID); !hasPending {
+		c.JSON(409, map[string]string{"error": "no pending interrupt for session: " + req.SessionID})
+		return
+	}
+
+	ch, err := interruptable.Resume(ctx, req.SessionID, req.Input)
+	if err != nil {
+		c.JSON(500, map[string]string{"error": err.Error()})
+		return
+	}
+
+	c.Response.Header.Set("Cache-Control", "no-cache")
+	c.Response.Header.Set("Connection", "keep-alive")
+	c.Response.Header.Set("X-Accel-Buffering", "no")
+	c.Response.Header.Set("Access-Control-Allow-Origin", "*")
+
+	w := sse.NewWriter(c)
+	defer func() { _ = w.Close() }()
+
+	for token := range ch {
+		if writeErr := w.WriteEvent("", "message", []byte(token)); writeErr != nil {
+			go func() {
+				for range ch {
+				}
+			}()
+			return
+		}
+	}
+	_ = w.WriteEvent("", "message", []byte("[DONE]"))
+}
+
+// HandleGetInterruptState returns the current interrupt state for a session.
+//
+// GET /api/v1/chat/interrupt_state?agent_id=<id>&session_id=<id>
+func (h *ChatSSEHandler) HandleGetInterruptState(ctx context.Context, c *app.RequestContext) {
+	agentID := string(c.QueryArgs().Peek("agent_id"))
+	sessionID := string(c.QueryArgs().Peek("session_id"))
+
+	if agentID == "" || sessionID == "" {
+		c.JSON(400, map[string]string{"error": "agent_id and session_id are required"})
+		return
+	}
+	if h.runtime == nil {
+		c.JSON(503, map[string]string{"error": "agent runtime not available"})
+		return
+	}
+
+	rawAgent, ok := h.runtime.GetAgent(agentID)
+	if !ok {
+		c.JSON(404, map[string]string{"error": "agent not found: " + agentID})
+		return
+	}
+
+	interruptable, ok := rawAgent.(agentdef.Interruptable)
+	if !ok {
+		c.JSON(200, map[string]any{"interrupted": false})
+		return
+	}
+
+	state, hasPending := interruptable.GetInterruptState(ctx, sessionID)
+	if !hasPending {
+		c.JSON(200, map[string]any{"interrupted": false})
+		return
+	}
+
+	data, _ := json.Marshal(state)
+	c.JSON(200, map[string]any{"interrupted": true, "state": json.RawMessage(data)})
 }
 
 // HandleListAgents returns JSON describing all agents known to the runtime.

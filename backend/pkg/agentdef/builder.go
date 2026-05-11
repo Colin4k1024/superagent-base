@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"time"
 
 	einoopenai "github.com/cloudwego/eino-ext/components/model/openai"
 	einotool "github.com/cloudwego/eino/components/tool"
@@ -29,9 +30,11 @@ import (
 	"github.com/cloudwego/eino/flow/agent/react"
 	"github.com/cloudwego/eino/schema"
 
+	"github.com/superagent-ai/superagent-base/backend/infra/checkpoint"
 	"github.com/superagent-ai/superagent-base/backend/pkg/mcp"
 	"github.com/superagent-ai/superagent-base/backend/pkg/memory"
 	"github.com/superagent-ai/superagent-base/backend/pkg/modelrouter"
+	"github.com/superagent-ai/superagent-base/backend/pkg/skill"
 	"github.com/superagent-ai/superagent-base/backend/pkg/tool"
 )
 
@@ -82,12 +85,18 @@ func WithAgentRegistry(fn func(name string) (Agent, bool)) BuilderOption {
 	return func(b *AgentBuilder) { b.agentRegistry = fn }
 }
 
+// WithSkillManager sets the skill manager used to resolve skill:// tool references.
+func WithSkillManager(mgr *skill.Manager) BuilderOption {
+	return func(b *AgentBuilder) { b.skillManager = mgr }
+}
+
 // AgentBuilder converts AgentDefinitions into running Agent instances.
 type AgentBuilder struct {
 	modelRouter   modelrouter.Router
 	toolManager   *tool.Manager
 	memoryFactory func(config memory.BackendConfig) (memory.Backend, error)
 	mcpRegistry   *mcp.Registry
+	skillManager  *skill.Manager
 	modelConfig   ModelRuntimeConfig
 	agentRegistry func(name string) (Agent, bool)
 }
@@ -111,6 +120,10 @@ func NewAgentBuilder(opts ...BuilderOption) *AgentBuilder {
 //
 // For orchestration types (supervisor, sequential, parallel, plan_execute) the
 // builder resolves sub-agent references via the registered agent registry.
+//
+// When spec.interrupt.enabled is true, the resulting agent is wrapped with
+// NewInterruptableAgent so that confirmation-seeking model outputs are
+// transparently captured and callers can Resume later.
 func (b *AgentBuilder) Build(ctx context.Context, def *AgentDefinition) (Agent, error) {
 	if def == nil {
 		return nil, fmt.Errorf("agentdef: Build: def is nil")
@@ -124,6 +137,8 @@ func (b *AgentBuilder) Build(ctx context.Context, def *AgentDefinition) (Agent, 
 		return b.buildSequential(ctx, def)
 	case "parallel":
 		return b.buildParallel(ctx, def)
+	case "workflow":
+		return b.buildWorkflow(def)
 	}
 
 	// Resolve primary model ID (may be overridden by router).
@@ -161,15 +176,18 @@ func (b *AgentBuilder) Build(ctx context.Context, def *AgentDefinition) (Agent, 
 		}
 	}
 
+	var built Agent
+
 	// If no real model config is provided fall back to the stub agent so
 	// existing unit tests that don't set up a model endpoint keep passing.
 	if b.modelConfig.BaseURL == "" {
-		return &chatAgent{
+		built = &chatAgent{
 			def:        def,
 			modelID:    modelID,
 			tools:      toolRefs,
 			memBackend: memBackend,
-		}, nil
+		}
+		return b.maybeWrapInterruptable(built, def), nil
 	}
 
 	// Build a real Eino ChatModel.
@@ -202,42 +220,75 @@ func (b *AgentBuilder) Build(ctx context.Context, def *AgentDefinition) (Agent, 
 		if err != nil {
 			return nil, fmt.Errorf("agentdef: Build: create react agent: %w", err)
 		}
-		return &einoReactAgent{
+		built = &einoReactAgent{
 			def:          def,
 			modelID:      effectiveModelID,
 			memBackend:   memBackend,
 			agent:        reactAgent,
 			systemPrompt: def.Spec.SystemPrompt,
-		}, nil
+		}
+		return b.maybeWrapInterruptable(built, def), nil
 	}
 
 	// Simple chat agent without tools.
-	return &einoChatAgent{
+	built = &einoChatAgent{
 		def:          def,
 		modelID:      effectiveModelID,
 		memBackend:   memBackend,
 		chatModel:    chatModel,
 		systemPrompt: def.Spec.SystemPrompt,
-	}, nil
+	}
+	return b.maybeWrapInterruptable(built, def), nil
+}
+
+// maybeWrapInterruptable wraps agent with InterruptableAgent when the
+// definition's interrupt config is present and enabled.
+func (b *AgentBuilder) maybeWrapInterruptable(agent Agent, def *AgentDefinition) Agent {
+	ic := def.Spec.Interrupt
+	if ic == nil || !ic.Enabled {
+		return agent
+	}
+
+	var store CheckpointStore
+	switch ic.CheckpointBackend {
+	case "redis":
+		// Redis store requires a cache client; fall back to memory if none is
+		// available in the builder (the caller can inject one via a future option).
+		store = checkpoint.NewInMemoryStore()
+	default:
+		store = checkpoint.NewInMemoryStore()
+	}
+
+	timeout := time.Duration(ic.TimeoutSeconds) * time.Second
+	return NewInterruptableAgent(agent, store, timeout)
 }
 
 // resolveEinoTools converts resolved tool refs to Eino einotool.BaseTool instances.
-// Only builtin tools backed by tool.Manager are currently wired; MCP and skill
-// refs are silently skipped until their adapters are ready.
+// Supports builtin (via tool.Manager) and skill:// (via skill.Manager) refs.
+// MCP refs are silently skipped until their adapter is ready.
 func (b *AgentBuilder) resolveEinoTools(refs []resolvedTool) []einotool.BaseTool {
-	if b.toolManager == nil {
-		return nil
-	}
 	var result []einotool.BaseTool
 	for _, ref := range refs {
-		if ref.scheme != "builtin" {
-			continue
+		switch ref.scheme {
+		case "builtin":
+			if b.toolManager == nil {
+				continue
+			}
+			t, ok := b.toolManager.Get(ref.target)
+			if !ok {
+				continue
+			}
+			result = append(result, t)
+		case "skill":
+			if b.skillManager == nil {
+				continue
+			}
+			t, ok := b.skillManager.GetTool(ref.target)
+			if !ok {
+				continue
+			}
+			result = append(result, t)
 		}
-		t, ok := b.toolManager.Get(ref.target)
-		if !ok {
-			continue
-		}
-		result = append(result, t)
 	}
 	return result
 }
@@ -369,6 +420,23 @@ func (b *AgentBuilder) buildParallel(_ context.Context, def *AgentDefinition) (A
 		name:        def.Metadata.Name,
 		description: def.Spec.SystemPrompt,
 		agents:      agents,
+		def:         def,
+	}, nil
+}
+
+// buildWorkflow constructs a WorkflowAgent from a workflow spec.
+func (b *AgentBuilder) buildWorkflow(def *AgentDefinition) (Agent, error) {
+	if def.Spec.Workflow == nil {
+		return nil, fmt.Errorf("agentdef: buildWorkflow %q: spec.workflow is required for type=workflow", def.Metadata.Name)
+	}
+	return &WorkflowAgent{
+		name:        def.Metadata.Name,
+		description: def.Spec.SystemPrompt,
+		nodes:       def.Spec.Workflow.Nodes,
+		edges:       def.Spec.Workflow.Edges,
+		variables:   def.Spec.Workflow.Variables,
+		registry:    b.agentRegistry,
+		modelCfg:    b.modelConfig,
 		def:         def,
 	}, nil
 }

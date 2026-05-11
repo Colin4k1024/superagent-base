@@ -1,0 +1,47 @@
+apiVersion: superagent/v1
+kind: Agent
+metadata:
+  name: research-workflow
+  version: "1.0.0"
+  description: A multi-step research workflow that searches, analyzes, and formats results.
+  tags: [workflow, research]
+spec:
+  type: workflow
+  model:
+    primary: Qwen3-Coder-Next-4bit
+  system_prompt: ""
+  workflow:
+    nodes:
+      - id: search
+        type: llm_call
+        prompt: |
+          Search for information about the following topic and list key findings:
+          Topic: {{.message}}
+        input_mapping:
+          query: "$.message"
+      - id: analyze
+        type: llm_call
+        prompt: |
+          Analyze the following research findings and identify the main insights:
+          {{.search_result}}
+        input_mapping:
+          data: "$.search.output"
+      - id: format
+        type: llm_call
+        prompt: |
+          Format the following analysis into a well-structured markdown report:
+          {{.analysis}}
+    edges:
+      - from: START
+        to: search
+      - from: search
+        to: analyze
+      - from: analyze
+        to: format
+      - from: format
+        to: END
+    variables:
+      - name: search_result
+        from: search.output
+      - name: analysis
+        from: analyze.output

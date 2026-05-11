@@ -110,6 +110,18 @@ func Validate(def *AgentDefinition) error {
 				return fmt.Errorf("agentdef: sub_agents[%d].ref is required", i)
 			}
 		}
+	} else if def.Spec.Type == "workflow" {
+		// Workflow type requires a non-nil workflow spec with at least one node
+		// and one edge.
+		if def.Spec.Workflow == nil {
+			return fmt.Errorf("agentdef: spec.type %q requires spec.workflow to be set", def.Spec.Type)
+		}
+		if len(def.Spec.Workflow.Nodes) == 0 {
+			return fmt.Errorf("agentdef: spec.workflow must have at least one node")
+		}
+		if len(def.Spec.Workflow.Edges) == 0 {
+			return fmt.Errorf("agentdef: spec.workflow must have at least one edge")
+		}
 	} else {
 		// Non-orchestration types require a primary model.
 		if def.Spec.Model.Primary == "" {

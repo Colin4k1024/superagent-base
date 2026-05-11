@@ -1,0 +1,22 @@
+apiVersion: superagent/v1
+kind: Agent
+metadata:
+  name: approval-agent
+  version: "1.0.0"
+  tags: [approval, safety]
+spec:
+  type: chat_model_agent
+  model:
+    primary: Qwen3-Coder-Next-4bit
+  system_prompt: |
+    You are a safety-aware assistant. When the user asks you to perform
+    potentially dangerous operations (delete files, send emails, make purchases),
+    you must first ask for explicit confirmation before proceeding.
+    Always say "Please confirm: do you want me to proceed with [action]?"
+    and wait for the user's response before taking any action.
+  tools:
+    - ref: builtin/http_request
+  interrupt:
+    enabled: true
+    checkpoint_backend: memory
+    timeout_seconds: 300
