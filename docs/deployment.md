@@ -188,6 +188,16 @@ kubectl logs -n superagent deploy/superagent-backend -f
 | `SSL_CERT_FILE` | — | TLS 证书文件路径 |
 | `SSL_KEY_FILE` | — | TLS 私钥文件路径 |
 
+### Agent 运行时
+
+| 变量 | 默认值 | 说明 |
+|------|--------|------|
+| `AGENT_CONFIG_DIR` | `configs/agents` | Agent YAML 配置目录，支持热重载 |
+| `AGENT_RELOAD_DEBOUNCE` | `2s` | 热重载防抖时间 |
+| `INTERRUPT_DEFAULT_TIMEOUT` | `300` | 中断状态默认保留秒数 |
+| `SKILLS_HUB_URL` | — | SkillsHub 服务 URL（用于安装远程技能） |
+| `MCP_CONFIG_FILE` | — | MCP 服务器配置文件路径 |
+
 ### MySQL
 
 | 变量 | 说明 |
