@@ -26,9 +26,10 @@ import (
 
 // ModelRuntimeConfig holds the LLM endpoint configuration.
 type ModelRuntimeConfig struct {
-	BaseURL string
-	APIKey  string
-	ModelID string
+	BaseURL string // LLM API endpoint
+	APIKey  string // API key
+	ModelID string // Model identifier
+	Type    string // "openai" (default) or "claude" for Anthropic protocol
 }
 
 // RuntimeConfig is the configuration for AgentRuntime.

@@ -1,0 +1,114 @@
+apiVersion: superagent/v1
+kind: Agent
+metadata:
+  name: document-pipeline
+  version: "1.0.0"
+  tags: [document, workflow, pipeline]
+  labels:
+    team: core
+    tier: production
+spec:
+  type: workflow
+  model:
+    primary: gpt-4o
+  system_prompt: |
+    你是一个专业的文档处理流水线，按照以下步骤处理用户输入的文档内容：
+    1. DocumentAnalyzer：分析文档结构、关键实体和主题
+    2. ContentSummarizer：将分析结果提炼为结构化摘要
+    3. ReportGenerator：生成最终的 Markdown 格式报告
+  workflow:
+    nodes:
+      - id: document_analyzer
+        type: llm_call
+        prompt: |
+          你是一个专业的文档分析专家。请对以下文档内容进行深入分析，输出结构化分析结果：
+
+          **分析要求**：
+          1. 识别文档类型（技术文档、报告、论文、商业文书等）
+          2. 提取关键实体（人名、组织、日期、产品名称等）
+          3. 识别核心主题和子主题层级
+          4. 标注文档结构（章节划分、逻辑关系）
+          5. 标记重要数据和技术术语
+
+          请按以下 JSON 格式输出分析结果：
+          ```json
+          {
+            "doc_type": "",
+            "language": "",
+            "key_entities": {"persons": [], "organizations": [], "dates": [], "products": []},
+            "primary_theme": "",
+            "sub_themes": [],
+            "structure": [{"section": "", "summary": ""}],
+            "key_terms": [],
+            "data_points": [],
+            "complexity_level": ""
+          }
+          ```
+
+          文档内容：
+          {{.message}}
+
+      - id: content_summarizer
+        type: llm_call
+        prompt: |
+          你是一个专业的内容总结专家。请基于以下文档分析结果，生成一份高质量的结构化摘要。
+
+          **摘要要求**：
+          1. 用 2-3 句话概括文档的核心内容
+          2. 列出 3-5 个关键发现
+          3. 提炼文档的核心观点/结论
+          4. 标注信息完整度（是否有缺失的关键信息）
+
+          文档分析结果：
+          {{.analysis_result}}
+
+          输出格式：
+          ```json
+          {
+            "executive_summary": "",
+            "key_findings": [],
+            "core_arguments": [],
+            "conclusions": [],
+            "information_completeness": "",
+            "recommended_actions": []
+          }
+          ```
+
+      - id: report_generator
+        type: llm_call
+        prompt: |
+          你是一个专业的报告撰写专家。请基于以下文档分析结果和结构化摘要，生成一份完整的 Markdown 格式报告。
+
+          **报告结构要求**：
+          1. 报告标题和元信息（生成日期、文档类型等）
+          2. 执行摘要（Executive Summary）
+          3. 文档概览（文档类型、语言、复杂度）
+          4. 核心发现（Core Findings）
+          5. 关键实体与术语（Key Entities & Terminology）
+          6. 文档结构分析（Document Structure）
+          7. 结论与建议（Conclusions & Recommendations）
+          8. 附录（数据点和参考资料）
+
+          文档分析结果：
+          {{.analysis_result}}
+
+          结构化摘要：
+          {{.summary}}
+
+          **重要**：请使用优美的 Markdown 格式，包含标题层级、列表、表格、代码块等元素，确保报告可直接用于呈现和分享。
+
+    edges:
+      - from: START
+        to: document_analyzer
+      - from: document_analyzer
+        to: content_summarizer
+      - from: content_summarizer
+        to: report_generator
+      - from: report_generator
+        to: END
+
+    variables:
+      - name: analysis_result
+        from: document_analyzer.output
+      - name: summary
+        from: content_summarizer.output

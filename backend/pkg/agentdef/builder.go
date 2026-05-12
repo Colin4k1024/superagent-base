@@ -24,8 +24,10 @@ import (
 	"strings"
 	"time"
 
+	einoclaude "github.com/cloudwego/eino-ext/components/model/claude"
 	einoopenai "github.com/cloudwego/eino-ext/components/model/openai"
 	einotool "github.com/cloudwego/eino/components/tool"
+	"github.com/cloudwego/eino/components/model"
 	"github.com/cloudwego/eino/compose"
 	"github.com/cloudwego/eino/flow/agent/react"
 	"github.com/cloudwego/eino/schema"
@@ -190,19 +192,34 @@ func (b *AgentBuilder) Build(ctx context.Context, def *AgentDefinition) (Agent, 
 		return b.maybeWrapInterruptable(built, def), nil
 	}
 
-	// Build a real Eino ChatModel.
+	// Build a real Eino ChatModel (OpenAI or Claude protocol).
 	effectiveModelID := modelID
 	if effectiveModelID == "" {
 		effectiveModelID = b.modelConfig.ModelID
 	}
 
-	chatModel, err := einoopenai.NewChatModel(ctx, &einoopenai.ChatModelConfig{
-		BaseURL: b.modelConfig.BaseURL,
-		APIKey:  b.modelConfig.APIKey,
-		Model:   effectiveModelID,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("agentdef: Build: create chat model: %w", err)
+	var chatModel model.ToolCallingChatModel
+	if b.modelConfig.Type == "claude" {
+		baseURL := b.modelConfig.BaseURL
+		cm, err := einoclaude.NewChatModel(ctx, &einoclaude.Config{
+			BaseURL: &baseURL,
+			APIKey:  b.modelConfig.APIKey,
+			Model:   effectiveModelID,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("agentdef: Build: create claude model: %w", err)
+		}
+		chatModel = cm
+	} else {
+		cm, err := einoopenai.NewChatModel(ctx, &einoopenai.ChatModelConfig{
+			BaseURL: b.modelConfig.BaseURL,
+			APIKey:  b.modelConfig.APIKey,
+			Model:   effectiveModelID,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("agentdef: Build: create openai model: %w", err)
+		}
+		chatModel = cm
 	}
 
 	// Gather Eino-compatible tools from resolved refs.
@@ -470,7 +487,7 @@ type einoChatAgent struct {
 	def          *AgentDefinition
 	modelID      string
 	memBackend   memory.Backend
-	chatModel    *einoopenai.ChatModel
+	chatModel    model.ToolCallingChatModel
 	systemPrompt string
 }
 
