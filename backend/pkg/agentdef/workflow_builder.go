@@ -17,9 +17,14 @@
 package agentdef
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"os"
+	"os/exec"
+	"path/filepath"
 	"strings"
+	"time"
 )
 
 // WorkflowAgent executes a graph-based workflow defined as a DAG of nodes
@@ -188,14 +193,81 @@ func (w *WorkflowAgent) executeToolNode(node *WorkflowNode, state map[string]str
 	return fmt.Sprintf("[tool:%s] input=%s", node.Tool, input), nil
 }
 
-// executeCodeNode is a placeholder for sandboxed code execution.
+// executeCodeNode executes user-defined code in a local process.
+// Supported languages: python, javascript, bash.
+// Input data is injected as a variable at the top of the user code.
+// Execution is bounded by a 10-second timeout.
 func (w *WorkflowAgent) executeCodeNode(node *WorkflowNode, state map[string]string) (string, error) {
 	code := w.resolveTemplate(node.Code, state)
-	preview := code
-	if len(preview) > 50 {
-		preview = preview[:50] + "..."
+	input := w.resolveInput(node.InputMapping, state)
+	lang := strings.ToLower(node.Language)
+
+	if lang == "" {
+		return "", fmt.Errorf("executeCodeNode: language is required")
 	}
-	return fmt.Sprintf("[code:%s] %s", node.Language, preview), nil
+
+	// Determine the runtime command and file extension, then build the
+	// full source with input injection.
+	var cmd string
+	var ext string
+	var fullSource string
+
+	switch lang {
+	case "python":
+		cmd = "python3"
+		ext = ".py"
+		// Inject input as a triple-quoted variable to handle multiline safely.
+		escapedInput := strings.ReplaceAll(input, `\`, `\\`)
+		escapedInput = strings.ReplaceAll(escapedInput, `"""`, `\"\"\"`)
+		fullSource = fmt.Sprintf("input_data = \"\"\"%s\"\"\"\n%s", escapedInput, code)
+	case "javascript", "js":
+		cmd = "node"
+		ext = ".js"
+		// Inject input as a template literal to handle multiline.
+		escapedInput := strings.ReplaceAll(input, "`", "\\`")
+		escapedInput = strings.ReplaceAll(escapedInput, `$`, `\$`)
+		fullSource = fmt.Sprintf("const input_data = `%s`;\n%s", escapedInput, code)
+	case "bash", "shell", "sh":
+		cmd = "bash"
+		ext = ".sh"
+		// Inject input as a heredoc-style variable.
+		fullSource = fmt.Sprintf("INPUT_DATA='%s'\n%s", strings.ReplaceAll(input, "'", "'\\''"), code)
+	default:
+		return "", fmt.Errorf("executeCodeNode: unsupported language %q (supported: python, javascript, bash)", lang)
+	}
+
+	// Write the source to a temp file.
+	tmpDir := os.TempDir()
+	tmpFile := filepath.Join(tmpDir, fmt.Sprintf("workflow_code_%d%s", time.Now().UnixNano(), ext))
+	if err := os.WriteFile(tmpFile, []byte(fullSource), 0600); err != nil {
+		return "", fmt.Errorf("executeCodeNode: write temp file: %w", err)
+	}
+	defer os.Remove(tmpFile)
+
+	// Execute with a 10-second timeout.
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	execCmd := exec.CommandContext(ctx, cmd, tmpFile)
+
+	var stdout, stderr bytes.Buffer
+	execCmd.Stdout = &stdout
+	execCmd.Stderr = &stderr
+
+	err := execCmd.Run()
+	if ctx.Err() == context.DeadlineExceeded {
+		return "", fmt.Errorf("executeCodeNode: execution timed out after 10s")
+	}
+	if err != nil {
+		// Return stderr + error as a descriptive message rather than crashing.
+		errMsg := stderr.String()
+		if errMsg == "" {
+			errMsg = err.Error()
+		}
+		return fmt.Sprintf("[code error] %s", strings.TrimSpace(errMsg)), nil
+	}
+
+	return strings.TrimRight(stdout.String(), "\n"), nil
 }
 
 // executeConditionNode evaluates a simple condition expression and returns
