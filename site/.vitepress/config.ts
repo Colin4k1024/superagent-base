@@ -21,7 +21,8 @@ export default defineConfig({
         {
           text: '入门',
           items: [
-            { text: '快速开始', link: '/guide/getting-started' },
+            { text: '5 分钟快速上手', link: '/guide/quickstart' },
+            { text: '完整安装指南', link: '/guide/getting-started' },
             { text: '架构概览', link: '/guide/architecture' },
             { text: '部署指南', link: '/guide/deployment' }
           ]
