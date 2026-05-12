@@ -1,0 +1,12 @@
+apiVersion: superagent/v1
+kind: Agent
+metadata:
+  name: e2e-sequential
+  version: "1.0.0"
+  tags: [e2e, test, sequential]
+spec:
+  type: sequential
+  system_prompt: "Sequential multi-agent pipeline for e2e testing"
+  sub_agents:
+    - ref: e2e-basic
+      role: "Initial processor - answer the user's question"

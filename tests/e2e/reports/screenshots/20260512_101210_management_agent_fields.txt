@@ -1,0 +1,1 @@
+Sample agent structure: {'description': 'Sequential multi-agent pipeline for e2e testing', 'name': 'e2e-sequential'}

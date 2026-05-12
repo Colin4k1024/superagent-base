@@ -1,0 +1,18 @@
+apiVersion: superagent/v1
+kind: Agent
+metadata:
+  name: e2e-interrupt
+  version: "1.0.0"
+  tags: [e2e, test, interrupt]
+spec:
+  type: chat_model_agent
+  model:
+    primary: Qwen3-Coder-Next-4bit
+  system_prompt: |
+    You are an approval agent. When the user asks to perform any action,
+    always ask for confirmation before proceeding.
+    If user confirms, proceed and respond with the result.
+  interrupt:
+    enabled: true
+    checkpoint_backend: memory
+    timeout_seconds: 300

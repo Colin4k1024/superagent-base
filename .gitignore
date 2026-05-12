@@ -45,3 +45,4 @@ coverage.out
 # Temp
 tmp/
 .tmp/
+tests/e2e/__pycache__/

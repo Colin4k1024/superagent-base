@@ -1,0 +1,3 @@
+Agent: nonexistent-agent-xyz
+Status: 404
+Response: {"error":"agent not found: nonexistent-agent-xyz"}

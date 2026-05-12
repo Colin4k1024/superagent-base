@@ -17,6 +17,7 @@
 package impl
 
 import (
+	"context"
 	"fmt"
 	"os"
 
@@ -50,6 +51,8 @@ func DefaultSVC() ConsumerService {
 func (consumerServiceImpl) RegisterConsumer(nameServer, topic, group string, consumerHandler eventbus.ConsumerHandler, opts ...eventbus.ConsumerOpt) error {
 	tp := os.Getenv(consts.MQTypeKey)
 	switch tp {
+	case "", "none":
+		return nil
 	case "nsq":
 		return nsq.RegisterConsumer(nameServer, topic, group, consumerHandler, opts...)
 	case "kafka":
@@ -65,9 +68,19 @@ func (consumerServiceImpl) RegisterConsumer(nameServer, topic, group string, con
 	return fmt.Errorf("invalid mq type: %s , only support nsq, kafka, rmq, pulsar, nats", tp)
 }
 
+// noopProducer is a no-op producer for testing without MQ infrastructure.
+type noopProducer struct{}
+
+func (noopProducer) Send(ctx context.Context, body []byte, opts ...eventbus.SendOpt) error { return nil }
+func (noopProducer) BatchSend(ctx context.Context, bodyArr [][]byte, opts ...eventbus.SendOpt) error {
+	return nil
+}
+
 func NewProducer(nameServer, topic, group string, retries int) (eventbus.Producer, error) {
 	tp := os.Getenv(consts.MQTypeKey)
 	switch tp {
+	case "", "none":
+		return noopProducer{}, nil
 	case "nsq":
 		return nsq.NewProducer(nameServer, topic, group)
 	case "kafka":

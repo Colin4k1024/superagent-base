@@ -36,6 +36,13 @@ import (
 var noNeedSessionCheckPath = map[string]bool{
 	"/api/passport/web/email/login/":       true,
 	"/api/passport/web/email/register/v2/": true,
+	"/api/v1/chat/stream":                  true,
+	"/api/v1/chat/resume":                  true,
+	"/api/v1/chat/interrupt_state":         true,
+	"/api/v1/agents":                       true,
+	"/api/v1/skills":                       true,
+	"/api/v1/skills/search":                true,
+	"/api/v1/skills/install":               true,
 }
 
 func SessionAuthMW() app.HandlerFunc {
@@ -46,7 +53,13 @@ func SessionAuthMW() app.HandlerFunc {
 			return
 		}
 
-		if noNeedSessionCheckPath[string(ctx.GetRequest().URI().Path())] {
+		path := string(ctx.GetRequest().URI().Path())
+		if noNeedSessionCheckPath[path] {
+			ctx.Next(c)
+			return
+		}
+		// Prefix-based skip for paths with dynamic segments.
+		if strings.HasPrefix(path, "/api/v1/skills/") {
 			ctx.Next(c)
 			return
 		}

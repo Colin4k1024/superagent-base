@@ -1,0 +1,20 @@
+apiVersion: superagent/v1
+kind: Agent
+metadata:
+  name: e2e-supervisor
+  version: "1.0.0"
+  tags: [e2e, test, supervisor]
+spec:
+  type: supervisor
+  model:
+    primary: Qwen3-Coder-Next-4bit
+  system_prompt: |
+    You are a project manager. Coordinate your sub-agents to answer user questions.
+    Delegate research tasks to your team and synthesize results.
+    Keep final answers concise.
+  sub_agents:
+    - ref: e2e-basic
+      role: "Research assistant - handles factual questions"
+  orchestration:
+    mode: supervisor
+    max_rounds: 3
