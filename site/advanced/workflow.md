@@ -56,6 +56,8 @@ spec:
 
 ---
 
+::: v-pre
+
 ## 节点类型
 
 ### llm_call（LLM 推理节点）
@@ -65,14 +67,14 @@ spec:
 ```yaml
 - id: summarize
   type: llm_call
-  prompt: "请对以下内容进行摘要：\{{.search_result}}"
+  prompt: "请对以下内容进行摘要：{{.search_result}}"
   input_mapping:
     content: "$.search.output"
 ```
 
 | 字段 | 必填 | 说明 |
 |------|------|------|
-| `prompt` | 否 | 系统提示词，支持 `\{{.varName}}` 模板语法 |
+| `prompt` | 否 | 系统提示词，支持 `{{.varName}}` 模板语法 |
 | `input_mapping` | 否 | 输入字段映射（见下文） |
 
 执行时会基于工作流的模型配置（`spec.model`）创建一个临时 ChatAgent。
@@ -139,7 +141,7 @@ spec:
 ```yaml
 - id: quality_check
   type: condition
-  condition: "\{{.summarize.output}}"
+  condition: "{{.summarize.output}}"
 ```
 
 | 字段 | 必填 | 说明 |
@@ -196,7 +198,7 @@ edges:
 input_mapping:
   query: "$.message"           # 从 state["message"] 读取（即原始用户消息）
   context: "$.search.output"  # 从 state["search.output"] 读取（search 节点输出）
-  combined: "\{{.summary}} \{{.context}}"  # 模板语法，拼接多个变量
+  combined: "{{.summary}} {{.context}}"  # 模板语法，拼接多个变量
 ```
 
 **两种引用方式：**
@@ -204,7 +206,7 @@ input_mapping:
 | 语法 | 说明 |
 |------|------|
 | `$.key` | 直接从状态中读取 key 的值 |
-| `\{{.varName}}` | 模板语法，可在字符串中嵌入变量 |
+| `{{.varName}}` | 模板语法，可在字符串中嵌入变量 |
 
 ### variables（命名别名）
 
@@ -216,7 +218,7 @@ variables:
     from: summarize.output
 ```
 
-声明变量后，下游节点可以通过 `$.search_result` 或 `\{{.search_result}}` 引用，而无需写完整的 `$.search.output`。
+声明变量后，下游节点可以通过 `$.search_result` 或 `{{.search_result}}` 引用，而无需写完整的 `$.search.output`。
 
 ### 状态键规则
 
@@ -258,14 +260,14 @@ spec:
         type: llm_call
         prompt: |
           你是一个技术文档编写专家，请将以下研究结果整理成结构化摘要：
-          \{{.search_result}}
+          {{.search_result}}
         input_mapping:
           content: "$.search.output"
 
       # 步骤 3：质量检查
       - id: quality_check
         type: condition
-        condition: "\{{.summary}}"
+        condition: "{{.summary}}"
 
     edges:
       - from: START
@@ -304,7 +306,7 @@ spec:
 
       - id: validate
         type: condition
-        condition: "\{{.extract.output}}"
+        condition: "{{.extract.output}}"
 
       - id: transform
         type: llm_call
@@ -406,3 +408,5 @@ state = { "message": "<user input>" }
 | 状态传递 | 显式 input_mapping + variables | Sequential 自动传递（前一个输出→下一个输入） |
 | 适用场景 | 明确定义的多步处理管道 | 动态协作、并发分析 |
 | 循环 | 不允许（DAG 限制） | Supervisor 支持 max_rounds 迭代 |
+
+:::

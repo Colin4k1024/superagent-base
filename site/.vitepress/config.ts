@@ -5,6 +5,7 @@ export default defineConfig({
   description: 'AI Agent 开发基座 — 基于 Eino 框架',
   lang: 'zh-CN',
   base: '/superagent-base/',
+  ignoreDeadLinks: true,
 
   themeConfig: {
     logo: '/logo.svg',

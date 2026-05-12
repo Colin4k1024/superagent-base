@@ -137,7 +137,7 @@ tools:
 | `checkpoint_backend` | string | `memory` | 持久化后端：`redis` 或 `memory` |
 | `timeout_seconds` | int | 300 | 中断状态保留时长（秒） |
 
-详见 [interrupt-resume.md](interrupt-resume.md)。
+详见 [中断与恢复](/advanced/interrupt-resume)。
 
 ---
 
@@ -206,12 +206,16 @@ tools:
 | `to` | string | 目标节点 ID，或 `END`（工作流出口） |
 | `condition` | string | 条件表达式，非空时仅在条件为真时跟随此边 |
 
+::: v-pre
+
 ### WorkflowVariable
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
-| `name` | string | 变量名，下游节点通过 `\{{.name}}` 引用 |
+| `name` | string | 变量名，下游节点通过 `{{.name}}` 引用 |
 | `from` | string | 来源格式：`node_id.output` 或 `node_id.field` |
+
+:::
 
 ---
 
@@ -406,6 +410,8 @@ spec:
     - ref: code-review-agent
 ```
 
+::: v-pre
+
 ### 示例 7：Workflow（DAG 图执行）
 
 ```yaml
@@ -436,7 +442,7 @@ spec:
 
       - id: quality_check
         type: condition
-        condition: "\{{.summarize.output}}"
+        condition: "{{.summarize.output}}"
 
     edges:
       - from: START
@@ -454,6 +460,8 @@ spec:
       - name: summary
         from: summarize.output
 ```
+
+:::
 
 ### 示例 8：中断/恢复 Agent
 
