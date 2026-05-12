@@ -1,4 +1,0 @@
-Performance: 1086ms
-Content: 
---- e2e-basic ---
-A REST API (Representational State Transfer Application Programming Interface) is a web service design style that uses HTTP methods (GET, POST, PUT, DELETE) to perform operations on

@@ -1,0 +1,4 @@
+Added: e2e-hotreload-add
+Path: /Users/ailabuser1/Desktop/gitcode/superagent-base/backend/configs/agents/e2e-hotreload-add.yaml
+Detected: YES
+Current agents: ['research-agent', 'project-manager', 'e2e-basic', 'e2e-parallel', 'e2e-interrupt', 'e2e-workflow', 'research-workflow', 'approval-agent', 'e2e-sequential', 'e2e-supervisor', 'e2e-hotreload-add']

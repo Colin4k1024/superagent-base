@@ -1,0 +1,5 @@
+Input: artificial intelligence
+Pipeline: research -> summarize
+Elapsed: 3053ms
+Output:
+AI simulates human intelligence via algorithms, big data, and computing, using machine learning and deep learning for task improvement; it transforms industries like healthcare and finance but raises ethical issues like bias and job displacement.

@@ -1,0 +1,3 @@
+Nodes: 2 (research -> summarize)
+Total time: 3498ms
+Avg per node: 1749ms

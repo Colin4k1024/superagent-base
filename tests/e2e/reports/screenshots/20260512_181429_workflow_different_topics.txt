@@ -1,0 +1,5 @@
+Topic 1: quantum computing
+Output 1: Qubits leverage superposition and entanglement for massive parallelism and correlated operations, enabling exponential (Shor) or quadratic (Grover) speedups for specific problems—though large-scale qu
+
+Topic 2: ocean biology
+Output 2: Phytoplankton drive marine food webs and produce ~50% of Earth’s oxygen; zooplankton transfer this energy upward; symbiosis enables ecosystems like coral reefs and deep-sea vents.

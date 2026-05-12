@@ -1,0 +1,6 @@
+Agent: e2e-sequential
+Pipeline: e2e-basic (single step)
+Input: Explain what a database is.
+Elapsed: 827ms
+Output:
+A database is an organized collection of structured data, stored electronically in a computer system. It allows efficient data retrieval, management, and updates, typically using a Database Management System (DBMS) like MySQL or PostgreSQL.

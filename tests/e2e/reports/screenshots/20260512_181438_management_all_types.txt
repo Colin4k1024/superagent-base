@@ -1,0 +1,3 @@
+Expected agents: ['e2e-basic', 'e2e-workflow']
+Found: ['e2e-basic', 'e2e-workflow']
+All agents: ['e2e-basic', 'e2e-parallel', 'e2e-interrupt', 'e2e-workflow', 'research-workflow', 'approval-agent', 'e2e-sequential', 'e2e-supervisor', 'research-agent', 'project-manager']

@@ -1,4 +1,0 @@
-Agent: e2e-hotreload-remove
-Added successfully: True
-Removed successfully: True
-Agents after removal: ['e2e-supervisor', 'research-workflow', 'approval-agent', 'e2e-workflow', 'e2e-parallel', 'e2e-basic', 'research-agent', 'project-manager', 'e2e-sequential', 'e2e-interrupt']

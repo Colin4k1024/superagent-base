@@ -1,3 +1,3 @@
 Delegation test
 Question: What is the capital of France?
-Response: Paris.
+Response: Paris

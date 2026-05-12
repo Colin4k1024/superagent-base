@@ -1,3 +1,0 @@
-/health status: 401
-Has dedicated health endpoint: False
-FINDING: NO /health endpoint — recommended to add
