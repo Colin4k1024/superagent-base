@@ -1,0 +1,3 @@
+Agent: e2e-interrupt
+Message: Hello, can you help me?
+Response: Hello! I'd be happy to help you. 😊  Could you please let me know what you'd like assistance with? I'm here to support you with questions, tasks, or guidance on almost any topic.

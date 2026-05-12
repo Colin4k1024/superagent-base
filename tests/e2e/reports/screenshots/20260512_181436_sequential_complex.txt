@@ -1,0 +1,3 @@
+Complex input test
+Response length: 458 chars
+Response: Key microservices patterns include:  - **API Gateway** (single entry point for clients)  - **Service Discovery** (dynamic service lookup)  - **Circuit Breaker** (prevent cascading failures)  - **Event-Driven Architecture** (asynchronous communication via events)  - **Sidecar** (auxiliary container f

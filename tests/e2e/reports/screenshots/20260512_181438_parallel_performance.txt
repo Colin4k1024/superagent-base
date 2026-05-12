@@ -1,0 +1,4 @@
+Performance: 736ms
+Content: 
+--- e2e-basic ---
+REST API is an architectural style for web services using HTTP methods (GET, POST, PUT, DELETE) to interact with resources, following stateless, cacheable, and uniform interface pri

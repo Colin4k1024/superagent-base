@@ -1,5 +1,0 @@
-Topic 1: quantum computing
-Output 1: Qubits leverage superposition and entanglement to enable exponential speedups for specific problems like factoring and search, revolutionizing computation beyond classical limits.
-
-Topic 2: ocean biology
-Output 2: Phytoplankton produce ~50% of Earth’s oxygen and anchor marine food webs; zooplankton transfer their energy upward; deep-sea species survive extreme conditions via bioluminescence, gigantism, and low 

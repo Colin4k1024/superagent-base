@@ -1,3 +1,0 @@
-5MB payload accepted: True
-Max configured: 200MB (MAX_REQUEST_BODY_SIZE)
-FINDING: Server accepts large payloads — consider reducing limit for agent chat
