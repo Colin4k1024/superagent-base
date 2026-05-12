@@ -437,3 +437,191 @@ func TestBuild_WorkflowType_NilSpec_ReturnsError(t *testing.T) {
 		t.Fatal("expected error for nil workflow spec, got nil")
 	}
 }
+
+// ─── Document Pipeline Workflow tests ────────────────────────────────────
+
+const documentPipelineYAML = `
+apiVersion: superagent/v1
+kind: Agent
+metadata:
+  name: document-pipeline
+  version: "1.0.0"
+  tags: [document, workflow, pipeline]
+spec:
+  type: workflow
+  model:
+    primary: gpt-4o
+  system_prompt: "Document processing pipeline"
+  workflow:
+    nodes:
+      - id: document_analyzer
+        type: llm_call
+        prompt: "Analyze this document: {{.message}}"
+      - id: content_summarizer
+        type: llm_call
+        prompt: "Summarize the analysis: {{.analysis_result}}"
+      - id: report_generator
+        type: llm_call
+        prompt: "Generate report from summary: {{.summary}}"
+    edges:
+      - from: START
+        to: document_analyzer
+      - from: document_analyzer
+        to: content_summarizer
+      - from: content_summarizer
+        to: report_generator
+      - from: report_generator
+        to: END
+    variables:
+      - name: analysis_result
+        from: document_analyzer.output
+      - name: summary
+        from: content_summarizer.output
+`
+
+func TestParse_DocumentPipelineYAML(t *testing.T) {
+	def, err := Parse([]byte(documentPipelineYAML))
+	if err != nil {
+		t.Fatalf("Parse document-pipeline YAML: %v", err)
+	}
+	if def.Spec.Type != "workflow" {
+		t.Errorf("Type = %q, want workflow", def.Spec.Type)
+	}
+	if def.Metadata.Name != "document-pipeline" {
+		t.Errorf("Name = %q, want document-pipeline", def.Metadata.Name)
+	}
+	wf := def.Spec.Workflow
+	if wf == nil {
+		t.Fatal("expected non-nil workflow spec")
+	}
+	if len(wf.Nodes) != 3 {
+		t.Errorf("expected 3 nodes, got %d", len(wf.Nodes))
+	}
+	if len(wf.Edges) != 4 {
+		t.Errorf("expected 4 edges, got %d", len(wf.Edges))
+	}
+	if len(wf.Variables) != 2 {
+		t.Errorf("expected 2 variables, got %d", len(wf.Variables))
+	}
+
+	nodeIDs := []string{"document_analyzer", "content_summarizer", "report_generator"}
+	for i, node := range wf.Nodes {
+		if node.ID != nodeIDs[i] {
+			t.Errorf("node[%d] ID = %q, want %q", i, node.ID, nodeIDs[i])
+		}
+		if node.Type != "llm_call" {
+			t.Errorf("node[%d] type = %q, want llm_call", i, node.Type)
+		}
+	}
+
+	expectedVars := map[string]string{
+		"analysis_result": "document_analyzer.output",
+		"summary":         "content_summarizer.output",
+	}
+	for _, v := range wf.Variables {
+		expectedFrom, ok := expectedVars[v.Name]
+		if !ok {
+			t.Errorf("unexpected variable %q", v.Name)
+			continue
+		}
+		if v.From != expectedFrom {
+			t.Errorf("variable %q From = %q, want %q", v.Name, v.From, expectedFrom)
+		}
+	}
+}
+
+func TestDocumentPipeline_TopologicalSort(t *testing.T) {
+	def, err := Parse([]byte(documentPipelineYAML))
+	if err != nil {
+		t.Fatalf("Parse error: %v", err)
+	}
+
+	w := &WorkflowAgent{
+		name:      def.Metadata.Name,
+		nodes:     def.Spec.Workflow.Nodes,
+		edges:     def.Spec.Workflow.Edges,
+		variables: def.Spec.Workflow.Variables,
+		def:       def,
+	}
+
+	order, err := w.topologicalSort()
+	if err != nil {
+		t.Fatalf("topologicalSort error: %v", err)
+	}
+	if len(order) != 3 {
+		t.Fatalf("expected 3 nodes in order, got %d: %v", len(order), order)
+	}
+
+	pos := func(id string) int {
+		for i, n := range order {
+			if n == id {
+				return i
+			}
+		}
+		return -1
+	}
+
+	if pos("document_analyzer") < 0 {
+		t.Errorf("document_analyzer not in order: %v", order)
+	}
+	if pos("content_summarizer") < 0 {
+		t.Errorf("content_summarizer not in order: %v", order)
+	}
+	if pos("report_generator") < 0 {
+		t.Errorf("report_generator not in order: %v", order)
+	}
+
+	if pos("document_analyzer") >= pos("content_summarizer") {
+		t.Errorf("document_analyzer before content_summarizer, got %v", order)
+	}
+	if pos("content_summarizer") >= pos("report_generator") {
+		t.Errorf("content_summarizer before report_generator, got %v", order)
+	}
+}
+
+func TestDocumentPipeline_Chat(t *testing.T) {
+	def, err := Parse([]byte(documentPipelineYAML))
+	if err != nil {
+		t.Fatalf("Parse error: %v", err)
+	}
+
+	w := &WorkflowAgent{
+		name:      def.Metadata.Name,
+		nodes:     def.Spec.Workflow.Nodes,
+		edges:     def.Spec.Workflow.Edges,
+		variables: def.Spec.Workflow.Variables,
+		def:       def,
+	}
+
+	inputDoc := `Title: Superagent Base Architecture Guide
+Author: Engineering Team
+Date: 2025-06-15
+
+This document describes the core architecture of Superagent Base,
+a declarative AI agent platform. The system uses a Kubernetes-like
+YAML schema for defining agents, supports multiple LLM backends
+through a model router, and provides workflow orchestration via
+DAG-based execution.
+
+Key components include the AgentRuntime, ModelRouter, MCP Client,
+and the A2UI streaming protocol. The platform supports hot-reload
+of agent definitions and checkpoint-based interrupt/resume.`
+
+	ch, err := w.Chat(context.Background(), "test-session", inputDoc)
+	if err != nil {
+		t.Fatalf("Chat error: %v", err)
+	}
+
+	var buf strings.Builder
+	for tok := range ch {
+		buf.WriteString(tok)
+	}
+	output := buf.String()
+	if output == "" {
+		t.Error("expected non-empty final output from document-pipeline")
+	}
+	if !strings.Contains(output, "gpt-4o") {
+		t.Logf("output (may be stub): %s", output)
+	}
+	t.Logf("document-pipeline output: %s", output)
+}
