@@ -153,6 +153,10 @@ type OrchestrationSpec struct {
 
 // ModelSpec configures model selection and routing for the agent.
 type ModelSpec struct {
+	// Protocol selects the LLM provider protocol.
+	// Supported: openai (default), claude, deepseek, gemini, ark, ollama, qwen.
+	// Protocols deepseek, ollama, qwen use OpenAI-compatible endpoints.
+	Protocol string `yaml:"protocol,omitempty" json:"protocol,omitempty"`
 	// Router is the named routing strategy (e.g. "capability-based").
 	// When empty, Primary is used directly without routing.
 	Router   string `yaml:"router,omitempty"   json:"router,omitempty"`
@@ -160,6 +164,12 @@ type ModelSpec struct {
 	Primary  string `yaml:"primary"            json:"primary"`
 	// Fallback is the model ID to use when Primary is unavailable.
 	Fallback string `yaml:"fallback,omitempty" json:"fallback,omitempty"`
+	// BaseURL overrides the global model endpoint for this agent.
+	// When empty, the global ModelRuntimeConfig.BaseURL is used.
+	BaseURL  string `yaml:"base_url,omitempty" json:"base_url,omitempty"`
+	// APIKeyEnv is the environment variable name holding the API key for this agent.
+	// When empty, the global ModelRuntimeConfig.APIKey is used.
+	APIKeyEnv string `yaml:"api_key_env,omitempty" json:"api_key_env,omitempty"`
 }
 
 // ToolRef identifies a tool by reference URI and optional per-tool config.
