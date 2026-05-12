@@ -43,6 +43,9 @@ var noNeedSessionCheckPath = map[string]bool{
 	"/api/v1/skills":                       true,
 	"/api/v1/skills/search":                true,
 	"/api/v1/skills/install":               true,
+	"/metrics":                             true,
+	"/health":                              true,
+	"/ready":                               true,
 }
 
 func SessionAuthMW() app.HandlerFunc {

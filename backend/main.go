@@ -203,8 +203,25 @@ func startHttpServer(agentRT *agentdef.AgentRuntime, skillMgr *skill.Manager) {
 
 	router.GeneratedRegister(s)
 
-	// Prometheus metrics endpoint — no auth middleware applied.
+	// Infrastructure endpoints — no auth required.
 	s.GET("/metrics", observe.MetricsHandler)
+	s.GET("/health", func(_ context.Context, ctx *app.RequestContext) {
+		ctx.JSON(200, map[string]any{"status": "ok"})
+	})
+	s.GET("/ready", func(_ context.Context, ctx *app.RequestContext) {
+		checks := map[string]string{"http": "ok"}
+		if agentRT != nil {
+			checks["agent_runtime"] = "ok"
+		} else {
+			checks["agent_runtime"] = "unavailable"
+		}
+		allOK := checks["agent_runtime"] == "ok"
+		status := 200
+		if !allOK {
+			status = 503
+		}
+		ctx.JSON(status, map[string]any{"status": checks})
+	})
 
 	// Agent SSE endpoints — direct streaming without the Coze conversation pipeline.
 	chatSSE := cozehandler.NewChatSSEHandler(agentRT)
