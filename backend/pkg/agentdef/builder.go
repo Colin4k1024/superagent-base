@@ -21,10 +21,14 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"strings"
 	"time"
 
+	einoark "github.com/cloudwego/eino-ext/components/model/ark"
 	einoclaude "github.com/cloudwego/eino-ext/components/model/claude"
+	einodeepseek "github.com/cloudwego/eino-ext/components/model/deepseek"
+	einoollama "github.com/cloudwego/eino-ext/components/model/ollama"
 	einoopenai "github.com/cloudwego/eino-ext/components/model/openai"
 	einotool "github.com/cloudwego/eino/components/tool"
 	"github.com/cloudwego/eino/components/model"
@@ -36,6 +40,7 @@ import (
 	"github.com/superagent-ai/superagent-base/backend/pkg/mcp"
 	"github.com/superagent-ai/superagent-base/backend/pkg/memory"
 	"github.com/superagent-ai/superagent-base/backend/pkg/modelrouter"
+	"github.com/superagent-ai/superagent-base/backend/pkg/observe"
 	"github.com/superagent-ai/superagent-base/backend/pkg/skill"
 	"github.com/superagent-ai/superagent-base/backend/pkg/tool"
 )
@@ -192,34 +197,32 @@ func (b *AgentBuilder) Build(ctx context.Context, def *AgentDefinition) (Agent, 
 		return b.maybeWrapInterruptable(built, def), nil
 	}
 
-	// Build a real Eino ChatModel (OpenAI or Claude protocol).
+	// Build a real Eino ChatModel dispatched by provider protocol.
 	effectiveModelID := modelID
 	if effectiveModelID == "" {
 		effectiveModelID = b.modelConfig.ModelID
 	}
 
-	var chatModel model.ToolCallingChatModel
-	if b.modelConfig.Type == "claude" {
-		baseURL := b.modelConfig.BaseURL
-		cm, err := einoclaude.NewChatModel(ctx, &einoclaude.Config{
-			BaseURL: &baseURL,
-			APIKey:  b.modelConfig.APIKey,
-			Model:   effectiveModelID,
-		})
-		if err != nil {
-			return nil, fmt.Errorf("agentdef: Build: create claude model: %w", err)
+	// Resolve per-agent model config overrides.
+	baseURL := b.modelConfig.BaseURL
+	apiKey := b.modelConfig.APIKey
+	protocol := b.modelConfig.Type // global default
+
+	if def.Spec.Model.BaseURL != "" {
+		baseURL = def.Spec.Model.BaseURL
+	}
+	if def.Spec.Model.APIKeyEnv != "" {
+		if v := os.Getenv(def.Spec.Model.APIKeyEnv); v != "" {
+			apiKey = v
 		}
-		chatModel = cm
-	} else {
-		cm, err := einoopenai.NewChatModel(ctx, &einoopenai.ChatModelConfig{
-			BaseURL: b.modelConfig.BaseURL,
-			APIKey:  b.modelConfig.APIKey,
-			Model:   effectiveModelID,
-		})
-		if err != nil {
-			return nil, fmt.Errorf("agentdef: Build: create openai model: %w", err)
-		}
-		chatModel = cm
+	}
+	if def.Spec.Model.Protocol != "" {
+		protocol = def.Spec.Model.Protocol
+	}
+
+	chatModel, err := b.createChatModel(ctx, protocol, baseURL, apiKey, effectiveModelID)
+	if err != nil {
+		return nil, fmt.Errorf("agentdef: Build %q: create model (protocol=%s): %w", def.Metadata.Name, protocol, err)
 	}
 
 	// Gather Eino-compatible tools from resolved refs.
@@ -244,17 +247,19 @@ func (b *AgentBuilder) Build(ctx context.Context, def *AgentDefinition) (Agent, 
 			agent:        reactAgent,
 			systemPrompt: def.Spec.SystemPrompt,
 		}
-		return b.maybeWrapInterruptable(built, def), nil
+	} else {
+		// Simple chat agent without tools.
+		built = &einoChatAgent{
+			def:          def,
+			modelID:      effectiveModelID,
+			memBackend:   memBackend,
+			chatModel:    chatModel,
+			systemPrompt: def.Spec.SystemPrompt,
+		}
 	}
 
-	// Simple chat agent without tools.
-	built = &einoChatAgent{
-		def:          def,
-		modelID:      effectiveModelID,
-		memBackend:   memBackend,
-		chatModel:    chatModel,
-		systemPrompt: def.Spec.SystemPrompt,
-	}
+	// Apply middleware wrapping (timeout, retry).
+	built = b.applyMiddleware(built, def)
 	return b.maybeWrapInterruptable(built, def), nil
 }
 
@@ -278,6 +283,138 @@ func (b *AgentBuilder) maybeWrapInterruptable(agent Agent, def *AgentDefinition)
 
 	timeout := time.Duration(ic.TimeoutSeconds) * time.Second
 	return NewInterruptableAgent(agent, store, timeout)
+}
+
+// applyMiddleware wraps the agent with middleware components from spec.middleware[]
+// and spec.observability settings.
+// Supported middleware: timeout, retry. Others are silently ignored (reserved for future).
+func (b *AgentBuilder) applyMiddleware(agent Agent, def *AgentDefinition) Agent {
+	result := agent
+
+	// Apply observability wrapper first (outermost = measures total latency).
+	obs := def.Spec.Observability
+	if obs.Metrics || obs.Tracing {
+		result = &observedAgent{inner: result, enableMetrics: obs.Metrics}
+	}
+
+	// Apply middleware pipeline.
+	for _, mw := range def.Spec.Middleware {
+		switch mw.Name {
+		case "timeout":
+			seconds := 30 // default
+			if v, ok := mw.Config["seconds"]; ok {
+				switch t := v.(type) {
+				case int:
+					seconds = t
+				case float64:
+					seconds = int(t)
+				}
+			}
+			result = &timeoutAgent{inner: result, timeout: time.Duration(seconds) * time.Second}
+
+		case "retry":
+			maxAttempts := 3
+			if v, ok := mw.Config["max_attempts"]; ok {
+				switch t := v.(type) {
+				case int:
+					maxAttempts = t
+				case float64:
+					maxAttempts = int(t)
+				}
+			}
+			result = &retryAgent{inner: result, maxAttempts: maxAttempts}
+		}
+	}
+	return result
+}
+
+// observedAgent wraps an Agent with Prometheus metrics recording.
+type observedAgent struct {
+	inner         Agent
+	enableMetrics bool
+}
+
+func (a *observedAgent) Name() string                    { return a.inner.Name() }
+func (a *observedAgent) Description() string             { return a.inner.Description() }
+func (a *observedAgent) GetDefinition() *AgentDefinition { return a.inner.GetDefinition() }
+
+func (a *observedAgent) Chat(ctx context.Context, sessionID string, message string) (<-chan string, error) {
+	start := time.Now()
+	ch, err := a.inner.Chat(ctx, sessionID, message)
+	if err != nil {
+		if a.enableMetrics {
+			observe.AgentRequestsTotal.WithLabelValues(a.inner.Name(), "error").Inc()
+			observe.AgentRequestDuration.WithLabelValues(a.inner.Name()).Observe(time.Since(start).Seconds())
+		}
+		return nil, err
+	}
+
+	// Wrap channel to record completion metrics.
+	out := make(chan string, 64)
+	go func() {
+		defer close(out)
+		for token := range ch {
+			out <- token
+		}
+		if a.enableMetrics {
+			observe.AgentRequestsTotal.WithLabelValues(a.inner.Name(), "success").Inc()
+			observe.AgentRequestDuration.WithLabelValues(a.inner.Name()).Observe(time.Since(start).Seconds())
+		}
+	}()
+	return out, nil
+}
+
+// timeoutAgent wraps an Agent with a per-request timeout.
+type timeoutAgent struct {
+	inner   Agent
+	timeout time.Duration
+}
+
+func (a *timeoutAgent) Name() string                    { return a.inner.Name() }
+func (a *timeoutAgent) Description() string             { return a.inner.Description() }
+func (a *timeoutAgent) GetDefinition() *AgentDefinition { return a.inner.GetDefinition() }
+
+func (a *timeoutAgent) Chat(ctx context.Context, sessionID string, message string) (<-chan string, error) {
+	ctx, cancel := context.WithTimeout(ctx, a.timeout)
+	ch, err := a.inner.Chat(ctx, sessionID, message)
+	if err != nil {
+		cancel()
+		return nil, err
+	}
+	// Wrap channel to cancel context after draining.
+	out := make(chan string, 64)
+	go func() {
+		defer close(out)
+		defer cancel()
+		for token := range ch {
+			out <- token
+		}
+	}()
+	return out, nil
+}
+
+// retryAgent wraps an Agent with retry-on-failure logic.
+type retryAgent struct {
+	inner       Agent
+	maxAttempts int
+}
+
+func (a *retryAgent) Name() string                    { return a.inner.Name() }
+func (a *retryAgent) Description() string             { return a.inner.Description() }
+func (a *retryAgent) GetDefinition() *AgentDefinition { return a.inner.GetDefinition() }
+
+func (a *retryAgent) Chat(ctx context.Context, sessionID string, message string) (<-chan string, error) {
+	var lastErr error
+	for attempt := 0; attempt < a.maxAttempts; attempt++ {
+		ch, err := a.inner.Chat(ctx, sessionID, message)
+		if err == nil {
+			return ch, nil
+		}
+		lastErr = err
+		// Exponential backoff: 100ms, 200ms, 400ms...
+		time.Sleep(time.Duration(100<<uint(attempt)) * time.Millisecond)
+	}
+	return nil, fmt.Errorf("agentdef: retry exhausted after %d attempts: %w", a.maxAttempts, lastErr)
 }
 
 // resolveEinoTools converts resolved tool refs to Eino einotool.BaseTool instances.
@@ -605,6 +742,76 @@ func (a *einoReactAgent) Chat(ctx context.Context, _ string, message string) (<-
 		}
 	}()
 	return ch, nil
+}
+
+// ─── provider dispatch ───────────────────────────────────────────────────────
+
+// createChatModel creates an Eino ChatModel for the given protocol.
+// Protocols deepseek, ollama, qwen are OpenAI-compatible (just different BaseURL).
+// Claude, Gemini, and ARK have dedicated SDK adapters.
+func (b *AgentBuilder) createChatModel(ctx context.Context, protocol, baseURL, apiKey, modelID string) (model.ToolCallingChatModel, error) {
+	switch strings.ToLower(protocol) {
+	case "claude":
+		return einoclaude.NewChatModel(ctx, &einoclaude.Config{
+			BaseURL: &baseURL,
+			APIKey:  apiKey,
+			Model:   modelID,
+		})
+
+	case "gemini":
+		// Gemini requires google.golang.org/genai client. For simplicity, use
+		// OpenAI-compatible endpoint (e.g. via LiteLLM proxy) when base_url is set.
+		if baseURL != "" {
+			return einoopenai.NewChatModel(ctx, &einoopenai.ChatModelConfig{
+				BaseURL: baseURL,
+				APIKey:  apiKey,
+				Model:   modelID,
+			})
+		}
+		return nil, fmt.Errorf("gemini protocol requires base_url pointing to an OpenAI-compatible proxy (e.g. LiteLLM)")
+
+	case "ark":
+		return einoark.NewChatModel(ctx, &einoark.ChatModelConfig{
+			BaseURL: baseURL,
+			APIKey:  apiKey,
+			Model:   modelID,
+		})
+
+	case "deepseek":
+		// DeepSeek uses OpenAI-compatible protocol with its own endpoint.
+		if baseURL == "" || baseURL == b.modelConfig.BaseURL {
+			baseURL = "https://api.deepseek.com/v1"
+		}
+		return einodeepseek.NewChatModel(ctx, &einodeepseek.ChatModelConfig{
+			BaseURL: baseURL,
+			APIKey:  apiKey,
+			Model:   modelID,
+		})
+
+	case "ollama":
+		// Ollama uses its own SDK at localhost:11434 (no /v1 suffix).
+		ollamaURL := baseURL
+		if ollamaURL == "" || ollamaURL == b.modelConfig.BaseURL {
+			ollamaURL = "http://localhost:11434"
+		}
+		// Strip /v1 suffix if present (Ollama SDK adds its own paths).
+		ollamaURL = strings.TrimSuffix(ollamaURL, "/v1")
+		return einoollama.NewChatModel(ctx, &einoollama.ChatModelConfig{
+			BaseURL: ollamaURL,
+			Model:   modelID,
+		})
+
+	case "openai", "qwen", "":
+		// OpenAI protocol (also used by Qwen DashScope compatible endpoint).
+		return einoopenai.NewChatModel(ctx, &einoopenai.ChatModelConfig{
+			BaseURL: baseURL,
+			APIKey:  apiKey,
+			Model:   modelID,
+		})
+
+	default:
+		return nil, fmt.Errorf("unsupported model protocol %q (supported: openai, claude, deepseek, gemini, ark, ollama, qwen)", protocol)
+	}
 }
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
