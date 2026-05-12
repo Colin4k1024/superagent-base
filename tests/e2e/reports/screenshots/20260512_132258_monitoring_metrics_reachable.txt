@@ -1,0 +1,10 @@
+Status: 200
+Content-Type: text/plain; version=0.0.4; charset=utf-8
+First 500 chars:
+# HELP etcd_debugging_auth_revision The current revision of auth store.
+# TYPE etcd_debugging_auth_revision gauge
+etcd_debugging_auth_revision 0
+# HELP etcd_debugging_disk_backend_commit_rebalance_duration_seconds The latency distributions of commit.rebalance called by bboltdb backend.
+# TYPE etcd_debugging_disk_backend_commit_rebalance_duration_seconds histogram
+etcd_debugging_disk_backend_commit_rebalance_duration_seconds_bucket{le="0.001"} 0
+etcd_debugging_disk_backend_commit_rebalance_durati

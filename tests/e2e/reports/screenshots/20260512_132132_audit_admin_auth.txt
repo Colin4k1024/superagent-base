@@ -1,0 +1,7 @@
+Admin endpoint protection audit:
+  /api/admin/config/basic/get: 401 (PROTECTED)
+  /api/admin/config/basic/save: 401 (PROTECTED)
+  /api/admin/config/model/list: 401 (PROTECTED)
+  /api/admin/config/model/create: 401 (PROTECTED)
+
+FINDING: ALL admin endpoints protected

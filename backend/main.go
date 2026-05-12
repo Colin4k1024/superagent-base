@@ -56,7 +56,7 @@ func main() {
 	setCrashOutput()
 
 	if err := loadEnv(); err != nil {
-		panic("loadEnv failed, err=" + err.Error())
+		logs.Warnf("loadEnv skipped (using environment variables directly): %v", err)
 	}
 
 	setLogLevel()

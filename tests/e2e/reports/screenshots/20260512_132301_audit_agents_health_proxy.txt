@@ -1,0 +1,2 @@
+Using /api/v1/agents as health proxy: HEALTHY
+Status: 200

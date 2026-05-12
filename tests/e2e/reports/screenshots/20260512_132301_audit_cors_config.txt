@@ -1,0 +1,3 @@
+CORS Allow-Origin: *
+Is wildcard/permissive: True
+FINDING: WARNING: AllowAllOrigins=true — restrict in production
