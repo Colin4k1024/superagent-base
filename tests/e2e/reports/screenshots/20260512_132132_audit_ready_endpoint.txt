@@ -1,0 +1,3 @@
+/ready status: 401
+Has dedicated readiness endpoint: False
+FINDING: NO /ready endpoint — recommended for K8s probes

@@ -1,0 +1,3 @@
+/health status: 200
+Has dedicated health endpoint: True
+FINDING: Health endpoint exists

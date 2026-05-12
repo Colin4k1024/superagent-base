@@ -1,0 +1,2 @@
+Sensitive data in metrics: NONE
+FINDING: CLEAN — no sensitive data in metrics

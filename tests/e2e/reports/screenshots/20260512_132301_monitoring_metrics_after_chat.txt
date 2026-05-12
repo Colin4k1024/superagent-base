@@ -1,0 +1,5 @@
+Chat completed: True
+Baseline superagent lines: 3
+Updated superagent lines: 3
+Superagent metrics sample:
+superagent_active_sessions 0

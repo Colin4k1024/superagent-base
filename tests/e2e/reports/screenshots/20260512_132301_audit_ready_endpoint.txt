@@ -1,0 +1,3 @@
+/ready status: 200
+Has dedicated readiness endpoint: True
+FINDING: Readiness endpoint exists
