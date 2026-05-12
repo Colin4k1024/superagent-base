@@ -18,11 +18,14 @@ package agentdef
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	einoark "github.com/cloudwego/eino-ext/components/model/ark"
@@ -36,6 +39,7 @@ import (
 	"github.com/cloudwego/eino/flow/agent/react"
 	"github.com/cloudwego/eino/schema"
 
+	"github.com/superagent-ai/superagent-base/backend/infra/cache"
 	"github.com/superagent-ai/superagent-base/backend/infra/checkpoint"
 	"github.com/superagent-ai/superagent-base/backend/pkg/mcp"
 	"github.com/superagent-ai/superagent-base/backend/pkg/memory"
@@ -97,6 +101,11 @@ func WithSkillManager(mgr *skill.Manager) BuilderOption {
 	return func(b *AgentBuilder) { b.skillManager = mgr }
 }
 
+// WithRedisClient sets the Redis client used for the redis checkpoint backend.
+func WithRedisClient(client cache.Cmdable) BuilderOption {
+	return func(b *AgentBuilder) { b.redisClient = client }
+}
+
 // AgentBuilder converts AgentDefinitions into running Agent instances.
 type AgentBuilder struct {
 	modelRouter   modelrouter.Router
@@ -106,6 +115,7 @@ type AgentBuilder struct {
 	skillManager  *skill.Manager
 	modelConfig   ModelRuntimeConfig
 	agentRegistry func(name string) (Agent, bool)
+	redisClient   cache.Cmdable
 }
 
 // NewAgentBuilder creates an AgentBuilder with optional configuration.
@@ -144,8 +154,16 @@ func (b *AgentBuilder) Build(ctx context.Context, def *AgentDefinition) (Agent, 
 		return b.buildSequential(ctx, def)
 	case "parallel":
 		return b.buildParallel(ctx, def)
+	case "plan_execute":
+		return b.buildPlanExecute(ctx, def)
 	case "workflow":
 		return b.buildWorkflow(def)
+	}
+
+	// deep_agent: prepend a step-by-step reasoning prefix to the system prompt.
+	if def.Spec.Type == "deep_agent" {
+		const deepReasoningPrefix = "You are in deep reasoning mode. Think step by step before answering. "
+		def = shallowCopyDefWithSystemPrompt(def, deepReasoningPrefix+def.Spec.SystemPrompt)
 	}
 
 	// Resolve primary model ID (may be overridden by router).
@@ -258,8 +276,49 @@ func (b *AgentBuilder) Build(ctx context.Context, def *AgentDefinition) (Agent, 
 		}
 	}
 
-	// Apply middleware wrapping (timeout, retry).
+	// Apply middleware wrapping (timeout, retry, rate_limit, cache).
 	built = b.applyMiddleware(built, def)
+
+	// Apply fallback wrapping after middleware but before interrupt.
+	if def.Spec.Model.Fallback != "" {
+		fallbackModelID := def.Spec.Model.Fallback
+		fallbackModel, fbErr := b.createChatModel(ctx, protocol, baseURL, apiKey, fallbackModelID)
+		if fbErr != nil {
+			return nil, fmt.Errorf("agentdef: Build %q: create fallback model: %w", def.Metadata.Name, fbErr)
+		}
+		var fbAgent Agent
+		if len(einoTools) > 0 {
+			fbReactAgent, fbReactErr := react.NewAgent(ctx, &react.AgentConfig{
+				ToolCallingModel: fallbackModel,
+				ToolsConfig: compose.ToolsNodeConfig{
+					Tools: einoTools,
+				},
+				MaxStep: 10,
+			})
+			if fbReactErr != nil {
+				return nil, fmt.Errorf("agentdef: Build: create fallback react agent: %w", fbReactErr)
+			}
+			fbAgent = &einoReactAgent{
+				def:          def,
+				modelID:      fallbackModelID,
+				memBackend:   memBackend,
+				agent:        fbReactAgent,
+				systemPrompt: def.Spec.SystemPrompt,
+			}
+		} else {
+			fbAgent = &einoChatAgent{
+				def:          def,
+				modelID:      fallbackModelID,
+				memBackend:   memBackend,
+				chatModel:    fallbackModel,
+				systemPrompt: def.Spec.SystemPrompt,
+			}
+		}
+		// Apply the same middleware to the fallback agent.
+		fbAgent = b.applyMiddleware(fbAgent, def)
+		built = &fallbackAgent{primary: built, fallback: fbAgent}
+	}
+
 	return b.maybeWrapInterruptable(built, def), nil
 }
 
@@ -274,9 +333,11 @@ func (b *AgentBuilder) maybeWrapInterruptable(agent Agent, def *AgentDefinition)
 	var store CheckpointStore
 	switch ic.CheckpointBackend {
 	case "redis":
-		// Redis store requires a cache client; fall back to memory if none is
-		// available in the builder (the caller can inject one via a future option).
-		store = checkpoint.NewInMemoryStore()
+		if b.redisClient != nil {
+			store = checkpoint.NewRedisStore(b.redisClient)
+		} else {
+			store = checkpoint.NewInMemoryStore()
+		}
 	default:
 		store = checkpoint.NewInMemoryStore()
 	}
@@ -323,6 +384,38 @@ func (b *AgentBuilder) applyMiddleware(agent Agent, def *AgentDefinition) Agent 
 				}
 			}
 			result = &retryAgent{inner: result, maxAttempts: maxAttempts}
+
+		case "rate_limit":
+			rpm := 60 // default requests per minute
+			if v, ok := mw.Config["requests_per_minute"]; ok {
+				switch t := v.(type) {
+				case int:
+					rpm = t
+				case float64:
+					rpm = int(t)
+				}
+			}
+			result = &rateLimitAgent{
+				inner: result,
+				rpm:   rpm,
+				times: make([]time.Time, 0, rpm),
+			}
+
+		case "cache":
+			ttlSeconds := 300 // default 5 minutes
+			if v, ok := mw.Config["ttl_seconds"]; ok {
+				switch t := v.(type) {
+				case int:
+					ttlSeconds = t
+				case float64:
+					ttlSeconds = int(t)
+				}
+			}
+			result = &cacheAgent{
+				inner: result,
+				ttl:   time.Duration(ttlSeconds) * time.Second,
+				cache: make(map[string]cacheEntry),
+			}
 		}
 	}
 	return result
@@ -415,6 +508,139 @@ func (a *retryAgent) Chat(ctx context.Context, sessionID string, message string)
 		time.Sleep(time.Duration(100<<uint(attempt)) * time.Millisecond)
 	}
 	return nil, fmt.Errorf("agentdef: retry exhausted after %d attempts: %w", a.maxAttempts, lastErr)
+}
+
+// ─── fallback agent ─────────────────────────────────────────────────────────
+
+// fallbackAgent wraps a primary Agent with a fallback Agent. If primary.Chat()
+// returns an error, the fallback agent is tried instead.
+type fallbackAgent struct {
+	primary  Agent
+	fallback Agent
+}
+
+func (a *fallbackAgent) Name() string                    { return a.primary.Name() }
+func (a *fallbackAgent) Description() string             { return a.primary.Description() }
+func (a *fallbackAgent) GetDefinition() *AgentDefinition { return a.primary.GetDefinition() }
+
+func (a *fallbackAgent) Chat(ctx context.Context, sessionID string, message string) (<-chan string, error) {
+	ch, err := a.primary.Chat(ctx, sessionID, message)
+	if err != nil {
+		// Primary failed; try fallback.
+		return a.fallback.Chat(ctx, sessionID, message)
+	}
+	return ch, nil
+}
+
+// ─── rate limit agent ───────────────────────────────────────────────────────
+
+// rateLimitAgent wraps an Agent with a simple token-bucket rate limiter based
+// on request timestamps within a sliding window.
+type rateLimitAgent struct {
+	inner Agent
+	rpm   int
+	mu    sync.Mutex
+	times []time.Time
+}
+
+func (a *rateLimitAgent) Name() string                    { return a.inner.Name() }
+func (a *rateLimitAgent) Description() string             { return a.inner.Description() }
+func (a *rateLimitAgent) GetDefinition() *AgentDefinition { return a.inner.GetDefinition() }
+
+func (a *rateLimitAgent) Chat(ctx context.Context, sessionID string, message string) (<-chan string, error) {
+	a.mu.Lock()
+	now := time.Now()
+	windowStart := now.Add(-time.Minute)
+
+	// Evict timestamps outside the sliding window.
+	valid := a.times[:0]
+	for _, t := range a.times {
+		if t.After(windowStart) {
+			valid = append(valid, t)
+		}
+	}
+	a.times = valid
+
+	if len(a.times) >= a.rpm {
+		a.mu.Unlock()
+		return nil, fmt.Errorf("agentdef: rate limit exceeded (%d requests/minute)", a.rpm)
+	}
+	a.times = append(a.times, now)
+	a.mu.Unlock()
+
+	return a.inner.Chat(ctx, sessionID, message)
+}
+
+// ─── cache agent ────────────────────────────────────────────────────────────
+
+// cacheEntry holds a cached response with its expiration time.
+type cacheEntry struct {
+	tokens    []string
+	expiresAt time.Time
+}
+
+// cacheAgent wraps an Agent with an in-memory response cache keyed by
+// SHA256(agentName + sessionID + message).
+type cacheAgent struct {
+	inner Agent
+	ttl   time.Duration
+	mu    sync.RWMutex
+	cache map[string]cacheEntry
+}
+
+func (a *cacheAgent) Name() string                    { return a.inner.Name() }
+func (a *cacheAgent) Description() string             { return a.inner.Description() }
+func (a *cacheAgent) GetDefinition() *AgentDefinition { return a.inner.GetDefinition() }
+
+func (a *cacheAgent) Chat(ctx context.Context, sessionID string, message string) (<-chan string, error) {
+	key := cacheKey(a.inner.Name(), sessionID, message)
+
+	// Check cache (read lock).
+	a.mu.RLock()
+	if entry, ok := a.cache[key]; ok && time.Now().Before(entry.expiresAt) {
+		a.mu.RUnlock()
+		ch := make(chan string, len(entry.tokens))
+		for _, tok := range entry.tokens {
+			ch <- tok
+		}
+		close(ch)
+		return ch, nil
+	}
+	a.mu.RUnlock()
+
+	// Cache miss: call inner agent.
+	innerCh, err := a.inner.Chat(ctx, sessionID, message)
+	if err != nil {
+		return nil, err
+	}
+
+	// Wrap channel to collect tokens for caching.
+	out := make(chan string, 64)
+	go func() {
+		defer close(out)
+		var tokens []string
+		for tok := range innerCh {
+			tokens = append(tokens, tok)
+			out <- tok
+		}
+		// Store in cache.
+		a.mu.Lock()
+		a.cache[key] = cacheEntry{
+			tokens:    tokens,
+			expiresAt: time.Now().Add(a.ttl),
+		}
+		a.mu.Unlock()
+	}()
+	return out, nil
+}
+
+// cacheKey produces a SHA256 hex digest from the agent name, session ID, and message.
+func cacheKey(agentName, sessionID, message string) string {
+	h := sha256.New()
+	h.Write([]byte(agentName))
+	h.Write([]byte(sessionID))
+	h.Write([]byte(message))
+	return hex.EncodeToString(h.Sum(nil))
 }
 
 // resolveEinoTools converts resolved tool refs to Eino einotool.BaseTool instances.
@@ -575,6 +801,46 @@ func (b *AgentBuilder) buildParallel(_ context.Context, def *AgentDefinition) (A
 		description: def.Spec.SystemPrompt,
 		agents:      agents,
 		def:         def,
+	}, nil
+}
+
+// buildPlanExecute constructs a PlanExecuteAgent.  It builds the main LLM agent
+// for planning and resolves sub-agent references as executors.
+func (b *AgentBuilder) buildPlanExecute(ctx context.Context, def *AgentDefinition) (Agent, error) {
+	executors, err := b.resolveSubAgentList(def)
+	if err != nil {
+		return nil, err
+	}
+
+	// Build the planner's own LLM as a chat_model_agent.
+	syntheticDef := &AgentDefinition{
+		APIVersion: def.APIVersion,
+		Kind:       def.Kind,
+		Metadata:   def.Metadata,
+		Spec: AgentSpec{
+			Type:          "chat_model_agent",
+			Model:         def.Spec.Model,
+			SystemPrompt:  def.Spec.SystemPrompt,
+			Observability: def.Spec.Observability,
+		},
+	}
+	mainAgent, err := b.Build(ctx, syntheticDef)
+	if err != nil {
+		return nil, fmt.Errorf("agentdef: buildPlanExecute %q: build main agent: %w", def.Metadata.Name, err)
+	}
+
+	maxSteps := 10
+	if def.Spec.Orchestration != nil && def.Spec.Orchestration.MaxRounds > 0 {
+		maxSteps = def.Spec.Orchestration.MaxRounds
+	}
+
+	return &PlanExecuteAgent{
+		name:        def.Metadata.Name,
+		description: def.Spec.SystemPrompt,
+		mainAgent:   mainAgent,
+		executors:   executors,
+		def:         def,
+		maxSteps:    maxSteps,
 	}, nil
 }
 
@@ -824,4 +1090,12 @@ func buildMessages(systemPrompt, userMessage string) []*schema.Message {
 	}
 	msgs = append(msgs, schema.UserMessage(userMessage))
 	return msgs
+}
+
+// shallowCopyDefWithSystemPrompt returns a copy of def with an overridden system prompt.
+// The original def is not mutated.
+func shallowCopyDefWithSystemPrompt(def *AgentDefinition, prompt string) *AgentDefinition {
+	cp := *def
+	cp.Spec.SystemPrompt = prompt
+	return &cp
 }
