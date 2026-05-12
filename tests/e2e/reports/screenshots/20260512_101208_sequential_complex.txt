@@ -1,0 +1,3 @@
+Complex input test
+Response length: 495 chars
+Response: Key microservices patterns include:  1. **Service Decomposition** (by business capability or domain)  2. **API Gateway** (unified entry point)  3. **Database per Service** (data isolation)  4. **Event-Driven Architecture** (asynchronous messaging)  5. **Circuit Breaker** (fault tolerance)  6. **Serv

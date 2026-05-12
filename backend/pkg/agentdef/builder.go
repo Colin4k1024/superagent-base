@@ -478,8 +478,39 @@ func (a *einoChatAgent) Name() string                    { return a.def.Metadata
 func (a *einoChatAgent) Description() string             { return a.systemPrompt }
 func (a *einoChatAgent) GetDefinition() *AgentDefinition { return a.def }
 
-func (a *einoChatAgent) Chat(ctx context.Context, _ string, message string) (<-chan string, error) {
-	msgs := buildMessages(a.systemPrompt, message)
+func (a *einoChatAgent) Chat(ctx context.Context, sessionID string, message string) (<-chan string, error) {
+	// Build message list: system prompt + history + new user message
+	msgs := make([]*schema.Message, 0, 8)
+	if a.systemPrompt != "" {
+		msgs = append(msgs, schema.SystemMessage(a.systemPrompt))
+	}
+
+	// Load conversation history from memory if available
+	if a.memBackend != nil && sessionID != "" {
+		history, err := a.memBackend.GetMessages(ctx, sessionID, memory.GetMessagesOpts{Limit: 20})
+		if err == nil {
+			for _, m := range history {
+				switch m.Role {
+				case "user":
+					msgs = append(msgs, schema.UserMessage(m.Content))
+				case "assistant":
+					msgs = append(msgs, schema.AssistantMessage(m.Content, nil))
+				}
+			}
+		}
+	}
+
+	// Append current user message
+	msgs = append(msgs, schema.UserMessage(message))
+
+	// Save user message to memory
+	if a.memBackend != nil && sessionID != "" {
+		_ = a.memBackend.AddMessage(ctx, sessionID, memory.Message{
+			Role:      "user",
+			Content:   message,
+			Timestamp: time.Now().Unix(),
+		})
+	}
 
 	reader, err := a.chatModel.Stream(ctx, msgs)
 	if err != nil {
@@ -490,15 +521,25 @@ func (a *einoChatAgent) Chat(ctx context.Context, _ string, message string) (<-c
 	go func() {
 		defer close(ch)
 		defer reader.Close()
+		var fullResponse strings.Builder
 		for {
 			chunk, err := reader.Recv()
 			if err != nil {
 				if !errors.Is(err, io.EOF) {
 					ch <- fmt.Sprintf("[error] %v", err)
 				}
+				// Save assistant response to memory
+				if a.memBackend != nil && sessionID != "" && fullResponse.Len() > 0 {
+					_ = a.memBackend.AddMessage(ctx, sessionID, memory.Message{
+						Role:      "assistant",
+						Content:   fullResponse.String(),
+						Timestamp: time.Now().Unix(),
+					})
+				}
 				return
 			}
 			if chunk != nil && chunk.Content != "" {
+				fullResponse.WriteString(chunk.Content)
 				ch <- chunk.Content
 			}
 		}

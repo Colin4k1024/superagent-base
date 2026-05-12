@@ -1,0 +1,5 @@
+Agent: e2e-supervisor
+Question: What are the benefits of exercise?
+Elapsed: 886ms
+Response:
+- e2e-basic: Exercise improves physical health (e.g., cardiovascular fitness, strength), boosts mental health (reduces anxiety, depression), enhances sleep, and supports weight management.

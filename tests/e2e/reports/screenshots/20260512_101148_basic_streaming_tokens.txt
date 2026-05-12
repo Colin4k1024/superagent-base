@@ -1,0 +1,3 @@
+Token count: 34
+First 5 tokens: ['Python', ' is', ' a', ' high', '-level']
+Full response: Python is a high-level, interpreted programming language known for its readability and simplicity. It supports multiple programming paradigms, including procedural, object-oriented, and functional programming.

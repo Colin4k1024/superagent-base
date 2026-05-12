@@ -66,6 +66,20 @@ func (m *Manager) ListInstalled() []SkillInstance {
 	return m.cache.All()
 }
 
+// RegisterLocal adds a skill directly to the local cache without fetching from the hub.
+// Use this to pre-register builtin skills that don't come from SkillHub.
+func (m *Manager) RegisterLocal(meta SkillMeta) {
+	m.cache.Set(meta.Name, &SkillInstance{Meta: meta, Status: "builtin"})
+}
+
+// Search delegates to the HubClient to search available skills.
+func (m *Manager) Search(ctx context.Context, query string, opts SearchOpts) ([]SkillMeta, error) {
+	if m.hubClient == nil {
+		return nil, fmt.Errorf("skill manager: no hub client configured")
+	}
+	return m.hubClient.Search(ctx, query, opts)
+}
+
 // Uninstall removes the named skill from the local cache.
 func (m *Manager) Uninstall(name string) {
 	m.cache.Delete(name)

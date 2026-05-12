@@ -49,13 +49,19 @@ func New(ctx context.Context, conf *config.KnowledgeConfig, es es.Client) ([]Man
 		return nil, fmt.Errorf("init vector store failed, err=%w", err)
 	}
 
-	return []searchstore.Manager{esSearchstoreManager, mgr}, nil
+	managers := []searchstore.Manager{esSearchstoreManager}
+	if mgr != nil {
+		managers = append(managers, mgr)
+	}
+	return managers, nil
 }
 
 func getVectorStore(ctx context.Context, conf *config.KnowledgeConfig) (searchstore.Manager, error) {
 	vsType := os.Getenv("VECTOR_STORE_TYPE")
 
 	switch vsType {
+	case "", "none":
+		return nil, nil
 	case "milvus":
 		ctx, cancel := context.WithTimeout(ctx, time.Second*5)
 		defer cancel()

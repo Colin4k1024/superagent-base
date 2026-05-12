@@ -1,0 +1,8 @@
+Agent: e2e-parallel
+Sub-agents: e2e-basic (parallel)
+Input: What is cloud computing?
+Elapsed: 934ms
+Output:
+
+--- e2e-basic ---
+Cloud computing delivers on-demand computing services—like storage, servers, databases, networking, and software—over the internet (“the cloud”) instead of using local servers or personal devices. It enables scalable, flexible, and cost-effective access to resources.

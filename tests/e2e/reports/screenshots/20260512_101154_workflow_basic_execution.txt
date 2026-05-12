@@ -1,0 +1,5 @@
+Input: artificial intelligence
+Pipeline: research -> summarize
+Elapsed: 3447ms
+Output:
+AI simulates human intelligence via subfields like machine learning and computer vision, enabled by big data, powerful computing, and deep learning, driving transformative applications across industries while raising ethical concerns about bias, privacy, and employment.

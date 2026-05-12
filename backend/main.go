@@ -26,6 +26,7 @@ import (
 	"runtime/debug"
 	"strings"
 
+	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/app/server"
 	"github.com/cloudwego/hertz/pkg/common/config"
 	"github.com/hertz-contrib/cors"
@@ -37,6 +38,11 @@ import (
 	"github.com/superagent-ai/superagent-base/backend/api/router"
 	"github.com/superagent-ai/superagent-base/backend/application"
 	"github.com/superagent-ai/superagent-base/backend/pkg/agentdef"
+	"github.com/superagent-ai/superagent-base/backend/pkg/memory"
+	"github.com/superagent-ai/superagent-base/backend/pkg/memory/builtin"
+	"github.com/superagent-ai/superagent-base/backend/pkg/skill"
+	skillbuiltin "github.com/superagent-ai/superagent-base/backend/pkg/skill/builtin"
+	"github.com/superagent-ai/superagent-base/backend/infra/cache/impl/redis"
 	"github.com/superagent-ai/superagent-base/backend/pkg/lang/conv"
 	"github.com/superagent-ai/superagent-base/backend/pkg/lang/ternary"
 	"github.com/superagent-ai/superagent-base/backend/pkg/logs"
@@ -73,7 +79,67 @@ func main() {
 			APIKey:  getEnv("MODEL_API_KEY_0", "123456"),
 			ModelID: getEnv("MODEL_ID_0", "Qwen3-Coder-Next-4bit"),
 		}),
+		agentdef.WithMemoryFactory(func(cfg memory.BackendConfig) (memory.Backend, error) {
+			redisAddr := getEnv("REDIS_ADDR", "127.0.0.1:6379")
+			redisPwd := getEnv("REDIS_PASSWORD", "")
+			c := redis.NewWithAddrAndPassword(redisAddr, redisPwd)
+			b := builtin.NewWithCache(c)
+			if err := b.Init(ctx, cfg); err != nil {
+				return nil, err
+			}
+			return b, nil
+		}),
 	)
+
+	// Initialize SkillManager with internal SkillHub client + builtin skills.
+	var skillMgr *skill.Manager
+	skillHubURL := getEnv("SKILLHUB_URL", "")
+	if skillHubURL != "" {
+		hubClient := skill.NewSkillHubClient(skill.SkillHubClientConfig{
+			BaseURL:     skillHubURL,
+			AccessToken: getEnv("SKILLHUB_TOKEN", ""),
+		})
+		localInvoker := skill.NewLocalInvoker()
+		skillbuiltin.RegisterAll(localInvoker)
+		httpInvoker := skill.NewHTTPInvoker()
+		compositeInvoker := skill.NewCompositeInvoker(localInvoker, httpInvoker)
+		skillMgr = skill.NewManager(hubClient, compositeInvoker)
+		agentBuilder = agentdef.NewAgentBuilder(
+			agentdef.WithModelConfig(agentdef.ModelRuntimeConfig{
+				BaseURL: getEnv("MODEL_BASE_URL_0", "http://127.0.0.1:8000/v1"),
+				APIKey:  getEnv("MODEL_API_KEY_0", "123456"),
+				ModelID: getEnv("MODEL_ID_0", "Qwen3-Coder-Next-4bit"),
+			}),
+			agentdef.WithMemoryFactory(func(cfg memory.BackendConfig) (memory.Backend, error) {
+				redisAddr := getEnv("REDIS_ADDR", "127.0.0.1:6379")
+				redisPwd := getEnv("REDIS_PASSWORD", "")
+				c := redis.NewWithAddrAndPassword(redisAddr, redisPwd)
+				b := builtin.NewWithCache(c)
+				if err := b.Init(ctx, cfg); err != nil {
+					return nil, err
+				}
+				return b, nil
+			}),
+			agentdef.WithSkillManager(skillMgr),
+		)
+		logs.Infof("SkillHub client initialized: %s", skillHubURL)
+	} else {
+		// Even without SkillHub, register builtin skills.
+		localInvoker := skill.NewLocalInvoker()
+		skillbuiltin.RegisterAll(localInvoker)
+		compositeInvoker := skill.NewCompositeInvoker(localInvoker, skill.NewHTTPInvoker())
+		skillMgr = skill.NewManager(nil, compositeInvoker)
+	}
+
+	// Pre-register builtin skills so they're accessible via skill://name in agent YAML.
+	for _, name := range []string{"datetime", "calculator", "uuid"} {
+		skillMgr.RegisterLocal(skill.SkillMeta{
+			Name:        name,
+			Version:     "1.0.0",
+			Description: "Built-in " + name + " skill",
+		})
+	}
+
 	agentRT := agentdef.NewRuntime(agentdef.RuntimeConfig{
 		ConfigDir: getEnv("AGENT_CONFIG_DIR", "configs/agents"),
 	}, agentBuilder)
@@ -90,10 +156,10 @@ func main() {
 		}
 	}()
 
-	startHttpServer(agentRT)
+	startHttpServer(agentRT, skillMgr)
 }
 
-func startHttpServer(agentRT *agentdef.AgentRuntime) {
+func startHttpServer(agentRT *agentdef.AgentRuntime, skillMgr *skill.Manager) {
 	maxRequestBodySize := os.Getenv("MAX_REQUEST_BODY_SIZE")
 	maxSize := conv.StrToInt64D(maxRequestBodySize, 1024*1024*200)
 	addr := getEnv("LISTEN_ADDR", ":8888")
@@ -145,7 +211,77 @@ func startHttpServer(agentRT *agentdef.AgentRuntime) {
 	s.POST("/api/v1/chat/stream", chatSSE.HandleChatStream)
 	s.GET("/api/v1/agents", chatSSE.HandleListAgents)
 
+	// Skill management API endpoints.
+	registerSkillRoutes(s, skillMgr)
+
 	s.Spin()
+}
+
+func registerSkillRoutes(s *server.Hertz, mgr *skill.Manager) {
+	if mgr == nil {
+		return
+	}
+
+	// GET /api/v1/skills — list installed skills
+	s.GET("/api/v1/skills", func(c context.Context, ctx *app.RequestContext) {
+		installed := mgr.ListInstalled()
+		items := make([]map[string]any, 0, len(installed))
+		for _, inst := range installed {
+			items = append(items, map[string]any{
+				"name":        inst.Meta.Name,
+				"version":     inst.Meta.Version,
+				"description": inst.Meta.Description,
+				"status":      inst.Status,
+			})
+		}
+		ctx.JSON(200, map[string]any{"skills": items})
+	})
+
+	// GET /api/v1/skills/search?q= — search SkillHub
+	s.GET("/api/v1/skills/search", func(c context.Context, ctx *app.RequestContext) {
+		query := string(ctx.QueryArgs().Peek("q"))
+		if query == "" {
+			ctx.JSON(400, map[string]any{"error": "query parameter 'q' is required"})
+			return
+		}
+		results, err := mgr.Search(c, query, skill.SearchOpts{Limit: 20})
+		if err != nil {
+			ctx.JSON(502, map[string]any{"error": err.Error()})
+			return
+		}
+		ctx.JSON(200, map[string]any{"skills": results})
+	})
+
+	// POST /api/v1/skills/install — install a skill
+	s.POST("/api/v1/skills/install", func(c context.Context, ctx *app.RequestContext) {
+		var req struct {
+			Name    string `json:"name"`
+			Version string `json:"version"`
+		}
+		if err := ctx.BindJSON(&req); err != nil {
+			ctx.JSON(400, map[string]any{"error": "invalid request body"})
+			return
+		}
+		if req.Name == "" {
+			ctx.JSON(400, map[string]any{"error": "name is required"})
+			return
+		}
+		if req.Version == "" {
+			req.Version = "latest"
+		}
+		if err := mgr.Install(c, req.Name, req.Version); err != nil {
+			ctx.JSON(502, map[string]any{"error": err.Error()})
+			return
+		}
+		ctx.JSON(200, map[string]any{"status": "installed", "name": req.Name, "version": req.Version})
+	})
+
+	// DELETE /api/v1/skills/:name — uninstall a skill
+	s.DELETE("/api/v1/skills/:name", func(_ context.Context, ctx *app.RequestContext) {
+		name := ctx.Param("name")
+		mgr.Uninstall(name)
+		ctx.JSON(200, map[string]any{"status": "uninstalled", "name": name})
+	})
 }
 
 func loadEnv() (err error) {
