@@ -26,6 +26,22 @@ import (
 	"github.com/superagent-ai/superagent-base/backend/pkg/skill"
 )
 
+// ─── HTTPInvoker.Register SSRF guard ─────────────────────────────────────────
+
+func TestHTTPInvoker_Register_RejectsLoopback(t *testing.T) {
+	inv := skill.NewHTTPInvoker()
+	if err := inv.Register("bad", "http://127.0.0.1:9999"); err == nil {
+		t.Fatal("expected error for loopback endpoint, got nil")
+	}
+}
+
+func TestHTTPInvoker_Register_RejectsPrivateNetwork(t *testing.T) {
+	inv := skill.NewHTTPInvoker()
+	if err := inv.Register("bad", "http://192.168.1.1:80"); err == nil {
+		t.Fatal("expected error for private-network endpoint, got nil")
+	}
+}
+
 // ─── LocalInvoker ─────────────────────────────────────────────────────────────
 
 func TestLocalInvoker_RegisterAndInvoke(t *testing.T) {
@@ -64,7 +80,7 @@ func TestHTTPInvoker_RegisterAndInvoke(t *testing.T) {
 	defer ts.Close()
 
 	inv := skill.NewHTTPInvoker()
-	inv.Register("echo", ts.URL)
+	inv.RegisterEndpointForTest("echo", ts.URL)
 
 	got, err := inv.Invoke(context.Background(), "echo", map[string]any{"msg": "world"})
 	if err != nil {
@@ -90,7 +106,7 @@ func TestHTTPInvoker_NonOKStatus(t *testing.T) {
 	defer ts.Close()
 
 	inv := skill.NewHTTPInvoker()
-	inv.Register("bad", ts.URL)
+	inv.RegisterEndpointForTest("bad", ts.URL)
 
 	_, err := inv.Invoke(context.Background(), "bad", nil)
 	if err == nil {
@@ -115,7 +131,7 @@ func TestCompositeInvoker_LocalFirst(t *testing.T) {
 	defer ts.Close()
 
 	httpInv := skill.NewHTTPInvoker()
-	httpInv.Register("greet", ts.URL)
+	httpInv.RegisterEndpointForTest("greet", ts.URL)
 
 	comp := skill.NewCompositeInvoker(local, httpInv)
 	got, err := comp.Invoke(context.Background(), "greet", nil)
@@ -139,7 +155,7 @@ func TestCompositeInvoker_FallsBackToHTTP(t *testing.T) {
 	defer ts.Close()
 
 	httpInv := skill.NewHTTPInvoker()
-	httpInv.Register("remote", ts.URL)
+	httpInv.RegisterEndpointForTest("remote", ts.URL)
 
 	comp := skill.NewCompositeInvoker(local, httpInv)
 	got, err := comp.Invoke(context.Background(), "remote", nil)

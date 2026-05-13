@@ -19,31 +19,75 @@ package checkpoint
 import (
 	"context"
 	"sync"
+	"time"
 
 	"github.com/cloudwego/eino/compose"
 )
 
+const (
+	maxCheckpointEntries = 1000
+	checkpointTTL        = 30 * time.Minute
+)
+
+type memEntry struct {
+	data      []byte
+	createdAt time.Time
+}
+
 type inMemoryStore struct {
-	m  map[string][]byte
+	m  map[string]memEntry
 	mu sync.RWMutex
 }
 
 func (i *inMemoryStore) Get(_ context.Context, checkPointID string) ([]byte, bool, error) {
 	i.mu.RLock()
-	v, ok := i.m[checkPointID]
+	e, ok := i.m[checkPointID]
 	i.mu.RUnlock()
-	return v, ok, nil
+	if !ok {
+		return nil, false, nil
+	}
+	// TTL check.
+	if time.Since(e.createdAt) > checkpointTTL {
+		i.mu.Lock()
+		delete(i.m, checkPointID)
+		i.mu.Unlock()
+		return nil, false, nil
+	}
+	return e.data, true, nil
 }
 
 func (i *inMemoryStore) Set(_ context.Context, checkPointID string, checkPoint []byte) error {
 	i.mu.Lock()
-	i.m[checkPointID] = checkPoint
-	i.mu.Unlock()
+	defer i.mu.Unlock()
+
+	// Evict expired entries when at capacity.
+	if len(i.m) >= maxCheckpointEntries {
+		now := time.Now()
+		for k, e := range i.m {
+			if now.Sub(e.createdAt) > checkpointTTL {
+				delete(i.m, k)
+			}
+		}
+		// If still at capacity, evict oldest.
+		if len(i.m) >= maxCheckpointEntries {
+			var oldestKey string
+			var oldestTime time.Time
+			for k, e := range i.m {
+				if oldestKey == "" || e.createdAt.Before(oldestTime) {
+					oldestKey = k
+					oldestTime = e.createdAt
+				}
+			}
+			delete(i.m, oldestKey)
+		}
+	}
+
+	i.m[checkPointID] = memEntry{data: checkPoint, createdAt: time.Now()}
 	return nil
 }
 
 func NewInMemoryStore() compose.CheckPointStore {
 	return &inMemoryStore{
-		m: make(map[string][]byte),
+		m: make(map[string]memEntry),
 	}
 }

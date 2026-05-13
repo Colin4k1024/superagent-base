@@ -21,7 +21,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
+	"net/url"
 	"strings"
 	"sync"
 	"time"
@@ -80,11 +82,40 @@ func NewHTTPInvoker() *HTTPInvoker {
 	}
 }
 
+// isInternalURL returns true if the URL resolves to a non-routable or private address,
+// which would indicate an SSRF-prone target.
+func isInternalURL(rawURL string) bool {
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		return true // reject unparseable URLs
+	}
+	host := u.Hostname()
+	ip := net.ParseIP(host)
+	if ip == nil {
+		// Try resolving hostname to an IP.
+		addrs, err := net.LookupHost(host)
+		if err != nil || len(addrs) == 0 {
+			return false // unresolvable host — will fail at call time
+		}
+		ip = net.ParseIP(addrs[0])
+		if ip == nil {
+			return false
+		}
+	}
+	return ip.IsLoopback() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() ||
+		ip.IsPrivate() || ip.IsUnspecified()
+}
+
 // Register maps a skill name to its HTTP endpoint base URL.
-func (h *HTTPInvoker) Register(skillName, endpoint string) {
+// Returns an error if the endpoint resolves to an internal or private address.
+func (h *HTTPInvoker) Register(skillName, endpoint string) error {
+	if isInternalURL(endpoint) {
+		return fmt.Errorf("skill %q: endpoint %q rejected (internal/private address)", skillName, endpoint)
+	}
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	h.endpoints[skillName] = endpoint
+	return nil
 }
 
 // Invoke POSTs the input as JSON to <endpoint>/invoke and returns the parsed response.
@@ -113,7 +144,8 @@ func (h *HTTPInvoker) Invoke(ctx context.Context, skillName string, input map[st
 	}
 	defer resp.Body.Close()
 
-	respBody, err := io.ReadAll(resp.Body)
+	const maxSkillResponseBytes = 10 * 1024 * 1024 // 10 MiB
+	respBody, err := io.ReadAll(io.LimitReader(resp.Body, maxSkillResponseBytes))
 	if err != nil {
 		return nil, fmt.Errorf("skill %q: read response: %w", skillName, err)
 	}

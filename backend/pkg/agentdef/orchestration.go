@@ -108,10 +108,16 @@ func (s *SequentialAgent) Chat(ctx context.Context, sessionID string, message st
 
 		currentInput := message
 		for i, agent := range s.agents {
+			if ctx.Err() != nil {
+				return
+			}
 			var result strings.Builder
 			subCh, err := agent.Chat(ctx, sessionID, currentInput)
 			if err != nil {
-				ch <- fmt.Sprintf("[error in step %d (%s)]: %v", i+1, agent.Name(), err)
+				select {
+				case ch <- fmt.Sprintf("[error in step %d (%s)]: %v", i+1, agent.Name(), err):
+				case <-ctx.Done():
+				}
 				return
 			}
 			isLast := i == len(s.agents)-1
@@ -119,7 +125,11 @@ func (s *SequentialAgent) Chat(ctx context.Context, sessionID string, message st
 				result.WriteString(token)
 				// Only stream tokens from the last agent to the caller.
 				if isLast {
-					ch <- token
+					select {
+					case ch <- token:
+					case <-ctx.Done():
+						return
+					}
 				}
 			}
 			currentInput = result.String()
@@ -151,6 +161,9 @@ func (p *ParallelAgent) Chat(ctx context.Context, sessionID string, message stri
 	go func() {
 		defer close(ch)
 
+		childCtx, cancel := context.WithCancel(ctx)
+		defer cancel()
+
 		type agentResult struct {
 			index  int
 			name   string
@@ -165,7 +178,7 @@ func (p *ParallelAgent) Chat(ctx context.Context, sessionID string, message stri
 			go func(idx int, a Agent) {
 				defer wg.Done()
 				var out strings.Builder
-				subCh, err := a.Chat(ctx, sessionID, message)
+				subCh, err := a.Chat(childCtx, sessionID, message)
 				if err != nil {
 					results <- agentResult{index: idx, name: a.Name(), output: fmt.Sprintf("[error]: %v", err)}
 					return
@@ -186,11 +199,20 @@ func (p *ParallelAgent) Chat(ctx context.Context, sessionID string, message stri
 		// Collect all results then emit in arrival order.
 		collected := make([]agentResult, 0, len(p.agents))
 		for r := range results {
+			select {
+			case <-ctx.Done():
+				return
+			default:
+			}
 			collected = append(collected, r)
 		}
 
 		for _, r := range collected {
-			ch <- fmt.Sprintf("\n--- %s ---\n%s\n", r.name, r.output)
+			select {
+			case ch <- fmt.Sprintf("\n--- %s ---\n%s\n", r.name, r.output):
+			case <-ctx.Done():
+				return
+			}
 		}
 	}()
 	return ch, nil
