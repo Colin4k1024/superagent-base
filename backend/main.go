@@ -77,25 +77,6 @@ func main() {
 	// invocations automatically report Prometheus metrics and OTel spans.
 	callbacks.AppendGlobalHandlers(observe.NewEinoObserveCallback())
 
-	// Build the AgentRuntime that powers YAML-defined agents.
-	agentBuilder := agentdef.NewAgentBuilder(
-		agentdef.WithModelConfig(agentdef.ModelRuntimeConfig{
-			BaseURL: getEnv("MODEL_BASE_URL_0", "http://127.0.0.1:8000/v1"),
-			APIKey:  getEnv("MODEL_API_KEY_0", "123456"),
-			ModelID: getEnv("MODEL_ID_0", "Qwen3-Coder-Next-4bit"),
-		}),
-		agentdef.WithMemoryFactory(func(cfg memory.BackendConfig) (memory.Backend, error) {
-			redisAddr := getEnv("REDIS_ADDR", "127.0.0.1:6379")
-			redisPwd := getEnv("REDIS_PASSWORD", "")
-			c := redis.NewWithAddrAndPassword(redisAddr, redisPwd)
-			b := builtin.NewWithCache(c)
-			if err := b.Init(ctx, cfg); err != nil {
-				return nil, err
-			}
-			return b, nil
-		}),
-	)
-
 	// Initialize SkillManager with internal SkillHub client + builtin skills.
 	var skillMgr *skill.Manager
 	skillHubURL := getEnv("SKILLHUB_URL", "")
@@ -109,24 +90,6 @@ func main() {
 		httpInvoker := skill.NewHTTPInvoker()
 		compositeInvoker := skill.NewCompositeInvoker(localInvoker, httpInvoker)
 		skillMgr = skill.NewManager(hubClient, compositeInvoker)
-		agentBuilder = agentdef.NewAgentBuilder(
-			agentdef.WithModelConfig(agentdef.ModelRuntimeConfig{
-				BaseURL: getEnv("MODEL_BASE_URL_0", "http://127.0.0.1:8000/v1"),
-				APIKey:  getEnv("MODEL_API_KEY_0", "123456"),
-				ModelID: getEnv("MODEL_ID_0", "Qwen3-Coder-Next-4bit"),
-			}),
-			agentdef.WithMemoryFactory(func(cfg memory.BackendConfig) (memory.Backend, error) {
-				redisAddr := getEnv("REDIS_ADDR", "127.0.0.1:6379")
-				redisPwd := getEnv("REDIS_PASSWORD", "")
-				c := redis.NewWithAddrAndPassword(redisAddr, redisPwd)
-				b := builtin.NewWithCache(c)
-				if err := b.Init(ctx, cfg); err != nil {
-					return nil, err
-				}
-				return b, nil
-			}),
-			agentdef.WithSkillManager(skillMgr),
-		)
 		logs.Infof("SkillHub client initialized: %s", skillHubURL)
 	} else {
 		// Even without SkillHub, register builtin skills.
@@ -144,6 +107,30 @@ func main() {
 			Description: "Built-in " + name + " skill",
 		})
 	}
+
+	// Build the AgentRuntime that powers YAML-defined agents.
+	// Single builder construction — SkillManager is conditionally added.
+	builderOpts := []agentdef.BuilderOption{
+		agentdef.WithModelConfig(agentdef.ModelRuntimeConfig{
+			BaseURL: getEnv("MODEL_BASE_URL_0", "http://127.0.0.1:8000/v1"),
+			APIKey:  getEnv("MODEL_API_KEY_0", "123456"),
+			ModelID: getEnv("MODEL_ID_0", "Qwen3-Coder-Next-4bit"),
+		}),
+		agentdef.WithMemoryFactory(func(cfg memory.BackendConfig) (memory.Backend, error) {
+			redisAddr := getEnv("REDIS_ADDR", "127.0.0.1:6379")
+			redisPwd := getEnv("REDIS_PASSWORD", "")
+			c := redis.NewWithAddrAndPassword(redisAddr, redisPwd)
+			b := builtin.NewWithCache(c)
+			if err := b.Init(ctx, cfg); err != nil {
+				return nil, err
+			}
+			return b, nil
+		}),
+	}
+	if skillMgr != nil {
+		builderOpts = append(builderOpts, agentdef.WithSkillManager(skillMgr))
+	}
+	agentBuilder := agentdef.NewAgentBuilder(builderOpts...)
 
 	agentRT := agentdef.NewRuntime(agentdef.RuntimeConfig{
 		ConfigDir: getEnv("AGENT_CONFIG_DIR", "configs/agents"),

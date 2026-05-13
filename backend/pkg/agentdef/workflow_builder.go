@@ -210,14 +210,25 @@ func codeSandboxMode() string {
 }
 
 // dockerAvailable checks if Docker daemon is reachable.
-var dockerAvailableOnce sync.Once
-var dockerOK bool
+// The result is cached for 30 seconds so that a temporarily unavailable Docker
+// daemon is detected on the next attempt instead of being permanently cached.
+var (
+	dockerMu        sync.Mutex
+	dockerOK        bool
+	dockerCheckedAt time.Time
+)
 
 func checkDockerAvailable() bool {
-	dockerAvailableOnce.Do(func() {
-		cmd := exec.Command("docker", "info")
-		dockerOK = cmd.Run() == nil
-	})
+	dockerMu.Lock()
+	defer dockerMu.Unlock()
+	if time.Since(dockerCheckedAt) < 30*time.Second {
+		return dockerOK
+	}
+	cmd := exec.Command("docker", "info")
+	cmd.Stdout = nil
+	cmd.Stderr = nil
+	dockerOK = cmd.Run() == nil
+	dockerCheckedAt = time.Now()
 	return dockerOK
 }
 

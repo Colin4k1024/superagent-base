@@ -44,8 +44,8 @@ var noNeedSessionCheckPath = map[string]bool{
 	"/api/v1/skills/search":                true,
 	"/api/v1/skills/install":               true,
 	"/api/v1/admin/status":                 true,
-	"/api/v1/admin/reload":                 true,
-	"/api/v1/admin/logs":                   true,
+	"/api/v1/admin/reload":                 true, // protected by AdminAuthMW at handler level
+	"/api/v1/admin/logs":                   true, // protected by AdminAuthMW at handler level
 	"/metrics":                             true,
 	"/health":                              true,
 	"/ready":                               true,

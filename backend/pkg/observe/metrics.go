@@ -84,6 +84,12 @@ var (
 	})
 )
 
+// AgentRequestsByMode counts requests by agent and protocol mode (legacy/a2ui).
+var AgentRequestsByMode = promauto.NewCounterVec(prometheus.CounterOpts{
+	Name: "superagent_agent_requests_by_mode_total",
+	Help: "Total agent requests by protocol mode",
+}, []string{"agent_id", "mode"})
+
 // Runtime metrics.
 var (
 	// AgentReloadFailures counts agent hot-reload failures by agent name.

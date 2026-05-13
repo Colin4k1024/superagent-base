@@ -206,11 +206,12 @@ func (b *builtinBackend) Update(ctx context.Context, memoryID string, content st
 }
 
 // Delete removes a memory entry by ID.
+// Entries are stored as hash fields under prefixLongTerm+userID, so we use HDel.
 func (b *builtinBackend) Delete(ctx context.Context, memoryID string) error {
 	userID, entryID := splitMemoryID(memoryID)
 	key := prefixLongTerm + sanitizeKeyPart(userID)
-	if err := b.cache.Del(ctx, key+":"+entryID).Err(); err != nil {
-		return fmt.Errorf("builtin memory Delete: %w", err)
+	if err := b.cache.HDel(ctx, key, entryID).Err(); err != nil {
+		return fmt.Errorf("builtin memory Delete: hdel: %w", err)
 	}
 	return nil
 }
