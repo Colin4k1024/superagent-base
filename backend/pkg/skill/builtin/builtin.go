@@ -87,8 +87,10 @@ func UUIDSkill(_ context.Context, _ map[string]any) (map[string]any, error) {
 
 // ─── simple expression evaluator ─────────────────────────────────────────────
 
-// evalSimple handles single binary operations: +, -, *, /, ^ (power), % (mod).
-// Operands may be integers or decimals.  Whitespace is ignored.
+// evalSimple evaluates arithmetic expressions with correct operator precedence.
+// Supports: +, -, *, /, % (mod), ^ (power). Operands are integers or decimals.
+// Precedence (low to high): +- , */% , ^
+// Associativity: left-to-right. Does NOT support parentheses.
 func evalSimple(expr string) (float64, error) {
 	expr = strings.Map(func(r rune) rune {
 		if unicode.IsSpace(r) {
@@ -100,55 +102,75 @@ func evalSimple(expr string) (float64, error) {
 		return 0, fmt.Errorf("empty expression")
 	}
 
-	// Try to parse as a plain number first.
+	// Try to parse as a plain number first (handles negatives like "-3.14").
 	if v, err := strconv.ParseFloat(expr, 64); err == nil {
 		return v, nil
 	}
 
-	// Scan for the operator (right-to-left so we respect left-associativity for
-	// + and -, which have lower precedence than * and /).
-	ops := []byte{'+', '-', '*', '/', '%', '^'}
-	for _, op := range ops {
-		idx := strings.LastIndexByte(expr, op)
-		// Skip negative sign at position 0.
-		if idx <= 0 {
-			continue
-		}
-		left := expr[:idx]
-		right := expr[idx+1:]
-		if left == "" || right == "" {
-			continue
-		}
-		lv, err := strconv.ParseFloat(left, 64)
-		if err != nil {
-			continue
-		}
-		rv, err := strconv.ParseFloat(right, 64)
-		if err != nil {
-			continue
-		}
-		switch op {
-		case '+':
-			return lv + rv, nil
-		case '-':
+	// Precedence level 1 (lowest): + and -
+	// Scan from right to left for left-associativity.
+	if idx := findLastOp(expr, '+', '-'); idx > 0 {
+		lv, lerr := evalSimple(expr[:idx])
+		rv, rerr := evalSimple(expr[idx+1:])
+		if lerr == nil && rerr == nil {
+			if expr[idx] == '+' {
+				return lv + rv, nil
+			}
 			return lv - rv, nil
-		case '*':
-			return lv * rv, nil
-		case '/':
-			if rv == 0 {
-				return 0, fmt.Errorf("division by zero")
+		}
+	}
+
+	// Precedence level 2: *, /, %
+	if idx := findLastOp(expr, '*', '/', '%'); idx > 0 {
+		lv, lerr := evalSimple(expr[:idx])
+		rv, rerr := evalSimple(expr[idx+1:])
+		if lerr == nil && rerr == nil {
+			switch expr[idx] {
+			case '*':
+				return lv * rv, nil
+			case '/':
+				if rv == 0 {
+					return 0, fmt.Errorf("division by zero")
+				}
+				return lv / rv, nil
+			case '%':
+				if rv == 0 {
+					return 0, fmt.Errorf("modulo by zero")
+				}
+				return math.Mod(lv, rv), nil
 			}
-			return lv / rv, nil
-		case '%':
-			if rv == 0 {
-				return 0, fmt.Errorf("modulo by zero")
-			}
-			return math.Mod(lv, rv), nil
-		case '^':
+		}
+	}
+
+	// Precedence level 3 (highest): ^
+	if idx := findLastOp(expr, '^'); idx > 0 {
+		lv, lerr := evalSimple(expr[:idx])
+		rv, rerr := evalSimple(expr[idx+1:])
+		if lerr == nil && rerr == nil {
 			return math.Pow(lv, rv), nil
 		}
 	}
+
 	return 0, fmt.Errorf("unsupported expression %q", expr)
+}
+
+// findLastOp finds the rightmost occurrence of any of the given operators in expr,
+// skipping positions where the character could be a unary sign (position 0 or after
+// another operator character).
+func findLastOp(expr string, ops ...byte) int {
+	for i := len(expr) - 1; i > 0; i-- {
+		ch := expr[i]
+		for _, op := range ops {
+			if ch == op {
+				// Ensure it's not a unary sign: previous char must be a digit or '.'
+				prev := expr[i-1]
+				if prev >= '0' && prev <= '9' || prev == '.' {
+					return i
+				}
+			}
+		}
+	}
+	return -1
 }
 
 // ─── UUID v4 generator ────────────────────────────────────────────────────────

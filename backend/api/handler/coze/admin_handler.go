@@ -17,9 +17,10 @@ import (
 // Set via ADMIN_API_KEY env; when empty, admin write endpoints are disabled.
 var adminAPIKey = os.Getenv("ADMIN_API_KEY")
 
-// checkAdminAuth validates the Authorization header for protected admin endpoints.
+// CheckAdminAuth validates the Authorization header for protected admin endpoints.
 // Returns true if authorized, false if rejected (response already written).
-func checkAdminAuth(c *app.RequestContext) bool {
+// Exported for use by other route registrars (e.g., skill install/uninstall).
+func CheckAdminAuth(c *app.RequestContext) bool {
 	if adminAPIKey == "" {
 		// No key configured → allow (dev mode). Production should always set ADMIN_API_KEY.
 		return true
@@ -46,7 +47,7 @@ func NewAdminHandler(rt *agentdef.AgentRuntime) *AdminHandler {
 // GET /api/v1/admin/status
 // Protected by ADMIN_API_KEY when configured.
 func (h *AdminHandler) HandleStatus(_ context.Context, c *app.RequestContext) {
-	if !checkAdminAuth(c) {
+	if !CheckAdminAuth(c) {
 		return
 	}
 	if h.runtime == nil {
@@ -82,7 +83,7 @@ func (h *AdminHandler) HandleStatus(_ context.Context, c *app.RequestContext) {
 // POST /api/v1/admin/reload
 // Protected by ADMIN_API_KEY when configured.
 func (h *AdminHandler) HandleReload(ctx context.Context, c *app.RequestContext) {
-	if !checkAdminAuth(c) {
+	if !CheckAdminAuth(c) {
 		return
 	}
 	if h.runtime == nil {
@@ -107,7 +108,7 @@ func (h *AdminHandler) HandleReload(ctx context.Context, c *app.RequestContext) 
 // GET /api/v1/admin/logs
 // Protected by ADMIN_API_KEY when configured.
 func (h *AdminHandler) HandleLogStream(ctx context.Context, c *app.RequestContext) {
-	if !checkAdminAuth(c) {
+	if !CheckAdminAuth(c) {
 		return
 	}
 	broadcaster := logs.GetBroadcaster()

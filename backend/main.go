@@ -221,6 +221,9 @@ func startHttpServer(agentRT *agentdef.AgentRuntime, skillMgr *skill.Manager) {
 	s.GET("/api/v1/agents", chatSSE.HandleListAgents)
 
 	// Admin/monitoring endpoints.
+	if getEnv("ADMIN_API_KEY", "") == "" {
+		logs.Warnf("⚠️  ADMIN_API_KEY is not set — admin endpoints (/api/v1/admin/*) are UNPROTECTED. Set ADMIN_API_KEY for production!")
+	}
 	adminH := cozehandler.NewAdminHandler(agentRT)
 	s.GET("/api/v1/admin/status", adminH.HandleStatus)
 	s.POST("/api/v1/admin/reload", adminH.HandleReload)
@@ -267,8 +270,11 @@ func registerSkillRoutes(s *server.Hertz, mgr *skill.Manager) {
 		ctx.JSON(200, map[string]any{"skills": results})
 	})
 
-	// POST /api/v1/skills/install — install a skill
+	// POST /api/v1/skills/install — install a skill (protected by ADMIN_API_KEY)
 	s.POST("/api/v1/skills/install", func(c context.Context, ctx *app.RequestContext) {
+		if !cozehandler.CheckAdminAuth(ctx) {
+			return
+		}
 		var req struct {
 			Name    string `json:"name"`
 			Version string `json:"version"`
@@ -291,8 +297,11 @@ func registerSkillRoutes(s *server.Hertz, mgr *skill.Manager) {
 		ctx.JSON(200, map[string]any{"status": "installed", "name": req.Name, "version": req.Version})
 	})
 
-	// DELETE /api/v1/skills/:name — uninstall a skill
+	// DELETE /api/v1/skills/:name — uninstall a skill (protected by ADMIN_API_KEY)
 	s.DELETE("/api/v1/skills/:name", func(_ context.Context, ctx *app.RequestContext) {
+		if !cozehandler.CheckAdminAuth(ctx) {
+			return
+		}
 		name := ctx.Param("name")
 		mgr.Uninstall(name)
 		ctx.JSON(200, map[string]any{"status": "uninstalled", "name": name})

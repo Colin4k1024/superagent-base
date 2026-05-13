@@ -19,11 +19,15 @@
 package grpc
 
 import (
+	"context"
 	"fmt"
 	"net"
+	"runtime/debug"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/reflection"
+	"google.golang.org/grpc/status"
 
 	agentv1 "github.com/superagent-ai/superagent-base/backend/api/grpc/gen/agent/v1"
 	conversationv1 "github.com/superagent-ai/superagent-base/backend/api/grpc/gen/conversation/v1"
@@ -36,10 +40,26 @@ import (
 	"github.com/superagent-ai/superagent-base/backend/pkg/logs"
 )
 
+// recoveryInterceptor catches panics in gRPC handlers and converts them to
+// Internal errors instead of crashing the process.
+func recoveryInterceptor() grpc.UnaryServerInterceptor {
+	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp any, err error) {
+		defer func() {
+			if r := recover(); r != nil {
+				logs.Errorf("gRPC panic recovered in %s: %v\n%s", info.FullMethod, r, debug.Stack())
+				err = status.Errorf(codes.Internal, "internal server error")
+			}
+		}()
+		return handler(ctx, req)
+	}
+}
+
 // NewServer creates a configured gRPC server and registers all service handlers.
 // rt may be nil if the agent runtime failed to start; handlers degrade gracefully.
 func NewServer(rt *agentdef.AgentRuntime) *grpc.Server {
-	s := grpc.NewServer()
+	s := grpc.NewServer(
+		grpc.ChainUnaryInterceptor(recoveryInterceptor()),
+	)
 
 	// Register service implementations.
 	agentv1.RegisterAgentServiceServer(s, NewAgentHandler(singleagent.SingleAgentSVC, rt))
