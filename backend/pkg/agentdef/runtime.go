@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/superagent-ai/superagent-base/backend/pkg/logs"
 	"github.com/superagent-ai/superagent-base/backend/pkg/observe"
@@ -45,12 +46,14 @@ type RuntimeConfig struct {
 // It loads YAML definitions, builds Agent instances, and keeps them in sync
 // with the filesystem via the Reloader/Watcher.
 type AgentRuntime struct {
-	mu        sync.RWMutex
-	agents    map[string]Agent
-	builder   *AgentBuilder
-	reloader  *Reloader
-	watcher   *Watcher
-	configDir string
+	mu           sync.RWMutex
+	agents       map[string]Agent
+	builder      *AgentBuilder
+	reloader     *Reloader
+	watcher      *Watcher
+	configDir    string
+	startTime    time.Time
+	lastReloadAt time.Time
 }
 
 // NewRuntime creates an AgentRuntime.  Call Start to populate and activate it.
@@ -59,6 +62,7 @@ func NewRuntime(cfg RuntimeConfig, builder *AgentBuilder) *AgentRuntime {
 		agents:    make(map[string]Agent),
 		builder:   builder,
 		configDir: cfg.ConfigDir,
+		startTime: time.Now(),
 	}
 	// Register a registry resolver on the builder so orchestration agents can
 	// look up already-loaded sub-agents by name at build time.
@@ -141,6 +145,60 @@ func (rt *AgentRuntime) Stop() {
 	if rt.watcher != nil {
 		_ = rt.watcher.Close()
 	}
+}
+
+// StartTime returns when the runtime was created.
+func (rt *AgentRuntime) StartTime() time.Time {
+	return rt.startTime
+}
+
+// LastReloadAt returns the timestamp of the most recent successful reload.
+func (rt *AgentRuntime) LastReloadAt() time.Time {
+	rt.mu.RLock()
+	defer rt.mu.RUnlock()
+	return rt.lastReloadAt
+}
+
+// Reload triggers a full reload of all agent definitions from the config directory.
+func (rt *AgentRuntime) Reload(ctx context.Context) error {
+	if rt.reloader == nil {
+		return fmt.Errorf("reloader not initialized")
+	}
+	if err := rt.reloader.ReloadDir(ctx, rt.configDir); err != nil {
+		return err
+	}
+	rt.mu.Lock()
+	rt.lastReloadAt = time.Now()
+	rt.mu.Unlock()
+	return nil
+}
+
+// AgentInfo holds basic information about a loaded agent for status reporting.
+type AgentInfo struct {
+	Name        string `json:"name"`
+	Type        string `json:"type"`
+	Status      string `json:"status"`
+	Description string `json:"description,omitempty"`
+}
+
+// AgentInfoList returns metadata about all loaded agents.
+func (rt *AgentRuntime) AgentInfoList() []AgentInfo {
+	rt.mu.RLock()
+	defer rt.mu.RUnlock()
+	infos := make([]AgentInfo, 0, len(rt.agents))
+	for name, agent := range rt.agents {
+		agentType := "unknown"
+		if def := agent.GetDefinition(); def != nil {
+			agentType = def.Spec.Type
+		}
+		infos = append(infos, AgentInfo{
+			Name:        name,
+			Type:        agentType,
+			Status:      "ok",
+			Description: agent.Description(),
+		})
+	}
+	return infos
 }
 
 // buildAll constructs Agent instances for every name in names from loader.

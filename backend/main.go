@@ -26,6 +26,7 @@ import (
 	"runtime/debug"
 	"strings"
 
+	"github.com/cloudwego/eino/callbacks"
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/app/server"
 	"github.com/cloudwego/hertz/pkg/common/config"
@@ -71,6 +72,10 @@ func main() {
 	if err := application.Init(ctx); err != nil {
 		panic("InitializeInfra failed, err=" + err.Error())
 	}
+
+	// OBS-001: Register Eino observability callback globally so all model/tool
+	// invocations automatically report Prometheus metrics and OTel spans.
+	callbacks.AppendGlobalHandlers(observe.NewEinoObserveCallback())
 
 	// Build the AgentRuntime that powers YAML-defined agents.
 	agentBuilder := agentdef.NewAgentBuilder(
@@ -227,6 +232,12 @@ func startHttpServer(agentRT *agentdef.AgentRuntime, skillMgr *skill.Manager) {
 	chatSSE := cozehandler.NewChatSSEHandler(agentRT)
 	s.POST("/api/v1/chat/stream", chatSSE.HandleChatStream)
 	s.GET("/api/v1/agents", chatSSE.HandleListAgents)
+
+	// Admin/monitoring endpoints.
+	adminH := cozehandler.NewAdminHandler(agentRT)
+	s.GET("/api/v1/admin/status", adminH.HandleStatus)
+	s.POST("/api/v1/admin/reload", adminH.HandleReload)
+	s.GET("/api/v1/admin/logs", adminH.HandleLogStream)
 
 	// Skill management API endpoints.
 	registerSkillRoutes(s, skillMgr)

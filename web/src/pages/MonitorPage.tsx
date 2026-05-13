@@ -1,56 +1,54 @@
+import { useState } from 'react'
 import Header from '../components/Header'
+import StatusPanel from '../components/monitor/StatusPanel'
+import MetricsPanel from '../components/monitor/MetricsPanel'
+import LogsPanel from '../components/monitor/LogsPanel'
+import AdminPanel from '../components/monitor/AdminPanel'
 
-const placeholderMetrics = [
-  { name: 'Active Agents', value: '3', trend: '+1 today' },
-  { name: 'Total Requests', value: '1,284', trend: '+42 last hour' },
-  { name: 'Avg Latency', value: '312ms', trend: '-18ms vs yesterday' },
-  { name: 'Error Rate', value: '0.4%', trend: 'stable' },
+type TabId = 'status' | 'metrics' | 'logs' | 'admin'
+
+const TABS: { id: TabId; label: string; icon: string }[] = [
+  { id: 'status', label: 'Status', icon: '✦' },
+  { id: 'metrics', label: 'Metrics', icon: '◈' },
+  { id: 'logs', label: 'Logs', icon: '≡' },
+  { id: 'admin', label: 'Admin', icon: '⚙' },
 ]
 
 export default function MonitorPage() {
+  const [activeTab, setActiveTab] = useState<TabId>('status')
+
   return (
     <div className="flex flex-col h-full">
       <Header title="Monitor" />
 
-      <div className="flex-1 overflow-auto p-6 space-y-6">
-        <p className="text-sm text-gray-500">
-          Real-time metrics and traces. Data will stream from the backend Prometheus/OpenTelemetry endpoints.
-        </p>
-
-        {/* KPI cards */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          {placeholderMetrics.map((m) => (
-            <div key={m.name} className="bg-white rounded-lg border border-gray-200 p-4">
-              <p className="text-xs text-gray-500 mb-1">{m.name}</p>
-              <p className="text-2xl font-bold text-gray-900">{m.value}</p>
-              <p className="text-xs text-gray-400 mt-1">{m.trend}</p>
-            </div>
+      {/* Tab bar */}
+      <div className="bg-white border-b border-gray-200 px-6">
+        <nav className="flex gap-1 -mb-px" role="tablist">
+          {TABS.map((tab) => (
+            <button
+              key={tab.id}
+              role="tab"
+              aria-selected={activeTab === tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`flex items-center gap-1.5 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+                activeTab === tab.id
+                  ? 'border-blue-600 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              <span className="text-base leading-none">{tab.icon}</span>
+              {tab.label}
+            </button>
           ))}
-        </div>
+        </nav>
+      </div>
 
-        {/* Chart placeholder */}
-        <div className="bg-white rounded-lg border border-gray-200 p-6">
-          <p className="text-sm font-medium text-gray-700 mb-3">Request Rate (last 1h)</p>
-          <div className="h-40 bg-gray-50 rounded flex items-center justify-center text-sm text-gray-400">
-            Chart will render here (connect to /metrics endpoint)
-          </div>
-        </div>
-
-        {/* Trace list placeholder */}
-        <div className="bg-white rounded-lg border border-gray-200 p-6">
-          <p className="text-sm font-medium text-gray-700 mb-3">Recent Traces</p>
-          <div className="space-y-2">
-            {['agent.run', 'tool.invoke', 'model.completion'].map((span) => (
-              <div
-                key={span}
-                className="flex items-center justify-between text-xs text-gray-600 bg-gray-50 px-3 py-2 rounded"
-              >
-                <span className="font-mono">{span}</span>
-                <span className="text-gray-400">–</span>
-              </div>
-            ))}
-          </div>
-        </div>
+      {/* Panel content */}
+      <div className="flex-1 overflow-auto p-6">
+        {activeTab === 'status' && <StatusPanel />}
+        {activeTab === 'metrics' && <MetricsPanel />}
+        {activeTab === 'logs' && <LogsPanel />}
+        {activeTab === 'admin' && <AdminPanel />}
       </div>
     </div>
   )
