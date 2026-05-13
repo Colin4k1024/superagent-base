@@ -447,7 +447,11 @@ func (a *observedAgent) Chat(ctx context.Context, sessionID string, message stri
 	go func() {
 		defer close(out)
 		for token := range ch {
-			out <- token
+			select {
+			case out <- token:
+			case <-ctx.Done():
+				return
+			}
 		}
 		if a.enableMetrics {
 			observe.AgentRequestsTotal.WithLabelValues(a.inner.Name(), "success").Inc()
@@ -480,7 +484,11 @@ func (a *timeoutAgent) Chat(ctx context.Context, sessionID string, message strin
 		defer close(out)
 		defer cancel()
 		for token := range ch {
-			out <- token
+			select {
+			case out <- token:
+			case <-ctx.Done():
+				return
+			}
 		}
 	}()
 	return out, nil
@@ -504,8 +512,13 @@ func (a *retryAgent) Chat(ctx context.Context, sessionID string, message string)
 			return ch, nil
 		}
 		lastErr = err
-		// Exponential backoff: 100ms, 200ms, 400ms...
-		time.Sleep(time.Duration(100<<uint(attempt)) * time.Millisecond)
+		// Exponential backoff: 100ms, 200ms, 400ms... — cancellable via ctx.
+		backoff := time.Duration(100<<uint(attempt)) * time.Millisecond
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case <-time.After(backoff):
+		}
 	}
 	return nil, fmt.Errorf("agentdef: retry exhausted after %d attempts: %w", a.maxAttempts, lastErr)
 }
@@ -579,6 +592,9 @@ type cacheEntry struct {
 	expiresAt time.Time
 }
 
+// maxCacheEntries is the maximum number of cached responses retained in memory.
+const maxCacheEntries = 1000
+
 // cacheAgent wraps an Agent with an in-memory response cache keyed by
 // SHA256(agentName + sessionID + message).
 type cacheAgent struct {
@@ -620,11 +636,36 @@ func (a *cacheAgent) Chat(ctx context.Context, sessionID string, message string)
 		defer close(out)
 		var tokens []string
 		for tok := range innerCh {
-			tokens = append(tokens, tok)
-			out <- tok
+			select {
+			case out <- tok:
+				tokens = append(tokens, tok)
+			case <-ctx.Done():
+				return
+			}
 		}
-		// Store in cache.
+		// Store in cache with eviction of expired/oldest entries.
 		a.mu.Lock()
+		now := time.Now()
+		// Evict expired entries first.
+		for k, e := range a.cache {
+			if now.After(e.expiresAt) {
+				delete(a.cache, k)
+			}
+		}
+		// If still at capacity, evict the oldest entry.
+		if len(a.cache) >= maxCacheEntries {
+			var oldestKey string
+			var oldestTime time.Time
+			for k, e := range a.cache {
+				if oldestKey == "" || e.expiresAt.Before(oldestTime) {
+					oldestKey = k
+					oldestTime = e.expiresAt
+				}
+			}
+			if oldestKey != "" {
+				delete(a.cache, oldestKey)
+			}
+		}
 		a.cache[key] = cacheEntry{
 			tokens:    tokens,
 			expiresAt: time.Now().Add(a.ttl),
@@ -635,10 +676,14 @@ func (a *cacheAgent) Chat(ctx context.Context, sessionID string, message string)
 }
 
 // cacheKey produces a SHA256 hex digest from the agent name, session ID, and message.
+// Fields are separated by a null byte to prevent collisions where field boundaries
+// shift (e.g. ("a","bc","d") vs ("ab","c","d")).
 func cacheKey(agentName, sessionID, message string) string {
 	h := sha256.New()
 	h.Write([]byte(agentName))
+	h.Write([]byte{0})
 	h.Write([]byte(sessionID))
+	h.Write([]byte{0})
 	h.Write([]byte(message))
 	return hex.EncodeToString(h.Sum(nil))
 }
@@ -946,7 +991,10 @@ func (a *einoChatAgent) Chat(ctx context.Context, sessionID string, message stri
 			chunk, err := reader.Recv()
 			if err != nil {
 				if !errors.Is(err, io.EOF) {
-					ch <- fmt.Sprintf("[error] %v", err)
+					select {
+					case ch <- fmt.Sprintf("[error] %v", err):
+					case <-ctx.Done():
+					}
 				}
 				// Save assistant response to memory
 				if a.memBackend != nil && sessionID != "" && fullResponse.Len() > 0 {
@@ -960,7 +1008,11 @@ func (a *einoChatAgent) Chat(ctx context.Context, sessionID string, message stri
 			}
 			if chunk != nil && chunk.Content != "" {
 				fullResponse.WriteString(chunk.Content)
-				ch <- chunk.Content
+				select {
+				case ch <- chunk.Content:
+				case <-ctx.Done():
+					return
+				}
 			}
 		}
 	}()
@@ -998,12 +1050,19 @@ func (a *einoReactAgent) Chat(ctx context.Context, _ string, message string) (<-
 			chunk, err := reader.Recv()
 			if err != nil {
 				if !errors.Is(err, io.EOF) {
-					ch <- fmt.Sprintf("[error] %v", err)
+					select {
+					case ch <- fmt.Sprintf("[error] %v", err):
+					case <-ctx.Done():
+					}
 				}
 				return
 			}
 			if chunk != nil && chunk.Content != "" {
-				ch <- chunk.Content
+				select {
+				case ch <- chunk.Content:
+				case <-ctx.Done():
+					return
+				}
 			}
 		}
 	}()

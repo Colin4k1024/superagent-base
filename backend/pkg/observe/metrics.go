@@ -83,3 +83,12 @@ var (
 		Help: "Number of active conversation sessions",
 	})
 )
+
+// Runtime metrics.
+var (
+	// AgentReloadFailures counts agent hot-reload failures by agent name.
+	AgentReloadFailures = promauto.NewCounterVec(prometheus.CounterOpts{
+		Name: "superagent_agent_reload_failures_total",
+		Help: "Total agent hot-reload build failures",
+	}, []string{"agent_id"})
+)

@@ -22,8 +22,8 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -108,7 +108,7 @@ func (w *WorkflowAgent) executeNode(ctx context.Context, sessionID string, node 
 	case "tool_call":
 		return w.executeToolNode(node, state)
 	case "code":
-		return w.executeCodeNode(node, state)
+		return w.executeCodeNode(ctx, node, state)
 	case "condition":
 		return w.executeConditionNode(node, state)
 	default:
@@ -125,13 +125,19 @@ func (w *WorkflowAgent) executeLLMNode(ctx context.Context, sessionID string, no
 
 	// Synthesise a minimal AgentDefinition so the embedded agent satisfies the
 	// Agent interface contract (Name, Description, GetDefinition).
+	// H9 fix: prefer the workflow's YAML-declared model.primary over the global
+	// runtime model; fall back to global only if YAML primary is empty.
+	nodeModelID := w.def.Spec.Model.Primary
+	if nodeModelID == "" {
+		nodeModelID = w.modelCfg.ModelID
+	}
 	synthDef := &AgentDefinition{
 		APIVersion: "superagent/v1",
 		Kind:       "Agent",
 		Metadata:   Metadata{Name: node.ID},
 		Spec: AgentSpec{
 			Type:         "chat_model_agent",
-			Model:        ModelSpec{Primary: w.modelCfg.ModelID},
+			Model:        ModelSpec{Primary: nodeModelID},
 			SystemPrompt: prompt,
 		},
 	}
@@ -193,11 +199,56 @@ func (w *WorkflowAgent) executeToolNode(node *WorkflowNode, state map[string]str
 	return fmt.Sprintf("[tool:%s] input=%s", node.Tool, input), nil
 }
 
-// executeCodeNode executes user-defined code in a local process.
+// codeSandboxMode determines the execution mode for code nodes.
+// Controlled by env WORKFLOW_CODE_SANDBOX: "docker" (default) or "none" (reject).
+func codeSandboxMode() string {
+	mode := os.Getenv("WORKFLOW_CODE_SANDBOX")
+	if mode == "" {
+		mode = "docker"
+	}
+	return mode
+}
+
+// dockerAvailable checks if Docker daemon is reachable.
+var dockerAvailableOnce sync.Once
+var dockerOK bool
+
+func checkDockerAvailable() bool {
+	dockerAvailableOnce.Do(func() {
+		cmd := exec.Command("docker", "info")
+		dockerOK = cmd.Run() == nil
+	})
+	return dockerOK
+}
+
+// dockerImageForLang returns the Docker image to use for a given language.
+func dockerImageForLang(lang string) string {
+	switch lang {
+	case "python":
+		return "python:3.11-slim"
+	case "javascript", "js":
+		return "node:20-slim"
+	case "bash", "shell", "sh":
+		return "alpine:3.19"
+	default:
+		return ""
+	}
+}
+
+// executeCodeNode executes user-defined code in a sandboxed container.
 // Supported languages: python, javascript, bash.
-// Input data is injected as a variable at the top of the user code.
+// Input data is passed via stdin to eliminate injection vectors.
 // Execution is bounded by a 10-second timeout.
-func (w *WorkflowAgent) executeCodeNode(node *WorkflowNode, state map[string]string) (string, error) {
+//
+// Security: Code runs inside a Docker container with:
+//   - --network=none (no network access)
+//   - --memory=128m (memory limit)
+//   - --cpus=0.5 (CPU limit)
+//   - --read-only (read-only filesystem)
+//   - --no-new-privileges
+//
+// When Docker is unavailable or WORKFLOW_CODE_SANDBOX=none, execution is rejected.
+func (w *WorkflowAgent) executeCodeNode(ctx context.Context, node *WorkflowNode, state map[string]string) (string, error) {
 	code := w.resolveTemplate(node.Code, state)
 	input := w.resolveInput(node.InputMapping, state)
 	lang := strings.ToLower(node.Language)
@@ -206,49 +257,59 @@ func (w *WorkflowAgent) executeCodeNode(node *WorkflowNode, state map[string]str
 		return "", fmt.Errorf("executeCodeNode: language is required")
 	}
 
-	// Determine the runtime command and file extension, then build the
-	// full source with input injection.
-	var cmd string
-	var ext string
-	var fullSource string
+	// Check sandbox mode.
+	mode := codeSandboxMode()
+	if mode == "none" {
+		return "", fmt.Errorf("executeCodeNode: code execution is disabled (WORKFLOW_CODE_SANDBOX=none)")
+	}
 
-	switch lang {
-	case "python":
-		cmd = "python3"
-		ext = ".py"
-		// Inject input as a triple-quoted variable to handle multiline safely.
-		escapedInput := strings.ReplaceAll(input, `\`, `\\`)
-		escapedInput = strings.ReplaceAll(escapedInput, `"""`, `\"\"\"`)
-		fullSource = fmt.Sprintf("input_data = \"\"\"%s\"\"\"\n%s", escapedInput, code)
-	case "javascript", "js":
-		cmd = "node"
-		ext = ".js"
-		// Inject input as a template literal to handle multiline.
-		escapedInput := strings.ReplaceAll(input, "`", "\\`")
-		escapedInput = strings.ReplaceAll(escapedInput, `$`, `\$`)
-		fullSource = fmt.Sprintf("const input_data = `%s`;\n%s", escapedInput, code)
-	case "bash", "shell", "sh":
-		cmd = "bash"
-		ext = ".sh"
-		// Inject input as a heredoc-style variable.
-		fullSource = fmt.Sprintf("INPUT_DATA='%s'\n%s", strings.ReplaceAll(input, "'", "'\\''"), code)
-	default:
+	if !checkDockerAvailable() {
+		return "", fmt.Errorf("executeCodeNode: Docker is not available; code execution requires a container runtime")
+	}
+
+	image := dockerImageForLang(lang)
+	if image == "" {
 		return "", fmt.Errorf("executeCodeNode: unsupported language %q (supported: python, javascript, bash)", lang)
 	}
 
-	// Write the source to a temp file.
-	tmpDir := os.TempDir()
-	tmpFile := filepath.Join(tmpDir, fmt.Sprintf("workflow_code_%d%s", time.Now().UnixNano(), ext))
-	if err := os.WriteFile(tmpFile, []byte(fullSource), 0600); err != nil {
-		return "", fmt.Errorf("executeCodeNode: write temp file: %w", err)
+	// Build the command to run inside the container.
+	// Input is passed via stdin; code is passed as an inline argument.
+	var containerCmd []string
+	switch lang {
+	case "python":
+		// Read stdin into input_data variable, then exec user code.
+		wrappedCode := "import sys; input_data = sys.stdin.read()\n" + code
+		containerCmd = []string{"python3", "-c", wrappedCode}
+	case "javascript", "js":
+		wrappedCode := "const input_data = require('fs').readFileSync(0, 'utf8');\n" + code
+		containerCmd = []string{"node", "-e", wrappedCode}
+	case "bash", "shell", "sh":
+		wrappedCode := "INPUT_DATA=$(cat)\n" + code
+		containerCmd = []string{"sh", "-c", wrappedCode}
 	}
-	defer os.Remove(tmpFile)
 
-	// Execute with a 10-second timeout.
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	// Execute with a 10-second timeout derived from the caller's context.
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
-	execCmd := exec.CommandContext(ctx, cmd, tmpFile)
+	// Build docker run command with security constraints.
+	args := []string{
+		"run", "--rm",
+		"--network=none",
+		"--memory=128m",
+		"--cpus=0.5",
+		"--read-only",
+		"--no-new-privileges",
+		"--tmpfs", "/tmp:rw,size=16m",
+		"-i", // stdin enabled
+		image,
+	}
+	args = append(args, containerCmd...)
+
+	execCmd := exec.CommandContext(ctx, "docker", args...)
+
+	// Pass input via stdin to eliminate injection risk.
+	execCmd.Stdin = strings.NewReader(input)
 
 	var stdout, stderr bytes.Buffer
 	execCmd.Stdout = &stdout
@@ -259,7 +320,6 @@ func (w *WorkflowAgent) executeCodeNode(node *WorkflowNode, state map[string]str
 		return "", fmt.Errorf("executeCodeNode: execution timed out after 10s")
 	}
 	if err != nil {
-		// Return stderr + error as a descriptive message rather than crashing.
 		errMsg := stderr.String()
 		if errMsg == "" {
 			errMsg = err.Error()

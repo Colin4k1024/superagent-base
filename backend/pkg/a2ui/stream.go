@@ -16,15 +16,18 @@
 
 package a2ui
 
-import "sync"
+import "sync/atomic"
 
 // EventStream is a thread-safe, buffered channel of A2UI events.
 // Producers call Send* helpers; consumers read from Chan().
 // Close is idempotent: the first call closes the underlying channel.
+//
+// The closed state is tracked via an atomic int32 so that Send never
+// blocks while holding a lock — preventing the deadlock where a full
+// channel + concurrent Close would starve each other.
 type EventStream struct {
 	ch     chan *Event
-	closed bool
-	mu     sync.Mutex
+	closed atomic.Int32 // 0 = open, 1 = closed
 }
 
 // NewEventStream creates an EventStream with the given channel buffer size.
@@ -33,11 +36,18 @@ func NewEventStream(bufSize int) *EventStream {
 }
 
 // Send enqueues an event. Calls after Close are silently dropped.
+// If the channel buffer is full, Send performs a non-blocking attempt:
+// the event is dropped rather than deadlocking the stream.
 func (s *EventStream) Send(evt *Event) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if !s.closed {
-		s.ch <- evt
+	if s.closed.Load() != 0 {
+		return
+	}
+	select {
+	case s.ch <- evt:
+	default:
+		// Channel full — drop event to prevent deadlock.
+		// In production this means back-pressure from a slow consumer;
+		// callers should size the buffer appropriately.
 	}
 }
 
@@ -85,10 +95,7 @@ func (s *EventStream) SendError(code, msg string) {
 // Close closes the underlying channel. Subsequent Send calls are no-ops.
 // Close is safe to call multiple times.
 func (s *EventStream) Close() {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if !s.closed {
-		s.closed = true
+	if s.closed.CompareAndSwap(0, 1) {
 		close(s.ch)
 	}
 }

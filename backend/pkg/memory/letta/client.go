@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"time"
 )
 
@@ -116,7 +117,7 @@ type archivalSearchParams struct {
 // SendMessage sends one or more messages to a Letta agent and returns the response.
 // POST /v1/agents/{agentID}/messages
 func (c *APIClient) SendMessage(ctx context.Context, agentID string, message string) (*Response, error) {
-	path := "/v1/agents/" + agentID + "/messages"
+	path := "/v1/agents/" + url.PathEscape(agentID) + "/messages"
 	body := SendMessageRequest{
 		Messages: []UserMessage{{Role: "user", Content: message}},
 	}
@@ -130,7 +131,7 @@ func (c *APIClient) SendMessage(ctx context.Context, agentID string, message str
 // GetCoreMemory fetches the agent's core (in-context) memory.
 // GET /v1/agents/{agentID}/core-memory
 func (c *APIClient) GetCoreMemory(ctx context.Context, agentID string) (*CoreMemory, error) {
-	path := "/v1/agents/" + agentID + "/core-memory"
+	path := "/v1/agents/" + url.PathEscape(agentID) + "/core-memory"
 	var cm CoreMemory
 	if err := c.doJSON(ctx, http.MethodGet, path, nil, &cm); err != nil {
 		return nil, fmt.Errorf("letta GetCoreMemory: %w", err)
@@ -141,7 +142,7 @@ func (c *APIClient) GetCoreMemory(ctx context.Context, agentID string) (*CoreMem
 // UpdateCoreMemory updates a named block in the agent's core memory.
 // PATCH /v1/agents/{agentID}/core-memory/blocks/{blockLabel}
 func (c *APIClient) UpdateCoreMemory(ctx context.Context, agentID string, section string, value string) error {
-	path := "/v1/agents/" + agentID + "/core-memory/blocks/" + section
+	path := "/v1/agents/" + url.PathEscape(agentID) + "/core-memory/blocks/" + url.PathEscape(section)
 	body := UpdateCoreMemoryRequest{Value: value}
 	if err := c.doJSON(ctx, http.MethodPatch, path, body, nil); err != nil {
 		return fmt.Errorf("letta UpdateCoreMemory: %w", err)
@@ -152,7 +153,7 @@ func (c *APIClient) UpdateCoreMemory(ctx context.Context, agentID string, sectio
 // SearchArchival searches the agent's archival (long-term) memory.
 // GET /v1/agents/{agentID}/archival?query=...&limit=...
 func (c *APIClient) SearchArchival(ctx context.Context, agentID string, query string, limit int) ([]ArchivalEntry, error) {
-	path := fmt.Sprintf("/v1/agents/%s/archival?query=%s", agentID, urlEncode(query))
+	path := fmt.Sprintf("/v1/agents/%s/archival?query=%s", url.PathEscape(agentID), urlEncode(query))
 	if limit > 0 {
 		path += fmt.Sprintf("&limit=%d", limit)
 	}
@@ -166,7 +167,7 @@ func (c *APIClient) SearchArchival(ctx context.Context, agentID string, query st
 // InsertArchival adds a passage to the agent's archival memory.
 // POST /v1/agents/{agentID}/archival
 func (c *APIClient) InsertArchival(ctx context.Context, agentID string, content string) (*ArchivalEntry, error) {
-	path := "/v1/agents/" + agentID + "/archival"
+	path := "/v1/agents/" + url.PathEscape(agentID) + "/archival"
 	body := InsertArchivalRequest{Text: content}
 	var entry ArchivalEntry
 	if err := c.doJSON(ctx, http.MethodPost, path, body, &entry); err != nil {
@@ -178,7 +179,7 @@ func (c *APIClient) InsertArchival(ctx context.Context, agentID string, content 
 // DeleteArchival removes an archival passage by ID.
 // DELETE /v1/agents/{agentID}/archival/{passageID}
 func (c *APIClient) DeleteArchival(ctx context.Context, agentID string, passageID string) error {
-	path := "/v1/agents/" + agentID + "/archival/" + passageID
+	path := "/v1/agents/" + url.PathEscape(agentID) + "/archival/" + url.PathEscape(passageID)
 	if err := c.doJSON(ctx, http.MethodDelete, path, nil, nil); err != nil {
 		return fmt.Errorf("letta DeleteArchival: %w", err)
 	}

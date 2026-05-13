@@ -22,6 +22,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"regexp"
 	"time"
 
 	"github.com/google/uuid"
@@ -29,6 +30,18 @@ import (
 	"github.com/superagent-ai/superagent-base/backend/infra/cache"
 	"github.com/superagent-ai/superagent-base/backend/pkg/memory"
 )
+
+// sanitizeKeyPart prevents Redis key injection by stripping characters
+// outside the safe set [a-zA-Z0-9_\-\.]. Empty inputs are replaced with "_".
+var unsafeKeyChars = regexp.MustCompile(`[^a-zA-Z0-9_\-\.]`)
+
+func sanitizeKeyPart(s string) string {
+	clean := unsafeKeyChars.ReplaceAllString(s, "")
+	if clean == "" {
+		return "_"
+	}
+	return clean
+}
 
 const (
 	backendName = "builtin"
@@ -91,7 +104,7 @@ func (b *builtinBackend) AddMessage(ctx context.Context, sessionID string, msg m
 	if err != nil {
 		return fmt.Errorf("builtin memory AddMessage: marshal: %w", err)
 	}
-	key := prefixShortTerm + sessionID
+	key := prefixShortTerm + sanitizeKeyPart(sessionID)
 	if err := b.cache.RPush(ctx, key, string(data)).Err(); err != nil {
 		return fmt.Errorf("builtin memory AddMessage: rpush: %w", err)
 	}
@@ -102,7 +115,7 @@ func (b *builtinBackend) AddMessage(ctx context.Context, sessionID string, msg m
 // GetMessages returns messages for a session, newest-first when opts.Before is
 // set, or all messages (oldest-first) otherwise.
 func (b *builtinBackend) GetMessages(ctx context.Context, sessionID string, opts memory.GetMessagesOpts) ([]memory.Message, error) {
-	key := prefixShortTerm + sessionID
+	key := prefixShortTerm + sanitizeKeyPart(sessionID)
 	raw, err := b.cache.LRange(ctx, key, 0, -1).Result()
 	if err != nil {
 		return nil, fmt.Errorf("builtin memory GetMessages: lrange: %w", err)
@@ -129,7 +142,7 @@ func (b *builtinBackend) GetMessages(ctx context.Context, sessionID string, opts
 
 // ClearSession removes all messages for a session.
 func (b *builtinBackend) ClearSession(ctx context.Context, sessionID string) error {
-	key := prefixShortTerm + sessionID
+	key := prefixShortTerm + sanitizeKeyPart(sessionID)
 	if err := b.cache.Del(ctx, key).Err(); err != nil {
 		return fmt.Errorf("builtin memory ClearSession: %w", err)
 	}
@@ -153,7 +166,7 @@ func (b *builtinBackend) Add(ctx context.Context, userID string, content string,
 	if err != nil {
 		return "", fmt.Errorf("builtin memory Add: marshal: %w", err)
 	}
-	key := prefixLongTerm + userID
+	key := prefixLongTerm + sanitizeKeyPart(userID)
 	if err := b.cache.HSet(ctx, key, id, string(data)).Err(); err != nil {
 		return "", fmt.Errorf("builtin memory Add: hset: %w", err)
 	}
@@ -195,7 +208,7 @@ func (b *builtinBackend) Update(ctx context.Context, memoryID string, content st
 // Delete removes a memory entry by ID.
 func (b *builtinBackend) Delete(ctx context.Context, memoryID string) error {
 	userID, entryID := splitMemoryID(memoryID)
-	key := prefixLongTerm + userID
+	key := prefixLongTerm + sanitizeKeyPart(userID)
 	if err := b.cache.Del(ctx, key+":"+entryID).Err(); err != nil {
 		return fmt.Errorf("builtin memory Delete: %w", err)
 	}
@@ -204,7 +217,7 @@ func (b *builtinBackend) Delete(ctx context.Context, memoryID string) error {
 
 // GetAll returns all memory entries for a user with optional pagination.
 func (b *builtinBackend) GetAll(ctx context.Context, userID string, opts memory.ListOpts) ([]memory.MemoryEntry, error) {
-	key := prefixLongTerm + userID
+	key := prefixLongTerm + sanitizeKeyPart(userID)
 	raw, err := b.cache.HGetAll(ctx, key).Result()
 	if err != nil {
 		return nil, fmt.Errorf("builtin memory GetAll: hgetall: %w", err)
@@ -238,7 +251,7 @@ func (b *builtinBackend) SetState(ctx context.Context, agentID string, key strin
 	if err != nil {
 		return fmt.Errorf("builtin memory SetState: marshal: %w", err)
 	}
-	hashKey := prefixAgentState + agentID
+	hashKey := prefixAgentState + sanitizeKeyPart(agentID)
 	if err := b.cache.HSet(ctx, hashKey, key, string(data)).Err(); err != nil {
 		return fmt.Errorf("builtin memory SetState: hset: %w", err)
 	}
@@ -256,20 +269,18 @@ func (b *builtinBackend) GetState(ctx context.Context, agentID string, key strin
 	return v, ok, nil
 }
 
-// DeleteState removes a state key from an agent's hash.
-// HDel is not exposed by cache.Cmdable, so we read-modify-write the hash.
+// DeleteState removes a state key from an agent's hash atomically using HDel.
 func (b *builtinBackend) DeleteState(ctx context.Context, agentID string, key string) error {
-	all, err := b.GetAllState(ctx, agentID)
-	if err != nil {
-		return err
+	hashKey := prefixAgentState + sanitizeKeyPart(agentID)
+	if err := b.cache.HDel(ctx, hashKey, key).Err(); err != nil {
+		return fmt.Errorf("builtin memory DeleteState: hdel: %w", err)
 	}
-	delete(all, key)
-	return b.replaceAgentState(ctx, agentID, all)
+	return nil
 }
 
 // GetAllState returns all state keys for an agent.
 func (b *builtinBackend) GetAllState(ctx context.Context, agentID string) (map[string]any, error) {
-	hashKey := prefixAgentState + agentID
+	hashKey := prefixAgentState + sanitizeKeyPart(agentID)
 	raw, err := b.cache.HGetAll(ctx, hashKey).Result()
 	if err != nil {
 		return nil, fmt.Errorf("builtin memory GetAllState: hgetall: %w", err)
@@ -290,7 +301,7 @@ func (b *builtinBackend) GetAllState(ctx context.Context, agentID string) (map[s
 
 func (b *builtinBackend) updateEntry(ctx context.Context, memoryID string, content string) error {
 	userID, entryID := splitMemoryID(memoryID)
-	key := prefixLongTerm + userID
+	key := prefixLongTerm + sanitizeKeyPart(userID)
 	raw, err := b.cache.HGetAll(ctx, key).Result()
 	if err != nil {
 		return fmt.Errorf("builtin memory Update: hgetall: %w", err)
@@ -313,7 +324,7 @@ func (b *builtinBackend) updateEntry(ctx context.Context, memoryID string, conte
 }
 
 func (b *builtinBackend) replaceAgentState(ctx context.Context, agentID string, state map[string]any) error {
-	hashKey := prefixAgentState + agentID
+	hashKey := prefixAgentState + sanitizeKeyPart(agentID)
 	if err := b.cache.Del(ctx, hashKey).Err(); err != nil {
 		return fmt.Errorf("builtin memory replaceAgentState: del: %w", err)
 	}

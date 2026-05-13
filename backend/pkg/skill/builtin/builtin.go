@@ -20,6 +20,7 @@ package builtin
 
 import (
 	"context"
+	cryptorand "crypto/rand"
 	"fmt"
 	"math"
 	"strconv"
@@ -155,12 +156,10 @@ func evalSimple(expr string) (float64, error) {
 // generateUUID returns a random UUID v4 string using crypto/rand.
 func generateUUID() string {
 	var b [16]byte
-	// Use time-seeded pseudo-random to avoid importing crypto/rand for this
-	// lightweight built-in; replace with crypto/rand if security is required.
-	seed := time.Now().UnixNano()
-	for i := range b {
-		b[i] = byte(seed>>uint(i*3)) ^ byte(seed>>(64-uint(i*3+1)))
-		seed = seed*6364136223846793005 + 1442695040888963407
+	if _, err := cryptorand.Read(b[:]); err != nil {
+		// Fallback should never happen in practice; panic is appropriate for
+		// a broken random source since it compromises session security.
+		panic("crypto/rand unavailable: " + err.Error())
 	}
 	// Set version 4 and variant bits.
 	b[6] = (b[6] & 0x0f) | 0x40
