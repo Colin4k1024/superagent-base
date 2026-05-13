@@ -86,6 +86,11 @@ func (r *redisImpl) HGetAll(ctx context.Context, key string) cache.MapStringStri
 	return r.client.HGetAll(ctx, key)
 }
 
+// HDel implements cache.Cmdable.
+func (r *redisImpl) HDel(ctx context.Context, key string, fields ...string) cache.IntCmd {
+	return r.client.HDel(ctx, key, fields...)
+}
+
 // HSet implements cache.Cmdable.
 func (r *redisImpl) HSet(ctx context.Context, key string, values ...interface{}) cache.IntCmd {
 	return r.client.HSet(ctx, key, values...)
@@ -194,6 +199,11 @@ func (p *pipelineImpl) Get(ctx context.Context, key string) cache.StringCmd {
 // HGetAll implements cache.Pipeliner.
 func (p *pipelineImpl) HGetAll(ctx context.Context, key string) cache.MapStringStringCmd {
 	return p.p.HGetAll(ctx, key)
+}
+
+// HDel implements cache.Pipeliner.
+func (p *pipelineImpl) HDel(ctx context.Context, key string, fields ...string) cache.IntCmd {
+	return p.p.HDel(ctx, key, fields...)
 }
 
 // HSet implements cache.Pipeliner.

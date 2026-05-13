@@ -45,6 +45,7 @@ type StringCmdable interface {
 type HashCmdable interface {
 	HSet(ctx context.Context, key string, values ...interface{}) IntCmd
 	HGetAll(ctx context.Context, key string) MapStringStringCmd
+	HDel(ctx context.Context, key string, fields ...string) IntCmd
 }
 
 type GenericCmdable interface {

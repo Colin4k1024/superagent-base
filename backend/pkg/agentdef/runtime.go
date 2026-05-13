@@ -22,6 +22,7 @@ import (
 	"sync"
 
 	"github.com/superagent-ai/superagent-base/backend/pkg/logs"
+	"github.com/superagent-ai/superagent-base/backend/pkg/observe"
 )
 
 // ModelRuntimeConfig holds the LLM endpoint configuration.
@@ -172,21 +173,35 @@ func (rt *AgentRuntime) buildAll(ctx context.Context, names []string, loader int
 	}
 
 	// Pass 1: build leaf agents (non-orchestration types).
+	var buildErrors []string
 	for name, def := range defs {
 		if _, isOrch := orchestrationTypes[def.Spec.Type]; isOrch {
 			continue
 		}
 		agent, err := rt.builder.Build(ctx, def)
 		if err != nil {
-			return fmt.Errorf("agentdef runtime: build %q: %w", name, err)
+			// Log warning and record metric; keep existing agent intact.
+			logs.Warnf("agentdef runtime: build %q failed (keeping old): %v", name, err)
+			observe.AgentReloadFailures.WithLabelValues(name).Inc()
+			buildErrors = append(buildErrors, name)
+			continue
 		}
 		built[name] = agent
 		logs.Infof("agentdef runtime: built agent %q (model=%s)", name, def.Spec.Model.Primary)
 	}
 
-	// Make leaf agents available in the registry before building orchestration agents.
+	// Incremental merge: only update successfully built agents; preserve
+	// existing agents that failed to rebuild (H8 fix).
 	rt.mu.Lock()
-	rt.agents = built
+	for name, agent := range built {
+		rt.agents[name] = agent
+	}
+	// Remove agents that were deleted from YAML (present in old map, absent from defs).
+	for name := range rt.agents {
+		if _, inDefs := defs[name]; !inDefs {
+			delete(rt.agents, name)
+		}
+	}
 	rt.mu.Unlock()
 
 	// Pass 2: build orchestration agents (can now resolve sub-agents via registry).
@@ -196,7 +211,10 @@ func (rt *AgentRuntime) buildAll(ctx context.Context, names []string, loader int
 		}
 		agent, err := rt.builder.Build(ctx, def)
 		if err != nil {
-			return fmt.Errorf("agentdef runtime: build %q: %w", name, err)
+			logs.Warnf("agentdef runtime: build orchestration %q failed (keeping old): %v", name, err)
+			observe.AgentReloadFailures.WithLabelValues(name).Inc()
+			buildErrors = append(buildErrors, name)
+			continue
 		}
 		rt.mu.Lock()
 		rt.agents[name] = agent
@@ -204,5 +222,8 @@ func (rt *AgentRuntime) buildAll(ctx context.Context, names []string, loader int
 		logs.Infof("agentdef runtime: built orchestration agent %q (type=%s)", name, def.Spec.Type)
 	}
 
+	if len(buildErrors) > 0 {
+		logs.Warnf("agentdef runtime: %d agent(s) failed to build: %v", len(buildErrors), buildErrors)
+	}
 	return nil
 }

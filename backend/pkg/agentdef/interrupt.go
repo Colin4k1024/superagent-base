@@ -83,6 +83,10 @@ var confirmationKeywords = []string{
 	"need your approval",
 }
 
+// maxInterruptEntries is the maximum number of interrupt states retained in memory.
+// When exceeded, the oldest entries are evicted (LRU by expiry time).
+const maxInterruptEntries = 1000
+
 // InterruptableAgent wraps an Agent with interrupt/resume capability.
 type InterruptableAgent struct {
 	inner      Agent
@@ -131,7 +135,10 @@ func (a *InterruptableAgent) Chat(ctx context.Context, sessionID string, message
 
 		innerCh, err := a.inner.Chat(ctx, sessionID, message)
 		if err != nil {
-			ch <- fmt.Sprintf("[error] %v", err)
+			select {
+			case ch <- fmt.Sprintf("[error] %v", err):
+			case <-ctx.Done():
+			}
 			return
 		}
 
@@ -150,13 +157,20 @@ func (a *InterruptableAgent) Chat(ctx context.Context, sessionID string, message
 				_ = saveErr
 			}
 			data, _ := json.Marshal(state)
-			ch <- interruptPrefix + string(data)
+			select {
+			case ch <- interruptPrefix + string(data):
+			case <-ctx.Done():
+			}
 			return
 		}
 
 		// No interrupt detected — stream the buffered tokens.
 		for _, tok := range tokens {
-			ch <- tok
+			select {
+			case ch <- tok:
+			case <-ctx.Done():
+				return
+			}
 		}
 	}()
 	return ch, nil
@@ -204,6 +218,27 @@ func (a *InterruptableAgent) detectInterrupt(response, sessionID string) *Interr
 // saveInterruptState persists the interrupt state both in-memory and in the store.
 func (a *InterruptableAgent) saveInterruptState(ctx context.Context, sessionID string, state *InterruptState) error {
 	a.mu.Lock()
+	// Evict expired entries and enforce maxSize (LRU by expiry).
+	now := time.Now()
+	for k, e := range a.interrupts {
+		if now.After(e.expiresAt) {
+			delete(a.interrupts, k)
+		}
+	}
+	if len(a.interrupts) >= maxInterruptEntries {
+		// Evict the oldest entry by earliest expiresAt.
+		var oldestKey string
+		var oldestTime time.Time
+		for k, e := range a.interrupts {
+			if oldestKey == "" || e.expiresAt.Before(oldestTime) {
+				oldestKey = k
+				oldestTime = e.expiresAt
+			}
+		}
+		if oldestKey != "" {
+			delete(a.interrupts, oldestKey)
+		}
+	}
 	a.interrupts[sessionID] = &interruptEntry{
 		state:     state,
 		expiresAt: time.Now().Add(a.timeout),
