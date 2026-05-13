@@ -3,6 +3,7 @@ package coze
 import (
 	"context"
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/cloudwego/hertz/pkg/app"
@@ -11,6 +12,25 @@ import (
 	"github.com/superagent-ai/superagent-base/backend/pkg/agentdef"
 	"github.com/superagent-ai/superagent-base/backend/pkg/logs"
 )
+
+// adminAPIKey is the token required for mutating admin operations (reload, logs).
+// Set via ADMIN_API_KEY env; when empty, admin write endpoints are disabled.
+var adminAPIKey = os.Getenv("ADMIN_API_KEY")
+
+// checkAdminAuth validates the Authorization header for protected admin endpoints.
+// Returns true if authorized, false if rejected (response already written).
+func checkAdminAuth(c *app.RequestContext) bool {
+	if adminAPIKey == "" {
+		// No key configured → allow (dev mode). Production should always set ADMIN_API_KEY.
+		return true
+	}
+	token := string(c.GetHeader("Authorization"))
+	if token == "Bearer "+adminAPIKey {
+		return true
+	}
+	c.JSON(403, map[string]string{"error": "forbidden: invalid or missing admin API key"})
+	return false
+}
 
 // AdminHandler provides endpoints for system monitoring and administration.
 type AdminHandler struct {
@@ -55,7 +75,11 @@ func (h *AdminHandler) HandleStatus(_ context.Context, c *app.RequestContext) {
 
 // HandleReload triggers a hot-reload of all agent definitions.
 // POST /api/v1/admin/reload
+// Protected by ADMIN_API_KEY when configured.
 func (h *AdminHandler) HandleReload(ctx context.Context, c *app.RequestContext) {
+	if !checkAdminAuth(c) {
+		return
+	}
 	if h.runtime == nil {
 		c.JSON(503, map[string]string{"error": "runtime not available"})
 		return
@@ -76,9 +100,14 @@ func (h *AdminHandler) HandleReload(ctx context.Context, c *app.RequestContext) 
 
 // HandleLogStream streams log entries as Server-Sent Events.
 // GET /api/v1/admin/logs
-func (h *AdminHandler) HandleLogStream(_ context.Context, c *app.RequestContext) {
+// Protected by ADMIN_API_KEY when configured.
+func (h *AdminHandler) HandleLogStream(ctx context.Context, c *app.RequestContext) {
+	if !checkAdminAuth(c) {
+		return
+	}
 	broadcaster := logs.GetBroadcaster()
 	logCh, unsubscribe := broadcaster.Subscribe()
+	defer unsubscribe()
 
 	// Set SSE headers.
 	c.Response.Header.Set("Cache-Control", "no-cache")
@@ -87,16 +116,30 @@ func (h *AdminHandler) HandleLogStream(_ context.Context, c *app.RequestContext)
 	c.Response.Header.Set("Access-Control-Allow-Origin", "*")
 
 	w := sse.NewWriter(c)
+	defer func() { _ = w.Close() }()
 
-	// Stream log entries until client disconnects.
-	for entry := range logCh {
-		data := logs.MarshalEntry(entry)
-		if err := w.WriteEvent("", "log", data); err != nil {
-			// Client disconnected.
-			break
+	// Heartbeat every 15 s detects dead connections even when no logs arrive.
+	ticker := time.NewTicker(15 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case entry, ok := <-logCh:
+			if !ok {
+				return
+			}
+			data := logs.MarshalEntry(entry)
+			if err := w.WriteEvent("", "log", data); err != nil {
+				// Client disconnected.
+				return
+			}
+		case <-ticker.C:
+			// SSE keepalive; also detects broken connections on write failure.
+			if err := w.WriteEvent("", "heartbeat", []byte(`{"type":"ping"}`)); err != nil {
+				return
+			}
+		case <-ctx.Done():
+			return
 		}
 	}
-
-	unsubscribe()
-	_ = w.Close()
 }

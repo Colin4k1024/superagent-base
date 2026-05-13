@@ -107,7 +107,7 @@ func (h *ChatSSEHandler) HandleChatStream(ctx context.Context, c *app.RequestCon
 	if useA2UI {
 		mode = "a2ui"
 	}
-	observe.AgentRequestsTotal.WithLabelValues(req.AgentID, mode).Inc()
+	observe.AgentRequestsByMode.WithLabelValues(req.AgentID, mode).Inc()
 
 	// OBS-003: Create OTel Agent span (no-op when OTEL_ENABLED=false).
 	ctx, span := observe.StartAgentSpan(ctx, req.AgentID, "chat")

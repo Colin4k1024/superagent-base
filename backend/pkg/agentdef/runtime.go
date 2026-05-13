@@ -160,17 +160,17 @@ func (rt *AgentRuntime) LastReloadAt() time.Time {
 }
 
 // Reload triggers a full reload of all agent definitions from the config directory.
+// lastReloadAt is always updated (even on partial failure) so operators know when
+// the last reload attempt occurred; check AgentReloadFailures metric for errors.
 func (rt *AgentRuntime) Reload(ctx context.Context) error {
 	if rt.reloader == nil {
 		return fmt.Errorf("reloader not initialized")
 	}
-	if err := rt.reloader.ReloadDir(ctx, rt.configDir); err != nil {
-		return err
-	}
+	err := rt.reloader.ReloadDir(ctx, rt.configDir)
 	rt.mu.Lock()
 	rt.lastReloadAt = time.Now()
 	rt.mu.Unlock()
-	return nil
+	return err
 }
 
 // AgentInfo holds basic information about a loaded agent for status reporting.

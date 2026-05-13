@@ -446,15 +446,27 @@ func (a *observedAgent) Chat(ctx context.Context, sessionID string, message stri
 	out := make(chan string, 64)
 	go func() {
 		defer close(out)
+		hadError := false
 		for token := range ch {
+			if strings.HasPrefix(token, "[error]") {
+				hadError = true
+			}
 			select {
 			case out <- token:
 			case <-ctx.Done():
+				if a.enableMetrics {
+					observe.AgentRequestsTotal.WithLabelValues(a.inner.Name(), "cancelled").Inc()
+					observe.AgentRequestDuration.WithLabelValues(a.inner.Name()).Observe(time.Since(start).Seconds())
+				}
 				return
 			}
 		}
 		if a.enableMetrics {
-			observe.AgentRequestsTotal.WithLabelValues(a.inner.Name(), "success").Inc()
+			status := "success"
+			if hadError {
+				status = "error"
+			}
+			observe.AgentRequestsTotal.WithLabelValues(a.inner.Name(), status).Inc()
 			observe.AgentRequestDuration.WithLabelValues(a.inner.Name()).Observe(time.Since(start).Seconds())
 		}
 	}()
@@ -643,34 +655,44 @@ func (a *cacheAgent) Chat(ctx context.Context, sessionID string, message string)
 				return
 			}
 		}
-		// Store in cache with eviction of expired/oldest entries.
-		a.mu.Lock()
-		now := time.Now()
-		// Evict expired entries first.
-		for k, e := range a.cache {
-			if now.After(e.expiresAt) {
-				delete(a.cache, k)
+		// Only cache successful responses (no error tokens).
+		hasError := false
+		for _, tok := range tokens {
+			if strings.HasPrefix(tok, "[error]") {
+				hasError = true
+				break
 			}
 		}
-		// If still at capacity, evict the oldest entry.
-		if len(a.cache) >= maxCacheEntries {
-			var oldestKey string
-			var oldestTime time.Time
+		if !hasError {
+			// Store in cache with eviction of expired/oldest entries.
+			a.mu.Lock()
+			now := time.Now()
+			// Evict expired entries first.
 			for k, e := range a.cache {
-				if oldestKey == "" || e.expiresAt.Before(oldestTime) {
-					oldestKey = k
-					oldestTime = e.expiresAt
+				if now.After(e.expiresAt) {
+					delete(a.cache, k)
 				}
 			}
-			if oldestKey != "" {
-				delete(a.cache, oldestKey)
+			// If still at capacity, evict the oldest entry.
+			if len(a.cache) >= maxCacheEntries {
+				var oldestKey string
+				var oldestTime time.Time
+				for k, e := range a.cache {
+					if oldestKey == "" || e.expiresAt.Before(oldestTime) {
+						oldestKey = k
+						oldestTime = e.expiresAt
+					}
+				}
+				if oldestKey != "" {
+					delete(a.cache, oldestKey)
+				}
 			}
+			a.cache[key] = cacheEntry{
+				tokens:    tokens,
+				expiresAt: time.Now().Add(a.ttl),
+			}
+			a.mu.Unlock()
 		}
-		a.cache[key] = cacheEntry{
-			tokens:    tokens,
-			expiresAt: time.Now().Add(a.ttl),
-		}
-		a.mu.Unlock()
 	}()
 	return out, nil
 }

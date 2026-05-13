@@ -64,32 +64,34 @@ func (b *Broadcaster) Publish(level, msg string, fields map[string]any) {
 
 // Subscribe returns a channel that receives log entries and an unsubscribe function.
 // The channel buffer is 100 entries; slow consumers will miss entries.
+// History is sent synchronously into the buffered channel before returning,
+// so there is no race between the history sender and unsubscribe.
 func (b *Broadcaster) Subscribe() (<-chan LogEntry, func()) {
 	ch := make(chan LogEntry, 100)
 
 	b.mu.Lock()
 	b.subscribers[ch] = struct{}{}
-
-	// Send recent history from ring buffer.
 	history := b.getHistoryLocked()
 	b.mu.Unlock()
 
-	go func() {
-		for _, entry := range history {
-			ch <- entry
+	// Send history directly into the buffered channel (non-blocking).
+	// If the buffer is full we skip older entries rather than blocking.
+	for _, entry := range history {
+		select {
+		case ch <- entry:
+		default:
+			// Buffer full — drop oldest history entry.
 		}
-	}()
+	}
 
 	unsubscribe := func() {
 		b.mu.Lock()
 		delete(b.subscribers, ch)
 		b.mu.Unlock()
-		// Drain channel to prevent goroutine leaks.
-		go func() {
-			for range ch {
-			}
-		}()
-		close(ch)
+		// Do NOT close ch here: the consumer (HandleLogStream) drives the
+		// loop via select and will exit on context cancellation or write
+		// error.  Closing a channel that a concurrent Publish may still be
+		// selecting on would cause a panic.
 	}
 
 	return ch, unsubscribe
