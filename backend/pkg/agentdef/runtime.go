@@ -85,28 +85,22 @@ func (rt *AgentRuntime) Start(ctx context.Context) error {
 		return err
 	}
 
-	// Subscribe to hot-reload events so new/updated/deleted agents propagate.
+	// Subscribe to hot-reload events.  On any add/update, do a full two-pass
+	// rebuild of all loaded definitions so orchestration agents can resolve
+	// sub-agents that may have been added in the same batch.  buildAll is
+	// idempotent; the watcher debounces filesystem events so rebuilds are infrequent.
 	reloader.OnChange(func(evt ChangeEvent) {
-		switch evt.Type {
-		case ChangeAdded, ChangeUpdated:
-			if evt.Def == nil {
-				return
-			}
-			agent, buildErr := rt.builder.Build(ctx, evt.Def)
-			if buildErr != nil {
-				logs.Warnf("agentdef runtime: rebuild %q: %v", evt.AgentName, buildErr)
-				return
-			}
-			rt.mu.Lock()
-			rt.agents[evt.AgentName] = agent
-			rt.mu.Unlock()
-			logs.Infof("agentdef runtime: agent %q updated", evt.AgentName)
-
-		case ChangeDeleted:
+		if evt.Type == ChangeDeleted {
 			rt.mu.Lock()
 			delete(rt.agents, evt.AgentName)
 			rt.mu.Unlock()
 			logs.Infof("agentdef runtime: agent %q removed", evt.AgentName)
+			return
+		}
+
+		names := reloader.List()
+		if err := rt.buildAll(ctx, names, reloader); err != nil {
+			logs.Warnf("agentdef runtime: hot-reload buildAll: %v", err)
 		}
 	})
 

@@ -68,8 +68,9 @@ def setup_test_agents():
         shutil.copy2(yaml_file, dest)
         copied_files.append(dest)
 
-    # Give the file watcher time to detect new files
-    time.sleep(2)
+    # Give the file watcher time to detect and build new agents.
+    # The watcher debounces events (~1s) then builds each agent sequentially.
+    time.sleep(5)
 
     yield
 

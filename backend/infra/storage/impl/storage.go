@@ -19,6 +19,7 @@ package impl
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 
 	"github.com/superagent-ai/superagent-base/backend/infra/imagex"
@@ -61,9 +62,42 @@ func New(ctx context.Context) (Storage, error) {
 			os.Getenv(consts.S3Endpoint),
 			os.Getenv(consts.S3Region),
 		)
+	case "none", "":
+		return &noopStorage{}, nil
 	}
 
 	return nil, fmt.Errorf("unknown storage type: %s", storageType)
+}
+
+// noopStorage is a no-op storage for environments without object storage (dev/test).
+// All write operations return an error; read operations return empty results.
+type noopStorage struct{}
+
+var errStorageDisabled = fmt.Errorf("storage disabled (STORAGE_TYPE=none)")
+
+func (n *noopStorage) PutObject(_ context.Context, _ string, _ []byte, _ ...storage.PutOptFn) error {
+	return errStorageDisabled
+}
+func (n *noopStorage) PutObjectWithReader(_ context.Context, _ string, _ io.Reader, _ ...storage.PutOptFn) error {
+	return errStorageDisabled
+}
+func (n *noopStorage) GetObject(_ context.Context, _ string) ([]byte, error) {
+	return nil, errStorageDisabled
+}
+func (n *noopStorage) DeleteObject(_ context.Context, _ string) error {
+	return errStorageDisabled
+}
+func (n *noopStorage) GetObjectUrl(_ context.Context, key string, _ ...storage.GetOptFn) (string, error) {
+	return key, nil
+}
+func (n *noopStorage) HeadObject(_ context.Context, _ string, _ ...storage.GetOptFn) (*storage.FileInfo, error) {
+	return nil, errStorageDisabled
+}
+func (n *noopStorage) ListAllObjects(_ context.Context, _ string, _ ...storage.GetOptFn) ([]*storage.FileInfo, error) {
+	return nil, errStorageDisabled
+}
+func (n *noopStorage) ListObjectsPaginated(_ context.Context, _ *storage.ListObjectsPaginatedInput, _ ...storage.GetOptFn) (*storage.ListObjectsPaginatedOutput, error) {
+	return nil, errStorageDisabled
 }
 
 func NewImagex(ctx context.Context) (imagex.ImageX, error) {
@@ -96,6 +130,8 @@ func NewImagex(ctx context.Context) (imagex.ImageX, error) {
 			os.Getenv(consts.S3Endpoint),
 			os.Getenv(consts.S3Region),
 		)
+	case "none", "":
+		return nil, nil
 	}
 	return nil, fmt.Errorf("unknown storage type: %s", storageType)
 }
