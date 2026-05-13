@@ -69,7 +69,8 @@ func Init(ctx context.Context) (*AppDependencies, error) {
 	var err error
 	deps.OSS, err = storage.New(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("init tos client failed, err=%w", err)
+		logs.Warnf("init storage client failed (non-fatal, storage features disabled): %v", err)
+		// Storage is optional for core agent functionality.
 	}
 
 	deps.DB, err = mysql.New()
@@ -100,12 +101,13 @@ func Init(ctx context.Context) (*AppDependencies, error) {
 
 	deps.ESClient, err = es.New()
 	if err != nil {
-		return nil, fmt.Errorf("init es client failed, err=%w", err)
+		logs.Warnf("init es client failed (non-fatal, search features disabled): %v", err)
+		// ES is optional for core agent functionality.
 	}
 
 	deps.ImageXClient, err = initImageX(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("init imagex client failed, err=%w", err)
+		logs.Warnf("init imagex client failed (non-fatal): %v", err)
 	}
 
 	deps.ResourceEventProducer, err = eventbus.InitResourceEventBusProducer()
