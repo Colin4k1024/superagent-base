@@ -18,10 +18,13 @@
 | **Workflow / Graph Tool** | DAG 执行，拓扑排序，节点类型：llm_call / agent_call / tool_call / code / condition |
 | **中断/恢复** | 检测确认请求 → 保存 checkpoint → HTTP Resume API 恢复对话 |
 | **A2UI 协议** | 结构化流式事件（text / thinking / tool_call / tool_result / code_block / interrupt / error / done / progress / agent_switch） |
-| **OpenTelemetry + Prometheus** | 分布式追踪 + 指标，开发环境可关闭 |
+| **OpenTelemetry + Prometheus** | 分布式追踪 + 指标（Agent 请求数/延迟/错误率、Model Token、Tool 调用、活跃会话数），Eino callback 自动上报 |
+| **Monitor Dashboard** | 4 Tab 实时面板（Status / Metrics / Logs / Admin），纯 SVG 图表，SSE 日志流，热重载管理 |
+| **监控栈一键部署** | Prometheus + Grafana + OTel Collector，`docker compose -f docker/docker-compose-monitoring.yml up -d` |
+| **Admin API** | `GET /api/v1/admin/status`（运行状态）、`POST /api/v1/admin/reload`（热重载）、`GET /api/v1/admin/logs`（实时日志 SSE） |
 | **gRPC API** | AgentService / ConversationService / ModelService / ToolService |
 | **HTTP SSE 流式 API** | POST /api/v1/chat/stream，GET /api/v1/agents，POST /api/v1/chat/resume |
-| **Web UI** | React + Vite + Tailwind，流式对话页面 |
+| **Web UI** | React + Vite + Tailwind，流式对话 + 监控面板 + 技能市场 |
 | **Docker Compose + Helm** | 开发环境轻量栈 + 生产级 Kubernetes 部署 |
 | **CLI 工具 sactl** | 技能管理和 Agent 管理命令行工具 |
 
@@ -128,6 +131,17 @@ make dev-down
 | `POST` | `/api/v1/chat/resume` | 恢复中断的对话 |
 | `GET` | `/api/v1/chat/interrupt_state` | 查询会话中断状态 |
 
+### 监控与管理 API
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| `GET` | `/api/v1/admin/status` | 系统运行状态（uptime、agents、health、ready） |
+| `POST` | `/api/v1/admin/reload` | 触发 Agent 热重载 |
+| `GET` | `/api/v1/admin/logs` | SSE 实时日志流（结构化 JSON） |
+| `GET` | `/metrics` | Prometheus 指标端点 |
+| `GET` | `/health` | 健康检查 |
+| `GET` | `/ready` | 就绪检查（含 Agent Runtime 状态） |
+
 **流式对话示例（Legacy 模式）：**
 
 ```bash
@@ -219,6 +233,36 @@ spec:
 | `make test-all` | 运行全部测试 |
 | `make debug` | 启动完整 debug 环境（含 ES / MinIO / NSQ 等） |
 
+### 监控栈
+
+```bash
+# 启动 Prometheus + Grafana + OTel Collector
+docker compose -f docker/docker-compose-monitoring.yml up -d
+
+# 访问
+# Prometheus: http://localhost:9090
+# Grafana:    http://localhost:3001 (admin/admin)
+# OTel gRPC:  localhost:4317
+
+# 启动后端时开启 OTel 追踪
+export OTEL_ENABLED=true
+export OTEL_ENDPOINT=localhost:4317
+export SERVICE_NAME=superagent
+make dev-server
+```
+
+**可观测性指标**:
+
+| 指标 | 说明 |
+|------|------|
+| `superagent_agent_requests_total{agent_id, status}` | Agent 请求计数（区分 legacy/a2ui 模式） |
+| `superagent_agent_request_duration_seconds{agent_id}` | 请求延迟直方图 |
+| `superagent_active_sessions` | 当前并发会话数 |
+| `superagent_model_tokens_total{model_id, provider, type}` | Model Token 消耗 |
+| `superagent_model_errors_total{model_id, provider, error_type}` | Model 调用错误 |
+| `superagent_tool_invocations_total{tool_name, status}` | Tool 调用计数 |
+| `superagent_agent_reload_failures_total{agent_id}` | 热重载失败计数 |
+
 ---
 
 ## 文档
@@ -259,8 +303,10 @@ superagent-base/
 │   ├── agents/               Agent YAML 示例（research-agent.yaml 等）
 │   └── models/               模型配置 YAML
 ├── docker/
-│   ├── docker-compose-dev.yml     轻量级开发栈
+│   ├── docker-compose-dev.yml     轻量级开发栈（MySQL + Redis）
 │   ├── docker-compose-debug.yml   完整 debug 栈
+│   ├── docker-compose-monitoring.yml  监控栈（Prometheus + Grafana + OTel）
+│   ├── monitoring/                监控配置（prometheus.yml / otel-collector.yaml / grafana）
 │   └── .env.dev                   开发环境配置模板
 ├── helm/                     Kubernetes Helm Chart
 ├── api/proto/                gRPC Proto 定义
