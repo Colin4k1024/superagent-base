@@ -26,6 +26,7 @@ export interface AdminStatus {
   agents: AdminAgent[]
   health: string
   ready: boolean
+  readiness_checks?: Record<string, string>
   start_time: string
   last_reload_at: string
 }

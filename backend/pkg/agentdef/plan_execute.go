@@ -55,7 +55,10 @@ func (a *PlanExecuteAgent) Chat(ctx context.Context, sessionID string, message s
 		planPrompt := "Create a step-by-step plan to accomplish: " + message
 		planCh, err := a.mainAgent.Chat(ctx, sessionID, planPrompt)
 		if err != nil {
-			ch <- fmt.Sprintf("[plan_execute] planning error: %v", err)
+			select {
+			case ch <- fmt.Sprintf("[plan_execute] planning error: %v", err):
+			case <-ctx.Done():
+			}
 			return
 		}
 
@@ -66,7 +69,11 @@ func (a *PlanExecuteAgent) Chat(ctx context.Context, sessionID string, message s
 		planText := planBuf.String()
 
 		// Emit the plan to the caller.
-		ch <- fmt.Sprintf("## Plan\n%s\n\n## Execution\n", planText)
+		select {
+		case ch <- fmt.Sprintf("## Plan\n%s\n\n## Execution\n", planText):
+		case <-ctx.Done():
+			return
+		}
 
 		// Phase 2: Parse steps from the plan.
 		steps := parsePlanSteps(planText)
@@ -78,28 +85,59 @@ func (a *PlanExecuteAgent) Chat(ctx context.Context, sessionID string, message s
 		// Enforce max steps limit.
 		if a.maxSteps > 0 && len(steps) > a.maxSteps {
 			steps = steps[:a.maxSteps]
-			ch <- fmt.Sprintf("[plan_execute] truncated to %d steps\n", a.maxSteps)
+			select {
+			case ch <- fmt.Sprintf("[plan_execute] truncated to %d steps\n", a.maxSteps):
+			case <-ctx.Done():
+				return
+			}
 		}
 
 		// Phase 3: Execute each step via the first executor.
 		if len(a.executors) == 0 {
-			ch <- "[plan_execute] no executor sub-agents configured"
+			select {
+			case ch <- "[plan_execute] no executor sub-agents configured":
+			case <-ctx.Done():
+			}
 			return
 		}
 		executor := a.executors[0]
 
 		for i, step := range steps {
-			ch <- fmt.Sprintf("\n### Step %d\n", i+1)
+			if ctx.Err() != nil {
+				select {
+				case ch <- fmt.Sprintf("[plan_execute] cancelled: %v", ctx.Err()):
+				case <-ctx.Done():
+				}
+				return
+			}
+
+			select {
+			case ch <- fmt.Sprintf("\n### Step %d\n", i+1):
+			case <-ctx.Done():
+				return
+			}
 
 			stepCh, stepErr := executor.Chat(ctx, sessionID, step)
 			if stepErr != nil {
-				ch <- fmt.Sprintf("[error in step %d]: %v\n", i+1, stepErr)
+				select {
+				case ch <- fmt.Sprintf("[error in step %d]: %v\n", i+1, stepErr):
+				case <-ctx.Done():
+					return
+				}
 				continue
 			}
 			for token := range stepCh {
-				ch <- token
+				select {
+				case ch <- token:
+				case <-ctx.Done():
+					return
+				}
 			}
-			ch <- "\n"
+			select {
+			case ch <- "\n":
+			case <-ctx.Done():
+				return
+			}
 		}
 	}()
 	return ch, nil

@@ -44,7 +44,11 @@ func NewAdminHandler(rt *agentdef.AgentRuntime) *AdminHandler {
 
 // HandleStatus returns aggregated runtime status.
 // GET /api/v1/admin/status
+// Protected by ADMIN_API_KEY when configured.
 func (h *AdminHandler) HandleStatus(_ context.Context, c *app.RequestContext) {
+	if !checkAdminAuth(c) {
+		return
+	}
 	if h.runtime == nil {
 		c.JSON(503, map[string]string{"error": "runtime not available"})
 		return
@@ -64,7 +68,8 @@ func (h *AdminHandler) HandleStatus(_ context.Context, c *app.RequestContext) {
 		"agent_count":    len(agents),
 		"agents":         agents,
 		"health":         "ok",
-		"ready": map[string]string{
+		"ready":          true,
+		"readiness_checks": map[string]string{
 			"agent_runtime": "ok",
 			"http":          "ok",
 		},
@@ -109,11 +114,10 @@ func (h *AdminHandler) HandleLogStream(ctx context.Context, c *app.RequestContex
 	logCh, unsubscribe := broadcaster.Subscribe()
 	defer unsubscribe()
 
-	// Set SSE headers.
+	// Set SSE headers (no wildcard CORS — restricted to same-origin or proxy).
 	c.Response.Header.Set("Cache-Control", "no-cache")
 	c.Response.Header.Set("Connection", "keep-alive")
 	c.Response.Header.Set("X-Accel-Buffering", "no")
-	c.Response.Header.Set("Access-Control-Allow-Origin", "*")
 
 	w := sse.NewWriter(c)
 	defer func() { _ = w.Close() }()
