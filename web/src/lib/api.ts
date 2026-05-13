@@ -13,12 +13,60 @@ export interface ChatMessage {
   content: string
 }
 
+export interface AdminAgent {
+  name: string
+  type: string
+  status: string
+  description: string
+}
+
+export interface AdminStatus {
+  uptime_seconds: number
+  agent_count: number
+  agents: AdminAgent[]
+  health: string
+  ready: boolean
+  start_time: string
+  last_reload_at: string
+}
+
+export interface ReloadResult {
+  message: string
+  agent_count: number
+  agents: AdminAgent[]
+}
+
 export const agentsApi = {
   async list(): Promise<Agent[]> {
     const res = await fetch(`${API_BASE}/agents`)
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
     const data = await res.json()
     return data.agents || []
+  },
+}
+
+export const adminApi = {
+  async getStatus(): Promise<AdminStatus> {
+    const res = await fetch(`${API_BASE}/admin/status`)
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    return res.json()
+  },
+
+  async triggerReload(): Promise<ReloadResult> {
+    const res = await fetch(`${API_BASE}/admin/reload`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    })
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    return res.json()
+  },
+}
+
+export const metricsApi = {
+  async getRaw(): Promise<string> {
+    const res = await fetch('/metrics')
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    return res.text()
   },
 }
 

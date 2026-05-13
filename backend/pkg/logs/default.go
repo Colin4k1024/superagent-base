@@ -98,26 +98,31 @@ func Fatalf(format string, v ...interface{}) {
 // Errorf calls the default logs's Errorf method.
 func Errorf(format string, v ...interface{}) {
 	logger.Errorf(format, v...)
+	BroadcastLog("error", fmt.Sprintf(format, v...), nil)
 }
 
 // Warnf calls the default logs's Warnf method.
 func Warnf(format string, v ...interface{}) {
 	logger.Warnf(format, v...)
+	BroadcastLog("warn", fmt.Sprintf(format, v...), nil)
 }
 
 // Noticef calls the default logs's Noticef method.
 func Noticef(format string, v ...interface{}) {
 	logger.Noticef(format, v...)
+	BroadcastLog("info", fmt.Sprintf(format, v...), nil)
 }
 
 // Infof calls the default logs's Infof method.
 func Infof(format string, v ...interface{}) {
 	logger.Infof(format, v...)
+	BroadcastLog("info", fmt.Sprintf(format, v...), nil)
 }
 
 // Debugf calls the default logs's Debugf method.
 func Debugf(format string, v ...interface{}) {
 	logger.Debugf(format, v...)
+	BroadcastLog("debug", fmt.Sprintf(format, v...), nil)
 }
 
 // Tracef calls the default logs's Tracef method.

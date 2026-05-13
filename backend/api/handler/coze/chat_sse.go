@@ -19,11 +19,13 @@ package coze
 import (
 	"context"
 	"encoding/json"
+	"time"
 
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/protocol/sse"
 
 	"github.com/superagent-ai/superagent-base/backend/pkg/agentdef"
+	"github.com/superagent-ai/superagent-base/backend/pkg/observe"
 )
 
 // ChatSSEHandler provides HTTP endpoints for direct agent interaction
@@ -85,9 +87,31 @@ func (h *ChatSSEHandler) HandleChatStream(ctx context.Context, c *app.RequestCon
 		return
 	}
 
+	// OBS-002: Track active sessions.
+	observe.ActiveSessions.Inc()
+	defer observe.ActiveSessions.Dec()
+
+	// OBS-004: Record request metrics (count + latency).
+	start := time.Now()
+	defer func() {
+		duration := time.Since(start).Seconds()
+		observe.AgentRequestDuration.WithLabelValues(req.AgentID).Observe(duration)
+	}()
+
 	// Detect A2UI mode from request header or query parameter.
 	useA2UI := string(c.GetHeader("X-A2UI")) == "true" ||
 		string(c.QueryArgs().Peek("a2ui")) == "true"
+
+	// OBS-004: Track request count by mode.
+	mode := "legacy"
+	if useA2UI {
+		mode = "a2ui"
+	}
+	observe.AgentRequestsTotal.WithLabelValues(req.AgentID, mode).Inc()
+
+	// OBS-003: Create OTel Agent span (no-op when OTEL_ENABLED=false).
+	ctx, span := observe.StartAgentSpan(ctx, req.AgentID, "chat")
+	defer span.End()
 
 	// Set SSE-specific headers before writing the first byte.
 	c.Response.Header.Set("Cache-Control", "no-cache")
