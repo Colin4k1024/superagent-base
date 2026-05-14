@@ -65,7 +65,7 @@ jobs:
           mysql -h 127.0.0.1 -u coze -pcoze123 opencoze < docker/volumes/mysql/schema.sql
 
       - name: Build backend
-        run: cd backend && go build -o ../bin/superagent .
+        run: cd backend && go build -o ./superagent .
 
       - name: Start backend
         env:
@@ -81,8 +81,9 @@ jobs:
           ES_ADDR: ""
           ADMIN_API_KEY: ""
           CODE_RUNNER_TYPE: "local"
+          AGENT_CONFIG_DIR: "../configs/agents"
         run: |
-          ./bin/superagent > /tmp/backend.log 2>&1 &
+          cd backend && ./superagent > /tmp/backend.log 2>&1 &
           echo $! > /tmp/backend.pid
           # Wait for backend to be ready (up to 45s)
           for i in $(seq 1 45); do
