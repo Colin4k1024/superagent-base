@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { setApiKey, isAuthenticated } from '@/lib/auth'
@@ -8,6 +9,7 @@ const API_BASE = '/api/v1'
 
 export default function LoginPage() {
   const navigate = useNavigate()
+  const { t } = useTranslation()
   const [apiKey, setApiKeyInput] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -36,7 +38,7 @@ export default function LoginPage() {
         setApiKey(apiKey)
         navigate('/agents', { replace: true })
       } else if (res.status === 401 || res.status === 403) {
-        setError('Invalid API key')
+        setError(t('login.error'))
       } else {
         setError(`Server error: HTTP ${res.status}`)
       }
@@ -51,7 +53,7 @@ export default function LoginPage() {
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
       <div className="w-full max-w-sm bg-white rounded-xl shadow-sm border border-gray-200 p-8">
         <div className="mb-8 text-center">
-          <h1 className="text-2xl font-bold text-gray-900">Superagent</h1>
+          <h1 className="text-2xl font-bold text-gray-900">{t('login.title')}</h1>
           <p className="mt-1 text-sm text-gray-500">AI Agent Development Platform</p>
         </div>
 
@@ -59,7 +61,7 @@ export default function LoginPage() {
           <Input
             label="API Key"
             type="password"
-            placeholder="Enter your admin API key"
+            placeholder={t('login.placeholder')}
             value={apiKey}
             onChange={(e) => setApiKeyInput(e.target.value)}
             autoComplete="current-password"
@@ -73,12 +75,12 @@ export default function LoginPage() {
           )}
 
           <Button type="submit" className="w-full" loading={loading}>
-            Login
+            {t('login.button')}
           </Button>
         </form>
 
         <p className="mt-6 text-center text-xs text-gray-400">
-          In dev mode, leave the key empty and click Login
+          {t('login.devNote')}
         </p>
       </div>
     </div>

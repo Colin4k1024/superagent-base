@@ -1,23 +1,31 @@
 import { useState } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { clearApiKey } from '@/lib/auth'
-
-const navItems = [
-  { to: '/agents', label: 'Agents', icon: '🤖' },
-  { to: '/chat', label: 'Chat', icon: '💬' },
-  { to: '/monitor', label: 'Monitor', icon: '📊' },
-  { to: '/skills', label: 'Skills', icon: '🧩' },
-  { to: '/settings', label: 'Settings', icon: '⚙️' },
-]
 
 export default function Sidebar() {
   const navigate = useNavigate()
+  const { t, i18n } = useTranslation()
   const [mobileOpen, setMobileOpen] = useState(false)
 
   function handleLogout() {
     clearApiKey()
     navigate('/login', { replace: true })
   }
+
+  function toggleLanguage() {
+    const next = i18n.language === 'zh' ? 'en' : 'zh'
+    i18n.changeLanguage(next)
+    localStorage.setItem('language', next)
+  }
+
+  const navItems = [
+    { to: '/agents', label: t('nav.agents'), icon: '🤖' },
+    { to: '/chat', label: t('nav.chat'), icon: '💬' },
+    { to: '/monitor', label: t('nav.monitor'), icon: '📊' },
+    { to: '/skills', label: t('nav.skills'), icon: '🧩' },
+    { to: '/settings', label: t('nav.settings'), icon: '⚙️' },
+  ]
 
   // On mobile: collapsed (w-16) unless mobileOpen; on md+: always w-56
   const sidebarWidth = mobileOpen ? 'w-56' : 'w-16 md:w-56'
@@ -73,17 +81,29 @@ export default function Sidebar() {
       </ul>
 
       <div className="px-4 pt-4 border-t border-gray-700 space-y-3">
+        {/* Language toggle */}
+        <button
+          onClick={toggleLanguage}
+          className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium text-gray-400 hover:bg-gray-800 hover:text-white transition-colors"
+          title={i18n.language === 'zh' ? 'Switch to English' : '切换为中文'}
+        >
+          <span className="shrink-0">🌐</span>
+          <span className={`${mobileOpen ? 'block' : 'hidden md:block'} truncate`}>
+            {i18n.language === 'zh' ? '中文' : 'EN'}
+          </span>
+        </button>
+
         <button
           onClick={handleLogout}
           className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium text-gray-400 hover:bg-gray-800 hover:text-white transition-colors"
         >
           <span className="shrink-0">🚪</span>
           <span className={`${mobileOpen ? 'block' : 'hidden md:block'} truncate`}>
-            Logout
+            {t('nav.logout')}
           </span>
         </button>
         <p className={`text-xs text-gray-500 px-3 ${mobileOpen ? 'block' : 'hidden md:block'}`}>
-          v0.1.0
+          {t('app.version')}
         </p>
       </div>
     </nav>

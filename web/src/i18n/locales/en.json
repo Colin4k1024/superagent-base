@@ -1,0 +1,105 @@
+{
+  "app": {
+    "name": "Superagent",
+    "version": "v0.1.0"
+  },
+  "nav": {
+    "agents": "Agents",
+    "chat": "Chat",
+    "monitor": "Monitor",
+    "skills": "Skills",
+    "settings": "Settings",
+    "logout": "Logout"
+  },
+  "login": {
+    "title": "Superagent",
+    "placeholder": "Enter API Key",
+    "button": "Login",
+    "devNote": "In dev mode, leave empty and click Login",
+    "error": "Invalid API Key"
+  },
+  "agents": {
+    "title": "Agents",
+    "newAgent": "New Agent",
+    "edit": "Edit",
+    "duplicate": "Duplicate",
+    "delete": "Delete",
+    "confirmDelete": "Delete agent \"{{name}}\"? This cannot be undone.",
+    "deleted": "Agent \"{{name}}\" deleted",
+    "empty": "No agents yet. Click \"New Agent\" to start.",
+    "graphEditor": "Graph Editor"
+  },
+  "editor": {
+    "save": "Save",
+    "validate": "Validate",
+    "test": "Test",
+    "cancel": "Cancel",
+    "saving": "Saving...",
+    "saved": "Saved successfully",
+    "validSuccess": "YAML validation passed",
+    "validFail": "Validation failed: {{error}}",
+    "backToList": "← Back to list"
+  },
+  "workflow": {
+    "title": "Workflow Editor",
+    "save": "Save",
+    "export": "Export YAML",
+    "autoLayout": "Auto Layout",
+    "backToAgent": "← Back to Agent",
+    "nodes": {
+      "llm_call": "LLM Call",
+      "agent_call": "Agent Call",
+      "tool_call": "Tool Call",
+      "code": "Code",
+      "condition": "Condition"
+    }
+  },
+  "skills": {
+    "title": "Skills Marketplace",
+    "search": "Search skills...",
+    "installed": "Installed",
+    "available": "Available",
+    "install": "Install",
+    "uninstall": "Uninstall",
+    "confirmUninstall": "Uninstall \"{{name}}\"?",
+    "installSuccess": "\"{{name}}\" installed successfully",
+    "uninstallSuccess": "\"{{name}}\" uninstalled",
+    "empty": "No skills installed yet"
+  },
+  "settings": {
+    "title": "Settings",
+    "models": "Models",
+    "mcpServers": "MCP Servers",
+    "addModel": "Add Model",
+    "deleteModel": "Delete Model",
+    "confirmDeleteModel": "Delete model \"{{name}}\"?",
+    "modelAdded": "Model added successfully",
+    "modelDeleted": "Model deleted"
+  },
+  "monitor": {
+    "status": "Status",
+    "metrics": "Metrics",
+    "logs": "Logs",
+    "admin": "Admin",
+    "reload": "Reload Agents",
+    "reloading": "Reloading...",
+    "reloaded": "Reloaded — {{count}} agents"
+  },
+  "chat": {
+    "placeholder": "Type a message...",
+    "send": "Send",
+    "selectAgent": "Select Agent",
+    "noAgent": "Please select an agent first",
+    "clear": "Clear chat"
+  },
+  "common": {
+    "loading": "Loading...",
+    "error": "Something went wrong",
+    "confirm": "Confirm",
+    "cancel": "Cancel",
+    "close": "Close",
+    "apply": "Apply",
+    "delete": "Delete",
+    "reload": "Reload"
+  }
+}
