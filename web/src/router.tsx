@@ -9,6 +9,7 @@ import ChatPage from './pages/ChatPage'
 import MonitorPage from './pages/MonitorPage'
 import SkillsPage from './pages/SkillsPage'
 import SettingsPage from './pages/SettingsPage'
+import EvolutionPage from './pages/EvolutionPage'
 
 export const router = createBrowserRouter([
   { path: '/login', element: <LoginPage /> },
@@ -29,6 +30,7 @@ export const router = createBrowserRouter([
           { path: 'monitor', element: <MonitorPage /> },
           { path: 'skills', element: <SkillsPage /> },
           { path: 'settings', element: <SettingsPage /> },
+          { path: 'evolution', element: <EvolutionPage /> },
         ],
       },
     ],

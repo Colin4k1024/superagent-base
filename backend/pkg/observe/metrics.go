@@ -99,6 +99,30 @@ var (
 	}, []string{"agent_id"})
 )
 
+// Evolution metrics.
+var (
+	// EvolutionSignalsTotal counts execution signals collected by type (tool_success, tool_error, etc.).
+	EvolutionSignalsTotal = promauto.NewCounterVec(prometheus.CounterOpts{
+		Namespace: "superagent",
+		Name:      "evolution_signals_total",
+		Help:      "Total execution signals collected for evolution",
+	}, []string{"signal_type"})
+
+	// EvolutionGenesShared counts Gene contributions successfully sent to the Experience Repo.
+	EvolutionGenesShared = promauto.NewCounter(prometheus.CounterOpts{
+		Namespace: "superagent",
+		Name:      "evolution_genes_shared_total",
+		Help:      "Total Gene contributions shared to the Oris Experience Repo",
+	})
+
+	// EvolutionRecommendationsServed counts Gene recommendations returned by the Advisor.
+	EvolutionRecommendationsServed = promauto.NewCounter(prometheus.CounterOpts{
+		Namespace: "superagent",
+		Name:      "evolution_recommendations_served_total",
+		Help:      "Total Gene recommendations served by the EvolutionAdvisor",
+	})
+)
+
 // Model router metrics.
 var (
 	// ModelRouteDecisions tracks which model was selected by the router.

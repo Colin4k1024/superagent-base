@@ -41,6 +41,7 @@ import (
 
 	"github.com/superagent-ai/superagent-base/backend/infra/cache"
 	"github.com/superagent-ai/superagent-base/backend/infra/checkpoint"
+	"github.com/superagent-ai/superagent-base/backend/pkg/evolution"
 	"github.com/superagent-ai/superagent-base/backend/pkg/graphs"
 	"github.com/superagent-ai/superagent-base/backend/pkg/mcp"
 	"github.com/superagent-ai/superagent-base/backend/pkg/memory"
@@ -102,6 +103,17 @@ func WithSkillManager(mgr *skill.Manager) BuilderOption {
 	return func(b *AgentBuilder) { b.skillManager = mgr }
 }
 
+// WithEvolutionAdvisor injects an EvolutionAdvisor so the builder can prepend
+// Gene-based experience recommendations into agent system prompts.
+func WithEvolutionAdvisor(a *evolution.EvolutionAdvisor) BuilderOption {
+	return func(b *AgentBuilder) { b.evolutionAdvisor = a }
+}
+
+// WithEvolutionCollector injects a SignalCollector used for workflow node-level signals.
+func WithEvolutionCollector(c *evolution.SignalCollector) BuilderOption {
+	return func(b *AgentBuilder) { b.evolutionCollector = c }
+}
+
 // WithRedisClient sets the Redis client used for the redis checkpoint backend.
 func WithRedisClient(client cache.Cmdable) BuilderOption {
 	return func(b *AgentBuilder) { b.redisClient = client }
@@ -109,14 +121,16 @@ func WithRedisClient(client cache.Cmdable) BuilderOption {
 
 // AgentBuilder converts AgentDefinitions into running Agent instances.
 type AgentBuilder struct {
-	modelRouter   modelrouter.Router
-	toolManager   *tool.Manager
-	memoryFactory func(config memory.BackendConfig) (memory.Backend, error)
-	mcpRegistry   *mcp.Registry
-	skillManager  *skill.Manager
-	modelConfig   ModelRuntimeConfig
-	agentRegistry func(name string) (Agent, bool)
-	redisClient   cache.Cmdable
+	modelRouter         modelrouter.Router
+	toolManager         *tool.Manager
+	memoryFactory       func(config memory.BackendConfig) (memory.Backend, error)
+	mcpRegistry         *mcp.Registry
+	skillManager        *skill.Manager
+	modelConfig         ModelRuntimeConfig
+	agentRegistry       func(name string) (Agent, bool)
+	redisClient         cache.Cmdable
+	evolutionAdvisor    *evolution.EvolutionAdvisor
+	evolutionCollector  *evolution.SignalCollector
 }
 
 // NewAgentBuilder creates an AgentBuilder with optional configuration.
@@ -167,6 +181,14 @@ func (b *AgentBuilder) Build(ctx context.Context, def *AgentDefinition) (Agent, 
 	if def.Spec.Type == "deep_agent" {
 		const deepReasoningPrefix = "You are in deep reasoning mode. Think step by step before answering. "
 		def = shallowCopyDefWithSystemPrompt(def, deepReasoningPrefix+def.Spec.SystemPrompt)
+	}
+
+	// Evolution advisor: query Gene recommendations and prepend to system prompt.
+	if b.evolutionAdvisor != nil && def.Spec.Evolution != nil && def.Spec.Evolution.Enabled {
+		recs := b.evolutionAdvisor.Recommend(ctx, def.Metadata.Name+" "+def.Spec.SystemPrompt)
+		if len(recs) > 0 {
+			def = shallowCopyDefWithSystemPrompt(def, buildEvolutionPromptPrefix(recs)+def.Spec.SystemPrompt)
+		}
 	}
 
 	// Resolve primary model ID (may be overridden by router).
@@ -947,7 +969,7 @@ func (b *AgentBuilder) buildWorkflow(def *AgentDefinition) (Agent, error) {
 	if def.Spec.Workflow == nil {
 		return nil, fmt.Errorf("agentdef: buildWorkflow %q: spec.workflow is required for type=workflow", def.Metadata.Name)
 	}
-	return &WorkflowAgent{
+	wa := &WorkflowAgent{
 		name:        def.Metadata.Name,
 		description: def.Spec.SystemPrompt,
 		nodes:       def.Spec.Workflow.Nodes,
@@ -956,7 +978,16 @@ func (b *AgentBuilder) buildWorkflow(def *AgentDefinition) (Agent, error) {
 		registry:    b.agentRegistry,
 		modelCfg:    b.modelConfig,
 		def:         def,
-	}, nil
+	}
+	// Inject evolution collector for node-level signal collection when enabled.
+	if b.evolutionAdvisor != nil && def.Spec.Evolution != nil && def.Spec.Evolution.Enabled {
+		// Advisor holds a reference to the expClient indirectly; we use the collector
+		// exposed via the advisor's internal client. Since collector is on the Engine,
+		// pass it from main.go via a dedicated field when available.
+		// Here we embed the collector if exposed via b.evolutionCollector.
+		wa.collector = b.evolutionCollector
+	}
+	return wa, nil
 }
 
 // buildEinoGraph constructs an einoGraphAgent from a named entry in the
@@ -1299,4 +1330,20 @@ func shallowCopyDefWithSystemPrompt(def *AgentDefinition, prompt string) *AgentD
 	cp := *def
 	cp.Spec.SystemPrompt = prompt
 	return &cp
+}
+
+// buildEvolutionPromptPrefix formats Gene recommendations into a concise prompt prefix.
+func buildEvolutionPromptPrefix(recs []evolution.Recommendation) string {
+	if len(recs) == 0 {
+		return ""
+	}
+	var sb strings.Builder
+	sb.WriteString("# Accumulated Experience (from Oris Gene repository)\n")
+	sb.WriteString("The following strategies have been validated in previous executions:\n\n")
+	for i, r := range recs {
+		sb.WriteString(fmt.Sprintf("%d. [confidence=%.2f, success_rate=%.0f%%] %v\n",
+			i+1, r.Confidence, r.SuccessRate*100, r.Strategy))
+	}
+	sb.WriteString("\nApply these strategies when relevant to the current task.\n\n")
+	return sb.String()
 }

@@ -286,3 +286,54 @@ export const chatApi = {
     }
   },
 }
+
+// Evolution API
+export interface EvolutionStats {
+  enabled: boolean
+  experience_url: string
+  hub_url: string
+  sender_id: string
+  peer_nodes: number
+  min_confidence: number
+  max_suggestions: number
+}
+
+export interface GeneItem {
+  id: string
+  strategy: unknown
+  confidence: number
+  quality_score: number
+  use_count: number
+  success_count: number
+  success_rate: number
+  contributor_id: string
+  created_at: string
+}
+
+export const evolutionApi = {
+  async getStats(): Promise<EvolutionStats> {
+    const res = await fetch(`${API_BASE}/admin/evolution/stats`, { headers: authHeaders() })
+    handleAuthError(res)
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    return res.json()
+  },
+
+  async listGenes(params?: { q?: string; min_confidence?: number; limit?: number }): Promise<{ enabled: boolean; genes: GeneItem[]; total: number }> {
+    const qs = new URLSearchParams()
+    if (params?.q) qs.set('q', params.q)
+    if (params?.min_confidence !== undefined) qs.set('min_confidence', String(params.min_confidence))
+    if (params?.limit !== undefined) qs.set('limit', String(params.limit))
+    const res = await fetch(`${API_BASE}/admin/evolution/genes?${qs}`, { headers: authHeaders() })
+    handleAuthError(res)
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    return res.json()
+  },
+
+  async federatedSearch(q: string, minConfidence = 0.5, limit = 10): Promise<{ results: unknown[]; total: number }> {
+    const qs = new URLSearchParams({ q, min_confidence: String(minConfidence), limit: String(limit) })
+    const res = await fetch(`${API_BASE}/admin/evolution/federated?${qs}`, { headers: authHeaders() })
+    handleAuthError(res)
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    return res.json()
+  },
+}

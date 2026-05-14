@@ -40,18 +40,19 @@ import (
 	"github.com/superagent-ai/superagent-base/backend/api/middleware"
 	"github.com/superagent-ai/superagent-base/backend/api/router"
 	"github.com/superagent-ai/superagent-base/backend/application"
-	"github.com/superagent-ai/superagent-base/backend/pkg/agentdef"
-	"github.com/superagent-ai/superagent-base/backend/pkg/mcp"
-	"github.com/superagent-ai/superagent-base/backend/pkg/memory"
-	"github.com/superagent-ai/superagent-base/backend/pkg/memory/builtin"
-	"github.com/superagent-ai/superagent-base/backend/pkg/skill"
-	skillbuiltin "github.com/superagent-ai/superagent-base/backend/pkg/skill/builtin"
 	"github.com/superagent-ai/superagent-base/backend/infra/cache/impl/redis"
+	"github.com/superagent-ai/superagent-base/backend/pkg/agentdef"
+	"github.com/superagent-ai/superagent-base/backend/pkg/evolution"
 	"github.com/superagent-ai/superagent-base/backend/pkg/lang/conv"
 	"github.com/superagent-ai/superagent-base/backend/pkg/lang/ternary"
 	"github.com/superagent-ai/superagent-base/backend/pkg/logs"
+	"github.com/superagent-ai/superagent-base/backend/pkg/mcp"
+	"github.com/superagent-ai/superagent-base/backend/pkg/memory"
+	"github.com/superagent-ai/superagent-base/backend/pkg/memory/builtin"
 	"github.com/superagent-ai/superagent-base/backend/pkg/observe"
 	"github.com/superagent-ai/superagent-base/backend/pkg/rbac"
+	"github.com/superagent-ai/superagent-base/backend/pkg/skill"
+	skillbuiltin "github.com/superagent-ai/superagent-base/backend/pkg/skill/builtin"
 	"github.com/superagent-ai/superagent-base/backend/pkg/tool"
 	"github.com/superagent-ai/superagent-base/backend/types/consts"
 )
@@ -81,6 +82,16 @@ func main() {
 	// OBS-001: Register Eino observability callback globally so all model/tool
 	// invocations automatically report Prometheus metrics and OTel spans.
 	callbacks.AppendGlobalHandlers(observe.NewEinoObserveCallback())
+
+	// EVO-001: Initialise experience self-evolution engine (Oris SDK).
+	// Non-fatal — returns nil when EVOLUTION_ENABLED is false or unset.
+	evoEngine, evoErr := evolution.Init(ctx, evolution.LoadConfigFromEnv())
+	if evoErr != nil {
+		logs.Warnf("evolution engine init failed (disabled): %v", evoErr)
+	} else if evoEngine != nil {
+		callbacks.AppendGlobalHandlers(evolution.NewEvolutionCallback(evoEngine))
+		logs.Infof("evolution engine enabled: %s", evoEngine.Config().ExperienceURL)
+	}
 
 	// DEV-001: Start Eino DevOps server for IDE graph visualization and debugging.
 	// Listens on 127.0.0.1:52538 (local only). Requires "Eino Dev" plugin in VS Code 1.97.x+.
@@ -155,6 +166,10 @@ func main() {
 	if skillMgr != nil {
 		builderOpts = append(builderOpts, agentdef.WithSkillManager(skillMgr))
 	}
+	if evoEngine != nil {
+		builderOpts = append(builderOpts, agentdef.WithEvolutionAdvisor(evoEngine.Advisor()))
+		builderOpts = append(builderOpts, agentdef.WithEvolutionCollector(evoEngine.Collector()))
+	}
 	agentBuilder := agentdef.NewAgentBuilder(builderOpts...)
 
 	agentRT := agentdef.NewRuntime(agentdef.RuntimeConfig{
@@ -186,10 +201,10 @@ func main() {
 		})
 	}
 
-	startHttpServer(agentRT, skillMgr, mcpRegistry, userStore)
+	startHttpServer(agentRT, skillMgr, mcpRegistry, userStore, evoEngine)
 }
 
-func startHttpServer(agentRT *agentdef.AgentRuntime, skillMgr *skill.Manager, mcpRegistry *mcp.Registry, userStore *rbac.UserStore) {
+func startHttpServer(agentRT *agentdef.AgentRuntime, skillMgr *skill.Manager, mcpRegistry *mcp.Registry, userStore *rbac.UserStore, evoEngine *evolution.Engine) {
 	maxRequestBodySize := os.Getenv("MAX_REQUEST_BODY_SIZE")
 	maxSize := conv.StrToInt64D(maxRequestBodySize, 1024*1024*200)
 	addr := getEnv("LISTEN_ADDR", ":8888")
@@ -287,6 +302,12 @@ func startHttpServer(agentRT *agentdef.AgentRuntime, skillMgr *skill.Manager, mc
 	adminGroup.POST("/mcp/servers", middleware.RequirePermission("config", "write"), mcpAdmin.HandleConnect)
 	adminGroup.DELETE("/mcp/servers/:name", middleware.RequirePermission("config", "write"), mcpAdmin.HandleDisconnect)
 	adminGroup.GET("/mcp/servers/:name/tools", mcpAdmin.HandleListTools)
+
+	// Evolution management endpoints — read-only queries; no data mutation.
+	evoAdmin := cozehandler.NewEvolutionAdminHandler(evoEngine)
+	adminGroup.GET("/evolution/stats", evoAdmin.HandleStats)
+	adminGroup.GET("/evolution/genes", evoAdmin.HandleListGenes)
+	adminGroup.GET("/evolution/federated", evoAdmin.HandleFederatedSearch)
 
 	// Skill management API endpoints.
 	registerSkillRoutes(s, skillMgr, userStore)

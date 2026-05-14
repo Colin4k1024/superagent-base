@@ -27,3 +27,13 @@ spec:
     tracing: true
     metrics: true
     log_level: info
+  evolution:
+    enabled: false        # set to true when EVOLUTION_ENABLED=true in env
+    collect:
+      - tool_success
+      - tool_error
+      - model_invoke
+      - agent_done
+    advise:
+      min_confidence: 0.5
+      max_suggestions: 3

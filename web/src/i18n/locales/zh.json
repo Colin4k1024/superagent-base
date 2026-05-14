@@ -9,7 +9,8 @@
     "monitor": "监控",
     "skills": "技能",
     "settings": "设置",
-    "logout": "退出登录"
+    "logout": "退出登录",
+    "evolution": "进化"
   },
   "login": {
     "title": "Superagent",

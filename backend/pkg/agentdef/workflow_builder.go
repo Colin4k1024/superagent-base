@@ -25,6 +25,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/superagent-ai/superagent-base/backend/pkg/evolution"
 )
 
 // WorkflowAgent executes a graph-based workflow defined as a DAG of nodes
@@ -40,6 +42,8 @@ type WorkflowAgent struct {
 	registry    func(name string) (Agent, bool) // for agent_call resolution
 	modelCfg    ModelRuntimeConfig
 	def         *AgentDefinition
+	// collector is optional; when non-nil node execution signals are reported.
+	collector *evolution.SignalCollector
 }
 
 func (w *WorkflowAgent) Name() string                    { return w.name }
@@ -99,21 +103,55 @@ func (w *WorkflowAgent) Chat(ctx context.Context, sessionID string, message stri
 }
 
 // executeNode dispatches to the appropriate node handler based on node.Type.
+// It wraps execution with timing and signals to the evolution collector when present.
 func (w *WorkflowAgent) executeNode(ctx context.Context, sessionID string, node *WorkflowNode, state map[string]string) (string, error) {
+	start := time.Now()
+	var result string
+	var execErr error
+
 	switch node.Type {
 	case "llm_call":
-		return w.executeLLMNode(ctx, sessionID, node, state)
+		result, execErr = w.executeLLMNode(ctx, sessionID, node, state)
 	case "agent_call":
-		return w.executeAgentNode(ctx, sessionID, node, state)
+		result, execErr = w.executeAgentNode(ctx, sessionID, node, state)
 	case "tool_call":
-		return w.executeToolNode(node, state)
+		result, execErr = w.executeToolNode(node, state)
 	case "code":
-		return w.executeCodeNode(ctx, node, state)
+		result, execErr = w.executeCodeNode(ctx, node, state)
 	case "condition":
-		return w.executeConditionNode(node, state)
+		result, execErr = w.executeConditionNode(node, state)
 	default:
 		return "", fmt.Errorf("unknown node type %q", node.Type)
 	}
+
+	// Report node_done signal to evolution engine asynchronously.
+	if w.collector != nil {
+		sig := evolution.Signal{
+			Type:      "node_done",
+			AgentName: w.name,
+			SessionID: sessionID,
+			Component: node.ID,
+			Duration:  time.Since(start),
+			Timestamp: time.Now(),
+			Metadata:  map[string]any{"node_type": node.Type},
+		}
+		if execErr != nil {
+			sig.Type = "node_error"
+			sig.Error = execErr.Error()
+		} else {
+			sig.Output = truncateStr(result, 200)
+		}
+		w.collector.Collect(ctx, sig)
+	}
+
+	return result, execErr
+}
+
+func truncateStr(s string, max int) string {
+	if len(s) <= max {
+		return s
+	}
+	return s[:max] + "..."
 }
 
 // executeLLMNode runs an LLM inference step.  When a real model endpoint is

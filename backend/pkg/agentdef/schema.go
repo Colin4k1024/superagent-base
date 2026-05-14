@@ -82,6 +82,28 @@ type AgentSpec struct {
 	// Graph is the registered Eino graph name for type=eino_graph.
 	// The name must match a factory registered via pkg/graphs.Register().
 	Graph         string             `yaml:"graph,omitempty"         json:"graph,omitempty"`
+	// Evolution enables experience self-evolution via the Oris SDK.
+	Evolution     *EvolutionSpec     `yaml:"evolution,omitempty"     json:"evolution,omitempty"`
+}
+
+// EvolutionSpec configures experience self-evolution for an agent.
+type EvolutionSpec struct {
+	// Enabled is the per-agent switch (requires global engine to be initialised).
+	Enabled bool `yaml:"enabled" json:"enabled"`
+	// Collect lists the signal types to contribute to the Experience Repo.
+	// Valid values: tool_success, tool_error, model_invoke, agent_done.
+	// Defaults to all types when empty.
+	Collect []string `yaml:"collect,omitempty" json:"collect,omitempty"`
+	// Advise configures Gene recommendation injection into the system prompt.
+	Advise EvolutionAdviseSpec `yaml:"advise,omitempty" json:"advise,omitempty"`
+}
+
+// EvolutionAdviseSpec controls how Advisor recommendations are applied.
+type EvolutionAdviseSpec struct {
+	// MinConfidence overrides the global minimum confidence threshold for this agent.
+	MinConfidence float64 `yaml:"min_confidence,omitempty" json:"min_confidence,omitempty"`
+	// MaxSuggestions caps the number of Gene recommendations injected into the prompt.
+	MaxSuggestions int `yaml:"max_suggestions,omitempty" json:"max_suggestions,omitempty"`
 }
 
 // WorkflowSpec defines a graph-based workflow composed of nodes and edges.
