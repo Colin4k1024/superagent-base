@@ -45,6 +45,7 @@ jobs:
         with:
           go-version: '1.24'
           cache-dependency-path: backend/go.sum
+          check-latest: true
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -59,6 +60,10 @@ jobs:
       - name: Install Playwright browsers
         run: cd web && npx playwright install --with-deps chromium
 
+      - name: Initialize MySQL schema
+        run: |
+          mysql -h 127.0.0.1 -u coze -pcoze123 opencoze < docker/volumes/mysql/schema.sql
+
       - name: Build backend
         run: cd backend && go build -o ../bin/superagent .
 
@@ -72,29 +77,48 @@ jobs:
           STORAGE_TYPE: "none"
           COZE_MQ_TYPE: "none"
           VECTOR_STORE_TYPE: "none"
+          EMBEDDING_TYPE: "none"
+          ES_ADDR: ""
           ADMIN_API_KEY: ""
+          CODE_RUNNER_TYPE: "local"
         run: |
-          ./bin/superagent &
-          # Wait for backend to be ready
-          for i in $(seq 1 30); do
+          ./bin/superagent > /tmp/backend.log 2>&1 &
+          echo $! > /tmp/backend.pid
+          # Wait for backend to be ready (up to 45s)
+          for i in $(seq 1 45); do
             if curl -s http://localhost:8888/health > /dev/null 2>&1; then
-              echo "Backend ready"
+              echo "Backend ready after ${i}s"
               break
+            fi
+            if ! kill -0 $(cat /tmp/backend.pid) 2>/dev/null; then
+              echo "Backend process died. Logs:"
+              cat /tmp/backend.log
+              exit 1
             fi
             sleep 1
           done
+          if ! curl -s http://localhost:8888/health > /dev/null 2>&1; then
+            echo "Backend failed to start. Logs:"
+            cat /tmp/backend.log
+            exit 1
+          fi
 
       - name: Start frontend dev server
         run: |
-          cd web && npm run dev &
+          cd web && npm run dev > /tmp/frontend.log 2>&1 &
           # Wait for vite to be ready
-          for i in $(seq 1 20); do
+          for i in $(seq 1 30); do
             if curl -s http://localhost:3000 > /dev/null 2>&1; then
-              echo "Frontend ready"
+              echo "Frontend ready after ${i}s"
               break
             fi
             sleep 1
           done
+          if ! curl -s http://localhost:3000 > /dev/null 2>&1; then
+            echo "Frontend failed to start. Logs:"
+            cat /tmp/frontend.log
+            exit 1
+          fi
 
       - name: Run Playwright tests
         run: cd web && npx playwright test
