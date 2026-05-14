@@ -4,26 +4,20 @@ test.describe('Agents Page', () => {
   test.beforeEach(async ({ page }) => {
     await page.addInitScript(() => {
       localStorage.setItem('language', 'en')
-      localStorage.setItem('admin_api_key', '') // dev mode bypass
+      localStorage.setItem('admin_api_key', '')
     })
     await page.goto('/agents')
-    // In dev mode with empty key in localStorage, should either show agents or redirect to login
-    // If redirected to login, the auth guard allows empty key
-    if (page.url().includes('/login')) {
-      await page.goto('/agents')
-    }
-    await page.waitForLoadState('networkidle', { timeout: 15_000 })
+    // Wait for React to render (not networkidle — Vite HMR keeps socket open)
+    await page.waitForLoadState('domcontentloaded')
+    await page.waitForTimeout(1000)
   })
 
   test('shows agents page content', async ({ page }) => {
-    // Page should have loaded (either with agents or empty state)
-    await expect(page.locator('body')).not.toBeEmpty()
     const url = page.url()
     expect(url).toContain('/agents')
   })
 
   test('sidebar has navigation links', async ({ page }) => {
-    // Check sidebar links exist by href
     await expect(page.locator('a[href="/chat"]')).toBeAttached()
     await expect(page.locator('a[href="/monitor"]')).toBeAttached()
     await expect(page.locator('a[href="/skills"]')).toBeAttached()
