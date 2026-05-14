@@ -56,6 +56,11 @@ features:
     details: 结构化事件流，前端可渲染工具调用、思考过程、代码块等 UI 组件
     link: /advanced/a2ui-protocol
     linkText: 了解协议
+  - icon: "\U0001F9EC"
+    title: 经验自进化
+    details: 集成 Oris SDK，自动收集执行信号 → 基因提炼 → 策略推荐，Agent 越用越强
+    link: /advanced/evolution
+    linkText: 了解进化
 ---
 
 <div class="vp-doc" style="padding: 0 24px;">
@@ -74,12 +79,12 @@ features:
 │(curl/Web)│ ◀──────────────│  (port 8888) │ ◀────────────── │ (port 8000)│
 └──────────┘   流式 Token   └──────┬──────┘                  └───────────┘
                                    │
-                    ┌──────────────┼──────────────┐
-                    ▼              ▼              ▼
-              ┌──────────┐  ┌──────────┐  ┌──────────┐
-              │  Memory   │  │  Tools   │  │  Skills  │
-              │  (Redis)  │  │ (MCP/内置)│  │(SkillHub)│
-              └──────────┘  └──────────┘  └──────────┘
+                    ┌──────────────┼──────────────┬───────────────┐
+                    ▼              ▼              ▼               ▼
+              ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────────┐
+              │  Memory   │  │  Tools   │  │  Skills  │  │  Evolution   │
+              │  (Redis)  │  │ (MCP/内置)│  │(SkillHub)│  │(Oris SDK/Hub)│
+              └──────────┘  └──────────┘  └──────────┘  └──────────────┘
 ```
 
 ## 快速体验

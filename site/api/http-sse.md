@@ -8,6 +8,9 @@
 | POST | `/api/v1/chat/stream` | 流式对话（SSE） |
 | POST | `/api/v1/chat/resume` | 恢复中断的对话 |
 | GET | `/api/v1/chat/interrupt_state` | 查询中断状态 |
+| GET | `/api/v1/admin/evolution/stats` | Evolution 引擎状态 |
+| GET | `/api/v1/admin/evolution/genes` | 基因列表查询 |
+| GET | `/api/v1/admin/evolution/federated` | 联邦搜索 |
 | GET | `/metrics` | Prometheus 指标 |
 
 ## 流式对话

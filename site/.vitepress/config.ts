@@ -56,7 +56,8 @@ export default defineConfig({
             { text: '工作流编排', link: '/advanced/workflow' },
             { text: 'Skill 开发', link: '/advanced/skill-development' },
             { text: '多 Agent 编排', link: '/advanced/multi-agent' },
-            { text: 'MCP 集成', link: '/advanced/mcp' }
+            { text: 'MCP 集成', link: '/advanced/mcp' },
+            { text: '经验自进化', link: '/advanced/evolution' }
           ]
         }
       ]
