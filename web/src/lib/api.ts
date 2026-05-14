@@ -8,7 +8,8 @@ const API_BASE = '/api/v1'
 function authHeaders(): Record<string, string> {
   const key = getApiKey()
   const headers: Record<string, string> = { 'Content-Type': 'application/json' }
-  if (key) {
+  if (key !== null) {
+    // Send header even for empty string — dev mode backend matches empty ADMIN_API_KEY
     headers['X-Admin-Key'] = key
   }
   return headers
