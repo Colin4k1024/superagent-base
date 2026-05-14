@@ -20,22 +20,36 @@ test.describe('Authentication', () => {
     await page.addInitScript(() => {
       localStorage.setItem('language', 'en')
     })
+    // Mock the status endpoint that login calls to validate key
+    await page.route('**/api/v1/admin/status', (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ health: 'healthy', agent_count: 0, ready: true }),
+      })
+    })
     await page.goto('/login')
     await page.waitForLoadState('domcontentloaded')
     await page.locator('button[type="submit"]').click()
-    await expect(page).toHaveURL(/\/agents/, { timeout: 15_000 })
+    await expect(page).toHaveURL(/\/agents/, { timeout: 10_000 })
   })
 
   test('stored key bypasses login', async ({ page }) => {
     await page.addInitScript(() => {
-      localStorage.setItem('admin_api_key', '')
+      localStorage.setItem('admin_api_key', 'test-key')
       localStorage.setItem('language', 'en')
+    })
+    // Mock API to prevent auth errors
+    await page.route('**/api/v1/admin/**', (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ agents: [], health: 'healthy' }),
+      })
     })
     await page.goto('/agents')
     await page.waitForLoadState('domcontentloaded')
-    await page.waitForTimeout(1000)
-    // With key stored (even empty), auth guard should not redirect
-    const url = page.url()
-    expect(url).not.toContain('/login')
+    await page.waitForTimeout(500)
+    expect(page.url()).not.toContain('/login')
   })
 })
