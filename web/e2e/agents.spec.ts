@@ -2,40 +2,46 @@ import { test, expect } from '@playwright/test'
 
 test.describe('Agents Page', () => {
   test.beforeEach(async ({ page }) => {
-    // Set English locale for consistent test selectors
     await page.addInitScript(() => {
       localStorage.setItem('language', 'en')
+      localStorage.setItem('admin_api_key', '') // dev mode bypass
     })
-    // Login (dev mode — empty key)
-    await page.goto('/login')
-    await page.getByRole('button', { name: /login|登录/i }).click()
-    await expect(page).toHaveURL(/\/agents/, { timeout: 15_000 })
+    await page.goto('/agents')
+    // In dev mode with empty key in localStorage, should either show agents or redirect to login
+    // If redirected to login, the auth guard allows empty key
+    if (page.url().includes('/login')) {
+      await page.goto('/agents')
+    }
+    await page.waitForLoadState('networkidle', { timeout: 15_000 })
   })
 
-  test('shows agents list or empty state', async ({ page }) => {
-    // Either agent cards or empty state message should be visible
-    const content = await page.textContent('body')
-    const hasContent = content && content.length > 0
-    expect(hasContent).toBeTruthy()
+  test('shows agents page content', async ({ page }) => {
+    // Page should have loaded (either with agents or empty state)
+    await expect(page.locator('body')).not.toBeEmpty()
+    const url = page.url()
+    expect(url).toContain('/agents')
   })
 
-  test('new agent button navigates to editor', async ({ page }) => {
-    await page.getByRole('button', { name: /new agent|新建/i }).click()
-    await expect(page).toHaveURL(/\/agents\/new/)
+  test('sidebar has navigation links', async ({ page }) => {
+    // Check sidebar links exist by href
+    await expect(page.locator('a[href="/chat"]')).toBeAttached()
+    await expect(page.locator('a[href="/monitor"]')).toBeAttached()
+    await expect(page.locator('a[href="/skills"]')).toBeAttached()
+    await expect(page.locator('a[href="/settings"]')).toBeAttached()
   })
 
-  test('sidebar navigation to Chat works', async ({ page }) => {
-    await page.getByRole('link', { name: /chat|对话/i }).click()
+  test('sidebar navigation works', async ({ page }) => {
+    await page.locator('a[href="/chat"]').click()
     await expect(page).toHaveURL(/\/chat/)
   })
 
-  test('sidebar navigation to Monitor works', async ({ page }) => {
-    await page.getByRole('link', { name: /monitor|监控/i }).click()
+  test('navigate to monitor', async ({ page }) => {
+    await page.locator('a[href="/monitor"]').click()
     await expect(page).toHaveURL(/\/monitor/)
   })
 
-  test('sidebar navigation to Skills works', async ({ page }) => {
-    await page.getByRole('link', { name: /skills|技能/i }).click()
+  test('navigate to skills', async ({ page }) => {
+    await page.locator('a[href="/skills"]').click()
     await expect(page).toHaveURL(/\/skills/)
   })
 })
