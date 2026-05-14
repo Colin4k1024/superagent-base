@@ -38,6 +38,7 @@ var validAgentTypes = map[string]struct{}{
 	"sequential":       {},
 	"parallel":         {},
 	"plan_execute":     {},
+	"eino_graph":       {}, // native Eino graph from pkg/graphs registry
 }
 
 // orchestrationTypes is the subset of validAgentTypes that represent

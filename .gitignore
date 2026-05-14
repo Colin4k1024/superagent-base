@@ -16,6 +16,8 @@ crash.log
 
 # Docker data
 docker/data/
+docker/.env.debug
+docker/.env
 
 # Frontend
 web/node_modules/
@@ -46,3 +48,4 @@ coverage.out
 tmp/
 .tmp/
 tests/e2e/__pycache__/
+tests/e2e/reports/

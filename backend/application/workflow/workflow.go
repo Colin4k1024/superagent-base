@@ -106,6 +106,9 @@ func (w *ApplicationService) InitNodeIconURLCache(ctx context.Context) error {
 					logs.Warnf("node '%s' has an empty IconURI, it will have no icon", nodeMeta.Name)
 					return nil
 				}
+				if w.TosClient == nil {
+					return nil
+				}
 				url, err := w.TosClient.GetObjectUrl(gCtx, nodeMeta.IconURI)
 				if err != nil {
 					logs.Warnf("failed to get object url for node %s: %v", nodeMeta.Name, err)

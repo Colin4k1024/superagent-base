@@ -70,7 +70,8 @@ func Init(ctx context.Context) (*AppDependencies, error) {
 	deps.OSS, err = storage.New(ctx)
 	if err != nil {
 		logs.Warnf("init storage client failed (non-fatal, storage features disabled): %v", err)
-		// Storage is optional for core agent functionality.
+		// Fall back to noop so downstream callers never see a nil Storage interface.
+		deps.OSS = storage.NewNoop()
 	}
 
 	deps.DB, err = mysql.New()

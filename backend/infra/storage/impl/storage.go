@@ -100,6 +100,12 @@ func (n *noopStorage) ListObjectsPaginated(_ context.Context, _ *storage.ListObj
 	return nil, errStorageDisabled
 }
 
+// NewNoop returns a no-op Storage that silently accepts writes and returns empty results.
+// Use this as a fallback when real storage (MinIO/TOS/S3) is unavailable in dev/test environments.
+func NewNoop() Storage {
+	return &noopStorage{}
+}
+
 func NewImagex(ctx context.Context) (imagex.ImageX, error) {
 	storageType := os.Getenv(consts.StorageType)
 	switch storageType {
