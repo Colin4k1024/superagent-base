@@ -42,17 +42,28 @@ func newEvolutionAdvisor(client *experienceclient.Client, minConfidence float64,
 	}
 }
 
-// Recommend fetches Gene recommendations for a free-text query (e.g. task description or tool name).
-// Returns an empty slice on any error to keep the caller non-blocking.
+// Recommend fetches Gene recommendations for a free-text query using default confidence/limit.
 func (a *EvolutionAdvisor) Recommend(ctx context.Context, query string) []Recommendation {
+	return a.RecommendWithOpts(ctx, query, 0, 0)
+}
+
+// RecommendWithOpts fetches Gene recommendations with explicit confidence and limit overrides.
+// Zero values fall back to the configured defaults.
+func (a *EvolutionAdvisor) RecommendWithOpts(ctx context.Context, query string, minConfidence float64, limit int) []Recommendation {
 	if a == nil || a.client == nil || query == "" {
 		return nil
+	}
+	if minConfidence <= 0 {
+		minConfidence = a.minConfidence
+	}
+	if limit <= 0 {
+		limit = a.maxSuggestions
 	}
 
 	results, err := a.client.Fetch(ctx, &experienceclient.FetchQuery{
 		Q:             query,
-		MinConfidence: a.minConfidence,
-		Limit:         a.maxSuggestions,
+		MinConfidence: minConfidence,
+		Limit:         limit,
 	})
 	if err != nil || results == nil {
 		return nil
