@@ -2,6 +2,7 @@ import '@xyflow/react/dist/style.css'
 
 import { useState, useCallback, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import {
   ReactFlow,
   ReactFlowProvider,
@@ -81,6 +82,7 @@ function specToFlow(spec: WorkflowSpec): { nodes: Node[]; edges: Edge[] } {
 
 // ---- Inner canvas component (uses useReactFlow so must be inside Provider) ----
 function WorkflowCanvas({ agentName }: { agentName: string }) {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const { screenToFlowPosition } = useReactFlow()
 
@@ -166,7 +168,7 @@ function WorkflowCanvas({ agentName }: { agentName: string }) {
       const updatedYaml = rebuildYamlWithFlow(rawYaml, nodes, edges)
       await agentAdminApi.update(agentName, updatedYaml)
       setRawYaml(updatedYaml)
-      toast.success('Workflow saved')
+      toast.success(t('workflow.save'))
     } catch (err) {
       toast.error(`Save failed: ${err instanceof Error ? err.message : String(err)}`)
     } finally {
@@ -193,7 +195,7 @@ function WorkflowCanvas({ agentName }: { agentName: string }) {
           onClick={() => navigate('/agents')}
           className="text-sm text-gray-500 hover:text-gray-700 flex items-center gap-1 transition-colors"
         >
-          ← Back
+          {t('workflow.backToAgent')}
         </button>
         <span className="text-gray-300">|</span>
         <span className="text-sm font-semibold text-gray-800 truncate">{agentName}</span>
@@ -203,14 +205,14 @@ function WorkflowCanvas({ agentName }: { agentName: string }) {
             onClick={handleExportYaml}
             className="text-xs border border-gray-200 rounded px-3 py-1.5 text-gray-600 hover:bg-gray-50 transition-colors"
           >
-            Export YAML
+            {t('workflow.export')}
           </button>
           <button
             onClick={handleSave}
             disabled={saving}
             className="text-xs bg-blue-600 text-white rounded px-3 py-1.5 font-semibold hover:bg-blue-700 disabled:opacity-50 transition-colors"
           >
-            {saving ? 'Saving…' : 'Save'}
+            {saving ? t('editor.saving') : t('workflow.save')}
           </button>
         </div>
       </div>

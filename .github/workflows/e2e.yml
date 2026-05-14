@@ -1,0 +1,108 @@
+name: E2E Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: opencoze
+          MYSQL_USER: coze
+          MYSQL_PASSWORD: coze123
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h localhost"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd="redis-cli ping"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+          cache-dependency-path: backend/go.sum
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install frontend dependencies
+        run: cd web && npm ci
+
+      - name: Install Playwright browsers
+        run: cd web && npx playwright install --with-deps chromium
+
+      - name: Build backend
+        run: cd backend && go build -o ../bin/superagent .
+
+      - name: Start backend
+        env:
+          LISTEN_ADDR: ":8888"
+          LOG_LEVEL: debug
+          APP_ENV: dev
+          MYSQL_DSN: "coze:coze123@tcp(127.0.0.1:3306)/opencoze?charset=utf8mb4&parseTime=True&allowNativePasswords=false"
+          REDIS_ADDR: "127.0.0.1:6379"
+          STORAGE_TYPE: "none"
+          COZE_MQ_TYPE: "none"
+          VECTOR_STORE_TYPE: "none"
+          ADMIN_API_KEY: ""
+        run: |
+          ./bin/superagent &
+          # Wait for backend to be ready
+          for i in $(seq 1 30); do
+            if curl -s http://localhost:8888/health > /dev/null 2>&1; then
+              echo "Backend ready"
+              break
+            fi
+            sleep 1
+          done
+
+      - name: Start frontend dev server
+        run: |
+          cd web && npm run dev &
+          # Wait for vite to be ready
+          for i in $(seq 1 20); do
+            if curl -s http://localhost:3000 > /dev/null 2>&1; then
+              echo "Frontend ready"
+              break
+            fi
+            sleep 1
+          done
+
+      - name: Run Playwright tests
+        run: cd web && npx playwright test
+
+      - name: Upload test results
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: web/playwright-report/
+          retention-days: 7

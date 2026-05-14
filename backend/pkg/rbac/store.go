@@ -39,3 +39,47 @@ func (s *UserStore) List() []*User {
 	}
 	return result
 }
+
+// LookupByID finds a user by their ID.
+func (s *UserStore) LookupByID(id string) (*User, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	for _, u := range s.users {
+		if u.ID == id {
+			return u, true
+		}
+	}
+	return nil, false
+}
+
+// Remove deletes a user by ID from the store. Returns false if not found.
+func (s *UserStore) Remove(id string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for key, u := range s.users {
+		if u.ID == id {
+			delete(s.users, key)
+			return true
+		}
+	}
+	return false
+}
+
+// Update applies partial changes to a user identified by ID.
+// Only non-zero fields in patch are applied. Returns false if not found.
+func (s *UserStore) Update(id string, role Role, disabled *bool) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, u := range s.users {
+		if u.ID == id {
+			if role != "" {
+				u.Role = role
+			}
+			if disabled != nil {
+				u.Disabled = *disabled
+			}
+			return true
+		}
+	}
+	return false
+}
