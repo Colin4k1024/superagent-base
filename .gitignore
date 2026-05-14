@@ -24,6 +24,11 @@ web/node_modules/
 web/dist/
 web/.next/
 
+# Docs site
+site/node_modules/
+site/.vitepress/dist/
+site/.vitepress/cache/
+
 # IDE
 .idea/
 .vscode/

@@ -45,6 +45,7 @@ Agent YAML 文件存放在配置目录（默认 `configs/agents/`）中，运行
 | `orchestration` | OrchestrationSpec | 否 | 多 Agent 协调策略 |
 | `workflow` | WorkflowSpec | 否 | 图工作流定义（type=workflow 时必填） |
 | `interrupt` | InterruptConfig | 否 | 中断/恢复配置 |
+| `evolution` | EvolutionSpec | 否 | 经验自进化配置 |
 
 ### spec.type 可选值
 
@@ -235,6 +236,19 @@ middleware:
   - name: cache
     ttl: 300s
 ```
+
+---
+
+## spec.evolution
+
+| 字段 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `enabled` | bool | false | 启用经验自进化（需要全局 `EVOLUTION_ENABLED=true`） |
+| `collect` | []string | [] (全部) | 信号类型过滤：`tool_success` / `tool_error` / `model_invoke` / `node_done` 等 |
+
+启用后，Agent 执行中产生的信号会自动被 SignalCollector 收集并发送到 Oris Experience Repo，Advisor 在构建时注入高置信度 Gene 策略推荐。
+
+详见 [经验自进化](/advanced/evolution)。
 
 ---
 

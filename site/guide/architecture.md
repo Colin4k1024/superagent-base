@@ -57,6 +57,13 @@
 │  │   builtin/             web_search / http_request / code_execute  │  │
 │  └─────────────────────────────────────────────────────────────────┘  │
 │  ┌─────────────────────────────────────────────────────────────────┐  │
+│  │ pkg/evolution/                                                    │  │
+│  │   Engine             Evolution 门面（Init/Shutdown/Discover）     │  │
+│  │   SignalCollector     异步信号收集（信号量限流 + 背压丢弃）       │  │
+│  │   EvolutionAdvisor   Gene 推荐查询 → system prompt 注入          │  │
+│  │   callback.go         Eino 全局 Callback 自动捕获 Tool/Model     │  │
+│  └─────────────────────────────────────────────────────────────────┘  │
+│  ┌─────────────────────────────────────────────────────────────────┐  │
 │  │ pkg/skill/                                                       │  │
 │  │   LocalInvoker        注册并调用本地 SkillFunc                   │  │
 │  │   HTTPInvoker         POST <endpoint>/invoke                     │  │
