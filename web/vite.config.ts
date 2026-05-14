@@ -28,6 +28,18 @@ export default defineConfig({
       },
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'vendor': ['react', 'react-dom', 'react-router-dom'],
+          'monaco': ['@monaco-editor/react'],
+          'xyflow': ['@xyflow/react'],
+          'query': ['@tanstack/react-query', 'zustand'],
+        },
+      },
+    },
+  },
   test: {
     globals: true,
     environment: 'jsdom',

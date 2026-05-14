@@ -19,6 +19,7 @@ package modelrouter
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -210,6 +211,28 @@ func TestRouterReload(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "new-model", result.ModelID)
 	assert.Equal(t, "custom", result.ProviderName)
+}
+
+// TestRoute_RecordsMetrics verifies that Route runs without panicking when
+// Prometheus metrics are recorded (label cardinality must match registration).
+func TestRoute_RecordsMetrics(t *testing.T) {
+	router, err := NewDefaultRouter(testConfig)
+	require.NoError(t, err)
+
+	// Any matching request causes ModelRouteDecisions and ModelRouteLatency to be recorded.
+	result, err := router.Route(context.Background(), &RouteRequest{TaskType: "reasoning"})
+	require.NoError(t, err)
+	assert.NotEmpty(t, result.ModelID)
+}
+
+// TestRecordModelLatency verifies that RecordModelLatency does not panic.
+func TestRecordModelLatency(t *testing.T) {
+	defer func() {
+		if r := recover(); r != nil {
+			t.Errorf("RecordModelLatency panicked: %v", r)
+		}
+	}()
+	RecordModelLatency("gpt-4o", "openai", 250*time.Millisecond)
 }
 
 // TestNoMatchReturnsError verifies that Route returns an error when all

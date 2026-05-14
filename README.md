@@ -16,7 +16,7 @@
 | **Tool 中间件链** | retry / timeout / rate-limit / cache + 内置工具 web_search / http_request / code_execute |
 | **多 Agent 编排** | Supervisor / Sequential / Parallel 三种模式 |
 | **Workflow / Graph Tool** | DAG 执行，拓扑排序，节点类型：llm_call / agent_call / tool_call / code / condition |
-| **Eino Dev 可视化编排** *(Coming Soon)* | 通过 VS Code "Eino Dev" 插件图形化编排 Eino Graph，导出原生 Go 代码后注册到 `pkg/graphs/`，YAML 引用即可热加载 |
+| **Eino Dev 可视化编排** | 通过 VS Code "Eino Dev" 插件图形化编排 Eino Graph，导出原生 Go 代码后注册到 `pkg/graphs/`，YAML 引用即可热加载 |
 | **中断/恢复** | 检测确认请求 → 保存 checkpoint → HTTP Resume API 恢复对话 |
 | **A2UI 协议** | 结构化流式事件（text / thinking / tool_call / tool_result / code_block / interrupt / error / done / progress / agent_switch） |
 | **OpenTelemetry + Prometheus** | 分布式追踪 + 指标（Agent 请求数/延迟/错误率、Model Token、Tool 调用、活跃会话数），Eino callback 自动上报 |
@@ -25,6 +25,10 @@
 | **Admin API** | `GET /api/v1/admin/status`（运行状态）、`POST /api/v1/admin/reload`（热重载）、`GET /api/v1/admin/logs`（实时日志 SSE） |
 | **gRPC API** | AgentService / ConversationService / ModelService / ToolService |
 | **HTTP SSE 流式 API** | POST /api/v1/chat/stream，GET /api/v1/agents，POST /api/v1/chat/resume |
+| **前端认证** | API Key 认证门禁，localStorage 持久化，未授权自动跳转登录页 |
+| **Agent 编辑器** | Monaco YAML 编辑器 + 表单双向同步，创建 / 编辑 / 复制 / 删除 / 校验 / 测试对话 |
+| **Workflow 图编辑器** | React Flow DAG 画布，5 种节点拖放，属性面板，自动布局，YAML ↔ Graph 双向序列化 |
+| **Skills 市场** | 搜索 / 安装 / 卸载技能，对接 SkillHub 真实 API |
 | **Web UI** | React + Vite + Tailwind，流式对话 + 监控面板 + 技能市场 |
 | **Docker Compose + Helm** | 开发环境轻量栈 + 生产级 Kubernetes 部署 |
 | **CLI 工具 sactl** | 技能管理和 Agent 管理命令行工具 |
@@ -217,7 +221,7 @@ spec:
 | `parallel` | 并发执行所有 sub_agents，合并输出 |
 | `plan_execute` | 先规划后执行的多 Agent 模式 |
 | `workflow` | DAG 图执行，通过 spec.workflow 定义节点和边 |
-| `eino_graph` *(Coming Soon)* | 原生 Eino Graph，通过 `pkg/graphs.Register()` 注册编译后的图，无需修改平台代码 |
+| `eino_graph` | 原生 Eino Graph，通过 `pkg/graphs.Register()` 注册编译后的图，无需修改平台代码 |
 
 ---
 
@@ -267,7 +271,7 @@ make dev-server
 
 ---
 
-## Eino Dev 可视化图编排 *(Coming Soon)*
+## Eino Dev 可视化图编排
 
 > 通过 VS Code **Eino Dev** 插件图形化设计 Eino Graph，将生成的原生 Go 代码直接接入 superagent 热加载体系。
 
@@ -324,6 +328,23 @@ spec:
 
 ---
 
+## Web UI 功能
+
+访问 `http://localhost:3000`（开发模式）或 `http://localhost:8888`（生产构建）。
+
+| 页面 | 路径 | 功能 |
+|------|------|------|
+| 登录 | `/login` | API Key 认证（开发模式可留空） |
+| Agent 管理 | `/agents` | 列表、创建、编辑、复制、删除 |
+| Agent 编辑器 | `/agents/:name/edit` | Monaco YAML + 表单双向同步 + 内嵌测试对话 |
+| Workflow 编辑器 | `/agents/:name/workflow` | React Flow DAG 画布，拖放节点，自动布局 |
+| 对话 | `/chat` | 流式对话，Agent 切换，多轮记忆 |
+| 监控 | `/monitor` | 系统状态、Prometheus 指标、实时日志、热重载管理 |
+| Skills | `/skills` | 搜索、安装、卸载技能 |
+| 设置 | `/settings` | 模型增删、MCP Server 管理 |
+
+---
+
 ## 文档
 
 | 文档 | 说明 |
@@ -368,6 +389,12 @@ superagent-base/
 │   ├── docker-compose-monitoring.yml  监控栈（Prometheus + Grafana + OTel）
 │   ├── monitoring/                监控配置（prometheus.yml / otel-collector.yaml / grafana）
 │   └── .env.dev                   开发环境配置模板
+├── web/                      React 前端
+│   └── src/
+│       ├── pages/            页面组件（Agent 编辑器、Workflow 编辑器、Chat 等）
+│       ├── components/       UI 组件 + Agent/Workflow 专用组件
+│       ├── lib/              API 客户端、认证、序列化器、工具函数
+│       └── test/             Vitest 测试（31 个基线用例）
 ├── helm/                     Kubernetes Helm Chart
 ├── api/proto/                gRPC Proto 定义
 ├── scripts/                  开发脚本（dev-start.sh / e2e-test.sh）
