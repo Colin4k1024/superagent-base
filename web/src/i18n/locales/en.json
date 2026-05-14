@@ -9,7 +9,8 @@
     "monitor": "Monitor",
     "skills": "Skills",
     "settings": "Settings",
-    "logout": "Logout"
+    "logout": "Logout",
+    "evolution": "Evolution"
   },
   "login": {
     "title": "Superagent",

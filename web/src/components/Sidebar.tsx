@@ -25,6 +25,7 @@ export default function Sidebar() {
     { to: '/monitor', label: t('nav.monitor'), icon: '📊' },
     { to: '/skills', label: t('nav.skills'), icon: '🧩' },
     { to: '/settings', label: t('nav.settings'), icon: '⚙️' },
+    { to: '/evolution', label: t('nav.evolution'), icon: '◈' },
   ]
 
   // On mobile: collapsed (w-16) unless mobileOpen; on md+: always w-56
