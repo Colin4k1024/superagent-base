@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
+import { useTranslation } from 'react-i18next'
 import Header from '../components/Header'
 import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
@@ -32,6 +33,7 @@ interface SkillCardProps {
 }
 
 function SkillCard({ skill, onInstall, onUninstall, installing, uninstalling }: SkillCardProps) {
+  const { t } = useTranslation()
   const [confirmOpen, setConfirmOpen] = useState(false)
 
   return (
@@ -54,7 +56,7 @@ function SkillCard({ skill, onInstall, onUninstall, installing, uninstalling }: 
               onClick={() => setConfirmOpen(true)}
               loading={uninstalling}
             >
-              Uninstall
+              {t('skills.uninstall')}
             </Button>
           ) : (
             <Button
@@ -63,7 +65,7 @@ function SkillCard({ skill, onInstall, onUninstall, installing, uninstalling }: 
               onClick={() => onInstall(skill.name)}
               loading={installing}
             >
-              Install
+              {t('skills.install')}
             </Button>
           )}
         </div>
@@ -72,14 +74,14 @@ function SkillCard({ skill, onInstall, onUninstall, installing, uninstalling }: 
       <Dialog
         open={confirmOpen}
         onClose={() => setConfirmOpen(false)}
-        title="Uninstall skill"
+        title={t('skills.uninstall')}
       >
         <p className="text-sm text-gray-700 mb-4">
-          Remove <strong>{skill.name}</strong>? This action cannot be undone.
+          {t('skills.confirmUninstall', { name: skill.name })}
         </p>
         <div className="flex justify-end gap-2">
           <Button variant="outline" size="sm" onClick={() => setConfirmOpen(false)}>
-            Cancel
+            {t('common.cancel')}
           </Button>
           <Button
             variant="destructive"
@@ -90,7 +92,7 @@ function SkillCard({ skill, onInstall, onUninstall, installing, uninstalling }: 
               onUninstall(skill.name)
             }}
           >
-            Uninstall
+            {t('skills.uninstall')}
           </Button>
         </div>
       </Dialog>
@@ -99,6 +101,7 @@ function SkillCard({ skill, onInstall, onUninstall, installing, uninstalling }: 
 }
 
 export default function SkillsPage() {
+  const { t } = useTranslation()
   const qc = useQueryClient()
   const [inputValue, setInputValue] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
@@ -129,7 +132,7 @@ export default function SkillsPage() {
     onSuccess: (_data, name) => {
       qc.invalidateQueries({ queryKey: ['skills'] })
       qc.invalidateQueries({ queryKey: ['skills-search'] })
-      toast.success(`Installed ${name}`)
+      toast.success(t('skills.installSuccess', { name }))
     },
     onError: (err: Error, name) => {
       toast.error(`Failed to install ${name}: ${err.message}`)
@@ -141,7 +144,7 @@ export default function SkillsPage() {
     onSuccess: (_data, name) => {
       qc.invalidateQueries({ queryKey: ['skills'] })
       qc.invalidateQueries({ queryKey: ['skills-search'] })
-      toast.success(`Uninstalled ${name}`)
+      toast.success(t('skills.uninstallSuccess', { name }))
     },
     onError: (err: Error, name) => {
       toast.error(`Failed to uninstall ${name}: ${err.message}`)
@@ -154,11 +157,11 @@ export default function SkillsPage() {
   return (
     <div className="flex flex-col h-full">
       <Header
-        title="Skills"
+        title={t('skills.title')}
         actions={
           <Input
             type="search"
-            placeholder="Search skills…"
+            placeholder={t('skills.search')}
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             className="w-56"
@@ -169,7 +172,7 @@ export default function SkillsPage() {
       <div className="flex-1 overflow-auto p-6 space-y-8">
         {/* Installed skills section */}
         <section>
-          <h2 className="text-sm font-semibold text-gray-700 mb-3">Installed</h2>
+          <h2 className="text-sm font-semibold text-gray-700 mb-3">{t('skills.installed')}</h2>
 
           {listLoading && (
             <div className="flex items-center gap-2 text-sm text-gray-500">
@@ -188,7 +191,7 @@ export default function SkillsPage() {
           )}
 
           {!listLoading && !listError && installed.length === 0 && (
-            <p className="text-sm text-gray-400 italic">No skills installed yet.</p>
+            <p className="text-sm text-gray-400 italic">{t('skills.empty')}</p>
           )}
 
           {installed.length > 0 && (
@@ -210,7 +213,7 @@ export default function SkillsPage() {
         {/* Search results section — only shown when there are results */}
         {searchQuery.length > 0 && (
           <section>
-            <h2 className="text-sm font-semibold text-gray-700 mb-3">Available</h2>
+            <h2 className="text-sm font-semibold text-gray-700 mb-3">{t('skills.available')}</h2>
 
             {searchResults.length === 0 ? (
               <p className="text-sm text-gray-400 italic">No results for &ldquo;{searchQuery}&rdquo;.</p>

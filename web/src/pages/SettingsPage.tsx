@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useTranslation } from 'react-i18next'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -73,6 +74,7 @@ interface AddModelDialogProps {
 }
 
 function AddModelDialog({ open, onClose, onSuccess }: AddModelDialogProps) {
+  const { t } = useTranslation()
   const {
     register,
     handleSubmit,
@@ -97,7 +99,7 @@ function AddModelDialog({ open, onClose, onSuccess }: AddModelDialogProps) {
     try {
       const payload: CreateModelRequest = { ...values }
       await modelConfigApi.create(payload)
-      toast.success('Model added and connection verified')
+      toast.success(t('settings.modelAdded'))
       reset()
       onSuccess()
       onClose()
@@ -209,6 +211,7 @@ function DeleteConfirmDialog({ open, model, onClose, onConfirm, loading }: Delet
 // ─── Models Tab ───────────────────────────────────────────────────────────────
 
 function ModelsTab() {
+  const { t } = useTranslation()
   const queryClient = useQueryClient()
   const [addOpen, setAddOpen] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<ModelRecord | null>(null)
@@ -234,7 +237,7 @@ function ModelsTab() {
     setDeleteLoading(true)
     try {
       await modelConfigApi.delete(deleteTarget.id)
-      toast.success('Model deleted')
+      toast.success(t('settings.modelDeleted'))
       queryClient.invalidateQueries({ queryKey: ['models'] })
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to delete model')
@@ -251,7 +254,7 @@ function ModelsTab() {
           Configure LLM providers and models for the Model Router.
         </p>
         <Button size="sm" onClick={() => setAddOpen(true)}>
-          + Add Model
+          + {t('settings.addModel')}
         </Button>
       </div>
 
@@ -372,17 +375,18 @@ function McpTab() {
 // ─── Page ──────────────────────────────────────────────────────────────────────
 
 export default function SettingsPage() {
+  const { t } = useTranslation()
   const [tab, setTab] = useState('models')
 
   return (
     <div className="flex flex-col h-full">
-      <Header title="Settings" />
+      <Header title={t('settings.title')} />
 
       <div className="flex-1 overflow-auto p-6">
         <Tabs value={tab} onChange={setTab}>
           <TabsList className="mb-6">
-            <TabsTrigger value="models">Model Config</TabsTrigger>
-            <TabsTrigger value="mcp">MCP Servers</TabsTrigger>
+            <TabsTrigger value="models">{t('settings.models')}</TabsTrigger>
+            <TabsTrigger value="mcp">{t('settings.mcpServers')}</TabsTrigger>
           </TabsList>
 
           <TabsContent value="models">

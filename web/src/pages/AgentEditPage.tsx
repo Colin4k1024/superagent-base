@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import { toast } from 'sonner'
+import { useTranslation } from 'react-i18next'
 import { agentAdminApi } from '../lib/api'
 import { Button } from '../components/ui/button'
 import { AgentYAMLEditor } from '../components/agent/AgentYAMLEditor'
@@ -20,6 +21,7 @@ spec:
 `
 
 export default function AgentEditPage() {
+  const { t } = useTranslation()
   const { name } = useParams<{ name: string }>()
   const navigate = useNavigate()
   const location = useLocation()
@@ -68,11 +70,11 @@ export default function AgentEditPage() {
     try {
       if (isNew) {
         await agentAdminApi.create(yamlContent)
-        toast.success('Agent created successfully')
+        toast.success(t('editor.saved'))
         navigate('/agents')
       } else {
         await agentAdminApi.update(name!, yamlContent)
-        toast.success('Agent saved successfully')
+        toast.success(t('editor.saved'))
         navigate('/agents')
       }
     } catch (err) {
@@ -87,9 +89,9 @@ export default function AgentEditPage() {
     try {
       const result = await agentAdminApi.validate(yamlContent)
       if (result.valid) {
-        toast.success('YAML is valid')
+        toast.success(t('editor.validSuccess'))
       } else {
-        toast.error(`Validation failed: ${result.error ?? 'Unknown error'}`)
+        toast.error(t('editor.validFail', { error: result.error ?? 'Unknown error' }))
       }
     } catch (err) {
       toast.error(`Validation error: ${err instanceof Error ? err.message : String(err)}`)
@@ -103,7 +105,7 @@ export default function AgentEditPage() {
       <div className="flex h-full items-center justify-center">
         <div className="flex items-center gap-2 text-sm text-gray-500">
           <span className="w-2 h-2 rounded-full bg-gray-400 animate-pulse" />
-          Loading agent…
+          {t('common.loading')}
         </div>
       </div>
     )
@@ -120,7 +122,7 @@ export default function AgentEditPage() {
           <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
           </svg>
-          Agents
+          {t('nav.agents')}
         </button>
         <span className="text-gray-300">/</span>
         <h1 className="text-sm font-semibold text-gray-900">
@@ -149,10 +151,10 @@ export default function AgentEditPage() {
       {/* Bottom toolbar */}
       <footer className="shrink-0 flex items-center gap-2 px-6 py-3 bg-white border-t border-gray-200">
         <Button onClick={handleSave} loading={saving} size="sm">
-          {isNew ? 'Create' : 'Save'}
+          {saving ? t('editor.saving') : (isNew ? 'Create' : t('editor.save'))}
         </Button>
         <Button variant="outline" size="sm" onClick={handleValidate} loading={validating}>
-          Validate
+          {t('editor.validate')}
         </Button>
         <Button
           variant="outline"
@@ -160,10 +162,10 @@ export default function AgentEditPage() {
           onClick={() => toast.info('Test chat coming soon')}
           type="button"
         >
-          Test
+          {t('editor.test')}
         </Button>
         <Button variant="ghost" size="sm" onClick={() => navigate('/agents')}>
-          Cancel
+          {t('editor.cancel')}
         </Button>
       </footer>
     </div>

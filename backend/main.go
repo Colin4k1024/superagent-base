@@ -25,6 +25,7 @@ import (
 	"os"
 	"runtime/debug"
 	"strings"
+	"time"
 
 	"github.com/cloudwego/eino-ext/devops"
 	"github.com/cloudwego/eino/callbacks"
@@ -40,6 +41,7 @@ import (
 	"github.com/superagent-ai/superagent-base/backend/api/router"
 	"github.com/superagent-ai/superagent-base/backend/application"
 	"github.com/superagent-ai/superagent-base/backend/pkg/agentdef"
+	"github.com/superagent-ai/superagent-base/backend/pkg/mcp"
 	"github.com/superagent-ai/superagent-base/backend/pkg/memory"
 	"github.com/superagent-ai/superagent-base/backend/pkg/memory/builtin"
 	"github.com/superagent-ai/superagent-base/backend/pkg/skill"
@@ -49,6 +51,7 @@ import (
 	"github.com/superagent-ai/superagent-base/backend/pkg/lang/ternary"
 	"github.com/superagent-ai/superagent-base/backend/pkg/logs"
 	"github.com/superagent-ai/superagent-base/backend/pkg/observe"
+	"github.com/superagent-ai/superagent-base/backend/pkg/rbac"
 	"github.com/superagent-ai/superagent-base/backend/pkg/tool"
 	"github.com/superagent-ai/superagent-base/backend/types/consts"
 )
@@ -166,10 +169,24 @@ func main() {
 		}
 	}()
 
-	startHttpServer(agentRT, skillMgr)
+	mcpRegistry := mcp.NewRegistry()
+
+	// Initialize RBAC UserStore and seed a default admin user from ADMIN_API_KEY (if set).
+	userStore := rbac.NewUserStore()
+	if adminKey := os.Getenv("ADMIN_API_KEY"); adminKey != "" {
+		userStore.Register(&rbac.User{
+			ID:        "admin",
+			Name:      "admin",
+			Role:      rbac.RoleAdmin,
+			APIKey:    adminKey,
+			CreatedAt: time.Now(),
+		})
+	}
+
+	startHttpServer(agentRT, skillMgr, mcpRegistry, userStore)
 }
 
-func startHttpServer(agentRT *agentdef.AgentRuntime, skillMgr *skill.Manager) {
+func startHttpServer(agentRT *agentdef.AgentRuntime, skillMgr *skill.Manager, mcpRegistry *mcp.Registry, userStore *rbac.UserStore) {
 	maxRequestBodySize := os.Getenv("MAX_REQUEST_BODY_SIZE")
 	maxSize := conv.StrToInt64D(maxRequestBodySize, 1024*1024*200)
 	addr := getEnv("LISTEN_ADDR", ":8888")
@@ -240,27 +257,41 @@ func startHttpServer(agentRT *agentdef.AgentRuntime, skillMgr *skill.Manager) {
 
 	// Admin/monitoring endpoints — protected by AdminAuthMW (key validation + rate limiting).
 	adminH := cozehandler.NewAdminHandler(agentRT)
-	adminGroup := s.Group("/api/v1/admin", middleware.APIKeyAdminAuthMW())
+	adminGroup := s.Group("/api/v1/admin", middleware.APIKeyAdminAuthMW(userStore))
 	adminGroup.GET("/status", adminH.HandleStatus)
 	adminGroup.POST("/reload", adminH.HandleReload)
 	adminGroup.GET("/logs", adminH.HandleLogStream)
 
-	// Agent CRUD endpoints — protected by the same admin auth middleware.
+	// Agent CRUD endpoints — read requires agents:read, mutations require agents:write/delete.
 	agentAdmin := cozehandler.NewAgentAdminHandler(agentRT, getEnv("AGENT_CONFIG_DIR", "configs/agents"))
-	adminGroup.GET("/agents", agentAdmin.HandleList)
-	adminGroup.POST("/agents/validate", agentAdmin.HandleValidate)
-	adminGroup.GET("/agents/:name", agentAdmin.HandleGet)
-	adminGroup.POST("/agents", agentAdmin.HandleCreate)
-	adminGroup.PUT("/agents/:name", agentAdmin.HandleUpdate)
-	adminGroup.DELETE("/agents/:name", agentAdmin.HandleDelete)
+	adminGroup.GET("/agents", middleware.RequirePermission("agents", "read"), agentAdmin.HandleList)
+	adminGroup.POST("/agents/validate", middleware.RequirePermission("agents", "read"), agentAdmin.HandleValidate)
+	adminGroup.GET("/agents/:name", middleware.RequirePermission("agents", "read"), agentAdmin.HandleGet)
+	adminGroup.POST("/agents", middleware.RequirePermission("agents", "write"), agentAdmin.HandleCreate)
+	adminGroup.PUT("/agents/:name", middleware.RequirePermission("agents", "write"), agentAdmin.HandleUpdate)
+	adminGroup.DELETE("/agents/:name", middleware.RequirePermission("agents", "delete"), agentAdmin.HandleDelete)
+
+	// User CRUD endpoints — full admin role required (no extra per-route permission; admin group auth suffices).
+	userAdmin := cozehandler.NewUserAdminHandler(userStore)
+	adminGroup.GET("/users", userAdmin.HandleList)
+	adminGroup.POST("/users", userAdmin.HandleCreate)
+	adminGroup.PUT("/users/:id", userAdmin.HandleUpdate)
+	adminGroup.DELETE("/users/:id", userAdmin.HandleDelete)
+
+	// MCP server management endpoints — protected by admin auth middleware.
+	mcpAdmin := cozehandler.NewMCPAdminHandler(mcpRegistry)
+	adminGroup.GET("/mcp/servers", mcpAdmin.HandleList)
+	adminGroup.POST("/mcp/servers", middleware.RequirePermission("config", "write"), mcpAdmin.HandleConnect)
+	adminGroup.DELETE("/mcp/servers/:name", middleware.RequirePermission("config", "write"), mcpAdmin.HandleDisconnect)
+	adminGroup.GET("/mcp/servers/:name/tools", mcpAdmin.HandleListTools)
 
 	// Skill management API endpoints.
-	registerSkillRoutes(s, skillMgr)
+	registerSkillRoutes(s, skillMgr, userStore)
 
 	s.Spin()
 }
 
-func registerSkillRoutes(s *server.Hertz, mgr *skill.Manager) {
+func registerSkillRoutes(s *server.Hertz, mgr *skill.Manager, userStore *rbac.UserStore) {
 	if mgr == nil {
 		return
 	}
@@ -295,8 +326,11 @@ func registerSkillRoutes(s *server.Hertz, mgr *skill.Manager) {
 		ctx.JSON(200, map[string]any{"skills": results})
 	})
 
-	// Mutating skill routes — protected by APIKeyAdminAuthMW (key validation + rate limiting).
-	skillAdmin := s.Group("/api/v1/skills", middleware.APIKeyAdminAuthMW())
+	// Mutating skill routes — protected by APIKeyAdminAuthMW + config:write permission.
+	skillAdmin := s.Group("/api/v1/skills",
+		middleware.APIKeyAdminAuthMW(userStore),
+		middleware.RequirePermission("config", "write"),
+	)
 
 	// POST /api/v1/skills/install — install a skill
 	skillAdmin.POST("/install", func(c context.Context, ctx *app.RequestContext) {

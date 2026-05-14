@@ -26,6 +26,7 @@ import (
 	"github.com/cloudwego/hertz/pkg/app"
 
 	"github.com/superagent-ai/superagent-base/backend/pkg/logs"
+	"github.com/superagent-ai/superagent-base/backend/pkg/rbac"
 )
 
 // adminAuthOnce guards the startup log so it prints exactly once.
@@ -133,7 +134,17 @@ func allowRequest(ip string) bool {
 
 // APIKeyAdminAuthMW returns a Hertz handler that enforces admin API key
 // authentication and IP rate limiting for /api/v1/admin/* routes.
-func APIKeyAdminAuthMW() app.HandlerFunc {
+//
+// store may be nil — if non-nil, it is consulted after the legacy single-key
+// check, enabling per-user API keys with role-based access control.
+//
+// Auth rules:
+//   - Key matches ADMIN_API_KEY → attach synthetic admin user to ctx
+//   - Key found in store → attach that user to ctx
+//   - Key matches neither → 403
+//   - No key configured + dev mode → pass-through with synthetic admin user
+//   - No key configured + non-dev mode → 403
+func APIKeyAdminAuthMW(store *rbac.UserStore) app.HandlerFunc {
 	apiKey := os.Getenv("ADMIN_API_KEY")
 	dev := isDevMode()
 
@@ -160,34 +171,50 @@ func APIKeyAdminAuthMW() app.HandlerFunc {
 
 		// --- Authentication ---
 		if apiKey != "" {
-			// Key is configured: validate header.
-			authorized := false
-
-			xAdminKey := string(c.GetHeader("X-Admin-Key"))
-			if xAdminKey == apiKey {
-				authorized = true
-			}
-
-			if !authorized {
+			// Extract the presented key from X-Admin-Key or Authorization: Bearer <key>.
+			presented := string(c.GetHeader("X-Admin-Key"))
+			if presented == "" {
 				authHeader := string(c.GetHeader("Authorization"))
-				if authHeader == "Bearer "+apiKey {
-					authorized = true
+				if strings.HasPrefix(authHeader, "Bearer ") {
+					presented = strings.TrimPrefix(authHeader, "Bearer ")
 				}
 			}
 
-			if !authorized {
-				c.JSON(403, map[string]any{"code": 403, "msg": "forbidden: invalid or missing admin API key"})
-				c.Abort()
+			// First: check multi-user store (supports per-user keys with roles).
+			if store != nil && presented != "" {
+				if u, ok := store.LookupByAPIKey(presented); ok {
+					ctx = rbac.WithUser(ctx, u)
+					c.Next(ctx)
+					return
+				}
+			}
+
+			// Second: check legacy single admin key (backward compatible).
+			if presented == apiKey {
+				adminUser := &rbac.User{
+					ID:   "admin",
+					Name: "admin",
+					Role: rbac.RoleAdmin,
+				}
+				ctx = rbac.WithUser(ctx, adminUser)
+				c.Next(ctx)
 				return
 			}
 
-			c.Next(ctx)
+			c.JSON(403, map[string]any{"code": 403, "msg": "forbidden: invalid or missing admin API key"})
+			c.Abort()
 			return
 		}
 
 		// Key is not configured.
 		if dev {
-			// Dev/debug pass-through.
+			// Dev/debug pass-through with synthetic admin user.
+			adminUser := &rbac.User{
+				ID:   "admin",
+				Name: "admin",
+				Role: rbac.RoleAdmin,
+			}
+			ctx = rbac.WithUser(ctx, adminUser)
 			c.Next(ctx)
 			return
 		}

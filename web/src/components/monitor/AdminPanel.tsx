@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { adminApi, AdminAgent, ReloadResult } from '../../lib/api'
 
 function AgentTypeTag({ type }: { type: string }) {
@@ -26,6 +27,7 @@ interface ReloadState {
 }
 
 export default function AdminPanel() {
+  const { t } = useTranslation()
   const [reload, setReload] = useState<ReloadState>({
     status: 'idle',
     result: null,
@@ -62,12 +64,12 @@ export default function AdminPanel() {
             disabled={reload.status === 'loading'}
             className="bg-blue-600 text-white rounded px-4 py-2 text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
-            {reload.status === 'loading' ? '↺ Reloading…' : '↺ Reload Agents'}
+            {reload.status === 'loading' ? `↺ ${t('monitor.reloading')}` : `↺ ${t('monitor.reload')}`}
           </button>
 
           {reload.status === 'success' && (
             <span className="text-sm text-green-600 font-medium">
-              Reloaded — {reload.result?.agent_count} agents loaded
+              {t('monitor.reloaded', { count: reload.result?.agent_count })}
             </span>
           )}
           {reload.status === 'error' && (

@@ -1,9 +1,11 @@
 import { useState, useRef, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { agentsApi, chatApi, type Agent, type ChatMessage } from '../lib/api'
 import Header from '../components/Header'
 
 export default function ChatPage() {
+  const { t } = useTranslation()
   const [searchParams] = useSearchParams()
   const [agents, setAgents] = useState<Agent[]>([])
   const [selectedAgent, setSelectedAgent] = useState('')
@@ -100,7 +102,7 @@ export default function ChatPage() {
               ))}
             </select>
           ) : (
-            <span className="text-sm text-gray-400">No agents available</span>
+            <span className="text-sm text-gray-400">{t('chat.noAgent')}</span>
           )
         }
       />
@@ -122,7 +124,7 @@ export default function ChatPage() {
                 d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
               />
             </svg>
-            <p className="text-sm">Send a message to start chatting</p>
+            <p className="text-sm">{t('chat.placeholder')}</p>
           </div>
         )}
 
@@ -152,7 +154,7 @@ export default function ChatPage() {
           <textarea
             className="flex-1 resize-none rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             rows={2}
-            placeholder="Send a message… (Enter to send, Shift+Enter for newline)"
+            placeholder={t('chat.placeholder')}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
@@ -170,7 +172,7 @@ export default function ChatPage() {
                 <span className="w-2 h-2 rounded-full bg-white animate-bounce [animation-delay:0.3s]" />
               </span>
             ) : (
-              'Send'
+              t('chat.send')
             )}
           </button>
         </div>
