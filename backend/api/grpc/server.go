@@ -58,13 +58,14 @@ func recoveryInterceptor() grpc.UnaryServerInterceptor {
 // NewServer creates a configured gRPC server and registers all service handlers.
 // rt may be nil if the agent runtime failed to start; handlers degrade gracefully.
 // toolMgr may be nil; the ToolHandler returns Unavailable in that case.
-func NewServer(rt *agentdef.AgentRuntime, toolMgr *tool.Manager) *grpc.Server {
+// configDir is the path to the agents YAML directory (e.g. "configs/agents").
+func NewServer(rt *agentdef.AgentRuntime, toolMgr *tool.Manager, configDir string) *grpc.Server {
 	s := grpc.NewServer(
 		grpc.ChainUnaryInterceptor(recoveryInterceptor()),
 	)
 
 	// Register service implementations.
-	agentv1.RegisterAgentServiceServer(s, NewAgentHandler(singleagent.SingleAgentSVC, rt))
+	agentv1.RegisterAgentServiceServer(s, NewAgentHandler(singleagent.SingleAgentSVC, rt, configDir))
 	conversationv1.RegisterConversationServiceServer(s, NewConversationHandler(conversation.ConversationSVC, rt))
 	modelv1.RegisterModelServiceServer(s, NewModelHandler(modelmgr.ModelmgrApplicationSVC))
 	toolv1.RegisterToolServiceServer(s, NewToolHandler(toolMgr))
@@ -77,13 +78,14 @@ func NewServer(rt *agentdef.AgentRuntime, toolMgr *tool.Manager) *grpc.Server {
 
 // ListenAndServe starts the gRPC server on the given address (e.g. ":50051").
 // It blocks until the server is stopped.
-func ListenAndServe(addr string, rt *agentdef.AgentRuntime, toolMgr *tool.Manager) error {
+// configDir is the path to the agents YAML directory (e.g. "configs/agents").
+func ListenAndServe(addr string, rt *agentdef.AgentRuntime, toolMgr *tool.Manager, configDir string) error {
 	lis, err := net.Listen("tcp", addr)
 	if err != nil {
 		return fmt.Errorf("grpc: failed to listen on %s: %w", addr, err)
 	}
 
-	s := NewServer(rt, toolMgr)
+	s := NewServer(rt, toolMgr, configDir)
 	logs.Infof("gRPC server listening on %s", addr)
 
 	if err := s.Serve(lis); err != nil {

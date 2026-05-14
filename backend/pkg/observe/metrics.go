@@ -98,3 +98,29 @@ var (
 		Help: "Total agent hot-reload build failures",
 	}, []string{"agent_id"})
 )
+
+// Model router metrics.
+var (
+	// ModelRouteDecisions tracks which model was selected by the router.
+	ModelRouteDecisions = promauto.NewCounterVec(prometheus.CounterOpts{
+		Namespace: "superagent",
+		Name:      "model_route_decisions_total",
+		Help:      "Number of routing decisions by strategy and selected model",
+	}, []string{"strategy", "model_id"})
+
+	// ModelRouteLatency tracks how long the routing decision itself takes.
+	ModelRouteLatency = promauto.NewHistogramVec(prometheus.HistogramOpts{
+		Namespace: "superagent",
+		Name:      "model_route_latency_seconds",
+		Help:      "Time to make a routing decision",
+		Buckets:   []float64{0.0001, 0.0005, 0.001, 0.005, 0.01},
+	}, []string{"strategy"})
+
+	// ModelResponseLatency tracks actual LLM response latency per model (time-to-first-token).
+	ModelResponseLatency = promauto.NewHistogramVec(prometheus.HistogramOpts{
+		Namespace: "superagent",
+		Name:      "model_response_latency_seconds",
+		Help:      "Actual LLM response latency per model (first token)",
+		Buckets:   prometheus.DefBuckets,
+	}, []string{"model_id", "provider"})
+)

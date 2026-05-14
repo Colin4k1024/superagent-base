@@ -24,6 +24,9 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"time"
+
+	"github.com/superagent-ai/superagent-base/backend/pkg/observe"
 )
 
 // Router selects a model for a given RouteRequest.
@@ -108,13 +111,21 @@ func (r *DefaultRouter) Route(ctx context.Context, req *RouteRequest) (*RouteRes
 
 	var fallbacks []string
 	for _, s := range strategies {
+		strategyName := s.Name()
+		start := time.Now()
 		modelID, err := s.Select(ctx, req)
+		elapsed := time.Since(start)
+
+		observe.ModelRouteLatency.WithLabelValues(strategyName).Observe(elapsed.Seconds())
+
 		if err != nil {
 			continue
 		}
 
+		observe.ModelRouteDecisions.WithLabelValues(strategyName, modelID).Inc()
+
 		// Collect fallbacks from remaining strategies.
-		fallbacks = buildFallbacks(ctx, req, strategies, s.Name())
+		fallbacks = buildFallbacks(ctx, req, strategies, strategyName)
 
 		providerName := ""
 		if pc, ok := providers[modelID]; ok {

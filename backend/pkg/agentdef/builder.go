@@ -264,6 +264,7 @@ func (b *AgentBuilder) Build(ctx context.Context, def *AgentDefinition) (Agent, 
 		built = &einoReactAgent{
 			def:          def,
 			modelID:      effectiveModelID,
+			provider:     protocol,
 			memBackend:   memBackend,
 			agent:        reactAgent,
 			systemPrompt: def.Spec.SystemPrompt,
@@ -273,6 +274,7 @@ func (b *AgentBuilder) Build(ctx context.Context, def *AgentDefinition) (Agent, 
 		built = &einoChatAgent{
 			def:          def,
 			modelID:      effectiveModelID,
+			provider:     protocol,
 			memBackend:   memBackend,
 			chatModel:    chatModel,
 			systemPrompt: def.Spec.SystemPrompt,
@@ -304,6 +306,7 @@ func (b *AgentBuilder) Build(ctx context.Context, def *AgentDefinition) (Agent, 
 			fbAgent = &einoReactAgent{
 				def:          def,
 				modelID:      fallbackModelID,
+				provider:     protocol,
 				memBackend:   memBackend,
 				agent:        fbReactAgent,
 				systemPrompt: def.Spec.SystemPrompt,
@@ -312,6 +315,7 @@ func (b *AgentBuilder) Build(ctx context.Context, def *AgentDefinition) (Agent, 
 			fbAgent = &einoChatAgent{
 				def:          def,
 				modelID:      fallbackModelID,
+				provider:     protocol,
 				memBackend:   memBackend,
 				chatModel:    fallbackModel,
 				systemPrompt: def.Spec.SystemPrompt,
@@ -1034,6 +1038,7 @@ func (a *chatAgent) Chat(_ context.Context, _ string, message string) (<-chan st
 type einoChatAgent struct {
 	def          *AgentDefinition
 	modelID      string
+	provider     string // protocol / provider type for metrics labeling
 	memBackend   memory.Backend
 	chatModel    model.ToolCallingChatModel
 	systemPrompt string
@@ -1087,6 +1092,8 @@ func (a *einoChatAgent) Chat(ctx context.Context, sessionID string, message stri
 		defer close(ch)
 		defer reader.Close()
 		var fullResponse strings.Builder
+		streamStart := time.Now()
+		firstToken := true
 		for {
 			chunk, err := reader.Recv()
 			if err != nil {
@@ -1107,6 +1114,10 @@ func (a *einoChatAgent) Chat(ctx context.Context, sessionID string, message stri
 				return
 			}
 			if chunk != nil && chunk.Content != "" {
+				if firstToken {
+					modelrouter.RecordModelLatency(a.modelID, a.provider, time.Since(streamStart))
+					firstToken = false
+				}
 				fullResponse.WriteString(chunk.Content)
 				select {
 				case ch <- chunk.Content:
@@ -1125,6 +1136,7 @@ func (a *einoChatAgent) Chat(ctx context.Context, sessionID string, message stri
 type einoReactAgent struct {
 	def          *AgentDefinition
 	modelID      string
+	provider     string // protocol / provider type for metrics labeling
 	memBackend   memory.Backend
 	agent        *react.Agent
 	systemPrompt string
@@ -1146,6 +1158,8 @@ func (a *einoReactAgent) Chat(ctx context.Context, _ string, message string) (<-
 	go func() {
 		defer close(ch)
 		defer reader.Close()
+		streamStart := time.Now()
+		firstToken := true
 		for {
 			chunk, err := reader.Recv()
 			if err != nil {
@@ -1158,6 +1172,10 @@ func (a *einoReactAgent) Chat(ctx context.Context, _ string, message string) (<-
 				return
 			}
 			if chunk != nil && chunk.Content != "" {
+				if firstToken {
+					modelrouter.RecordModelLatency(a.modelID, a.provider, time.Since(streamStart))
+					firstToken = false
+				}
 				select {
 				case ch <- chunk.Content:
 				case <-ctx.Done():

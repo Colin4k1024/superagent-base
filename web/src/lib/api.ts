@@ -1,7 +1,26 @@
 // REST API client for the Superagent backend.
 // All requests go to /api which the Vite dev proxy forwards to localhost:8888.
 
+import { getApiKey, clearApiKey } from './auth'
+
 const API_BASE = '/api/v1'
+
+function authHeaders(): Record<string, string> {
+  const key = getApiKey()
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+  if (key) {
+    headers['X-Admin-Key'] = key
+  }
+  return headers
+}
+
+function handleAuthError(res: Response): void {
+  if (res.status === 401 || res.status === 403) {
+    clearApiKey()
+    window.location.href = '/login'
+    throw new Error('Session expired')
+  }
+}
 
 export interface Agent {
   name: string
@@ -39,7 +58,8 @@ export interface ReloadResult {
 
 export const agentsApi = {
   async list(): Promise<Agent[]> {
-    const res = await fetch(`${API_BASE}/agents`)
+    const res = await fetch(`${API_BASE}/agents`, { headers: authHeaders() })
+    handleAuthError(res)
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
     const data = await res.json()
     return data.agents || []
@@ -48,7 +68,8 @@ export const agentsApi = {
 
 export const adminApi = {
   async getStatus(): Promise<AdminStatus> {
-    const res = await fetch(`${API_BASE}/admin/status`)
+    const res = await fetch(`${API_BASE}/admin/status`, { headers: authHeaders() })
+    handleAuthError(res)
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
     return res.json()
   },
@@ -56,8 +77,9 @@ export const adminApi = {
   async triggerReload(): Promise<ReloadResult> {
     const res = await fetch(`${API_BASE}/admin/reload`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: authHeaders(),
     })
+    handleAuthError(res)
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
     return res.json()
   },
@@ -73,44 +95,53 @@ export interface AgentDetail {
 
 export const agentAdminApi = {
   list: async (): Promise<{ agents: AgentDetail[] }> => {
-    const res = await fetch(`${API_BASE}/admin/agents`)
+    const res = await fetch(`${API_BASE}/admin/agents`, { headers: authHeaders() })
+    handleAuthError(res)
     if (!res.ok) throw new Error(await res.text())
     return res.json()
   },
   get: async (name: string): Promise<{ agent: unknown; yaml: string }> => {
-    const res = await fetch(`${API_BASE}/admin/agents/${name}`)
+    const res = await fetch(`${API_BASE}/admin/agents/${name}`, { headers: authHeaders() })
+    handleAuthError(res)
     if (!res.ok) throw new Error(await res.text())
     return res.json()
   },
   create: async (yaml: string): Promise<unknown> => {
     const res = await fetch(`${API_BASE}/admin/agents`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: authHeaders(),
       body: JSON.stringify({ yaml }),
     })
+    handleAuthError(res)
     if (!res.ok) throw new Error(await res.text())
     return res.json()
   },
   update: async (name: string, yaml: string): Promise<unknown> => {
     const res = await fetch(`${API_BASE}/admin/agents/${name}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers: authHeaders(),
       body: JSON.stringify({ yaml }),
     })
+    handleAuthError(res)
     if (!res.ok) throw new Error(await res.text())
     return res.json()
   },
   delete: async (name: string): Promise<unknown> => {
-    const res = await fetch(`${API_BASE}/admin/agents/${name}`, { method: 'DELETE' })
+    const res = await fetch(`${API_BASE}/admin/agents/${name}`, {
+      method: 'DELETE',
+      headers: authHeaders(),
+    })
+    handleAuthError(res)
     if (!res.ok) throw new Error(await res.text())
     return res.json()
   },
   validate: async (yaml: string): Promise<{ valid: boolean; error?: string; agent?: unknown }> => {
     const res = await fetch(`${API_BASE}/admin/agents/validate`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: authHeaders(),
       body: JSON.stringify({ yaml }),
     })
+    handleAuthError(res)
     return res.json()
   },
 }
@@ -133,26 +164,33 @@ export interface SkillInfo {
 
 export const skillsApi = {
   list: async (): Promise<{ skills: SkillInfo[] }> => {
-    const res = await fetch(`${API_BASE}/skills`)
+    const res = await fetch(`${API_BASE}/skills`, { headers: authHeaders() })
+    handleAuthError(res)
     if (!res.ok) throw new Error('Failed to fetch skills')
     return res.json()
   },
   search: async (query: string): Promise<{ results: SkillInfo[] }> => {
-    const res = await fetch(`${API_BASE}/skills/search?q=${encodeURIComponent(query)}`)
+    const res = await fetch(`${API_BASE}/skills/search?q=${encodeURIComponent(query)}`, { headers: authHeaders() })
+    handleAuthError(res)
     if (!res.ok) throw new Error('Search failed')
     return res.json()
   },
   install: async (name: string, version = 'latest'): Promise<unknown> => {
     const res = await fetch(`${API_BASE}/skills/install`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: authHeaders(),
       body: JSON.stringify({ name, version }),
     })
+    handleAuthError(res)
     if (!res.ok) throw new Error(await res.text())
     return res.json()
   },
   uninstall: async (name: string): Promise<unknown> => {
-    const res = await fetch(`${API_BASE}/skills/${name}`, { method: 'DELETE' })
+    const res = await fetch(`${API_BASE}/skills/${name}`, {
+      method: 'DELETE',
+      headers: authHeaders(),
+    })
+    handleAuthError(res)
     if (!res.ok) throw new Error(await res.text())
     return res.json()
   },
@@ -168,25 +206,28 @@ export interface CreateModelRequest {
 
 export const modelConfigApi = {
   list: async (): Promise<any> => {
-    const res = await fetch('/api/admin/config/model/list')
+    const res = await fetch('/api/admin/config/model/list', { headers: authHeaders() })
+    handleAuthError(res)
     if (!res.ok) throw new Error('Failed to fetch models')
     return res.json()
   },
   create: async (data: CreateModelRequest): Promise<any> => {
     const res = await fetch('/api/admin/config/model/create', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: authHeaders(),
       body: JSON.stringify(data),
     })
+    handleAuthError(res)
     if (!res.ok) throw new Error(await res.text())
     return res.json()
   },
   delete: async (modelId: number): Promise<any> => {
     const res = await fetch('/api/admin/config/model/delete', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: authHeaders(),
       body: JSON.stringify({ id: modelId }),
     })
+    handleAuthError(res)
     if (!res.ok) throw new Error(await res.text())
     return res.json()
   },
@@ -204,10 +245,11 @@ export const chatApi = {
     try {
       const res = await fetch(`${API_BASE}/chat/stream`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: authHeaders(),
         body: JSON.stringify({ agent_id: agentId, session_id: sessionId, message }),
       })
 
+      handleAuthError(res)
       if (!res.ok) {
         throw new Error(`HTTP ${res.status}`)
       }
