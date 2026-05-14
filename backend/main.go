@@ -159,8 +159,9 @@ func main() {
 
 	// Start gRPC server in background goroutine on port 50051.
 	grpcAddr := getEnv("GRPC_LISTEN_ADDR", ":50051")
+	agentConfigDir := getEnv("AGENT_CONFIG_DIR", "configs/agents")
 	go func() {
-		if err := grpcserver.ListenAndServe(grpcAddr, agentRT, toolMgr); err != nil {
+		if err := grpcserver.ListenAndServe(grpcAddr, agentRT, toolMgr, agentConfigDir); err != nil {
 			logs.Errorf("gRPC server stopped: %v", err)
 		}
 	}()
