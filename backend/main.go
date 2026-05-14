@@ -49,6 +49,7 @@ import (
 	"github.com/superagent-ai/superagent-base/backend/pkg/lang/ternary"
 	"github.com/superagent-ai/superagent-base/backend/pkg/logs"
 	"github.com/superagent-ai/superagent-base/backend/pkg/observe"
+	"github.com/superagent-ai/superagent-base/backend/pkg/tool"
 	"github.com/superagent-ai/superagent-base/backend/types/consts"
 )
 
@@ -115,6 +116,14 @@ func main() {
 		})
 	}
 
+	// Build the ToolManager and register all built-in tools.
+	// Shared between the AgentBuilder (resolves builtin:// refs in YAML) and
+	// the gRPC ToolService (exposes registered tools via ListTools/GetTool/InvokeTool).
+	toolMgr := tool.NewManager()
+	if err := toolMgr.RegisterBuiltins(); err != nil {
+		logs.Warnf("tool manager: register builtins failed: %v", err)
+	}
+
 	// Build the AgentRuntime that powers YAML-defined agents.
 	// Single builder construction — SkillManager is conditionally added.
 	builderOpts := []agentdef.BuilderOption{
@@ -134,6 +143,7 @@ func main() {
 			return b, nil
 		}),
 	}
+	builderOpts = append(builderOpts, agentdef.WithToolManager(toolMgr))
 	if skillMgr != nil {
 		builderOpts = append(builderOpts, agentdef.WithSkillManager(skillMgr))
 	}
@@ -150,7 +160,7 @@ func main() {
 	// Start gRPC server in background goroutine on port 50051.
 	grpcAddr := getEnv("GRPC_LISTEN_ADDR", ":50051")
 	go func() {
-		if err := grpcserver.ListenAndServe(grpcAddr, agentRT); err != nil {
+		if err := grpcserver.ListenAndServe(grpcAddr, agentRT, toolMgr); err != nil {
 			logs.Errorf("gRPC server stopped: %v", err)
 		}
 	}()
@@ -227,14 +237,12 @@ func startHttpServer(agentRT *agentdef.AgentRuntime, skillMgr *skill.Manager) {
 	s.POST("/api/v1/chat/stream", chatSSE.HandleChatStream)
 	s.GET("/api/v1/agents", chatSSE.HandleListAgents)
 
-	// Admin/monitoring endpoints.
-	if getEnv("ADMIN_API_KEY", "") == "" {
-		logs.Warnf("⚠️  ADMIN_API_KEY is not set — admin endpoints (/api/v1/admin/*) are UNPROTECTED. Set ADMIN_API_KEY for production!")
-	}
+	// Admin/monitoring endpoints — protected by AdminAuthMW (key validation + rate limiting).
 	adminH := cozehandler.NewAdminHandler(agentRT)
-	s.GET("/api/v1/admin/status", adminH.HandleStatus)
-	s.POST("/api/v1/admin/reload", adminH.HandleReload)
-	s.GET("/api/v1/admin/logs", adminH.HandleLogStream)
+	adminGroup := s.Group("/api/v1/admin", middleware.APIKeyAdminAuthMW())
+	adminGroup.GET("/status", adminH.HandleStatus)
+	adminGroup.POST("/reload", adminH.HandleReload)
+	adminGroup.GET("/logs", adminH.HandleLogStream)
 
 	// Skill management API endpoints.
 	registerSkillRoutes(s, skillMgr)
@@ -247,7 +255,7 @@ func registerSkillRoutes(s *server.Hertz, mgr *skill.Manager) {
 		return
 	}
 
-	// GET /api/v1/skills — list installed skills
+	// GET /api/v1/skills — list installed skills (public, no auth required)
 	s.GET("/api/v1/skills", func(c context.Context, ctx *app.RequestContext) {
 		installed := mgr.ListInstalled()
 		items := make([]map[string]any, 0, len(installed))
@@ -262,7 +270,7 @@ func registerSkillRoutes(s *server.Hertz, mgr *skill.Manager) {
 		ctx.JSON(200, map[string]any{"skills": items})
 	})
 
-	// GET /api/v1/skills/search?q= — search SkillHub
+	// GET /api/v1/skills/search?q= — search SkillHub (public, no auth required)
 	s.GET("/api/v1/skills/search", func(c context.Context, ctx *app.RequestContext) {
 		query := string(ctx.QueryArgs().Peek("q"))
 		if query == "" {
@@ -277,11 +285,11 @@ func registerSkillRoutes(s *server.Hertz, mgr *skill.Manager) {
 		ctx.JSON(200, map[string]any{"skills": results})
 	})
 
-	// POST /api/v1/skills/install — install a skill (protected by ADMIN_API_KEY)
-	s.POST("/api/v1/skills/install", func(c context.Context, ctx *app.RequestContext) {
-		if !cozehandler.CheckAdminAuth(ctx) {
-			return
-		}
+	// Mutating skill routes — protected by APIKeyAdminAuthMW (key validation + rate limiting).
+	skillAdmin := s.Group("/api/v1/skills", middleware.APIKeyAdminAuthMW())
+
+	// POST /api/v1/skills/install — install a skill
+	skillAdmin.POST("/install", func(c context.Context, ctx *app.RequestContext) {
 		var req struct {
 			Name    string `json:"name"`
 			Version string `json:"version"`
@@ -304,11 +312,8 @@ func registerSkillRoutes(s *server.Hertz, mgr *skill.Manager) {
 		ctx.JSON(200, map[string]any{"status": "installed", "name": req.Name, "version": req.Version})
 	})
 
-	// DELETE /api/v1/skills/:name — uninstall a skill (protected by ADMIN_API_KEY)
-	s.DELETE("/api/v1/skills/:name", func(_ context.Context, ctx *app.RequestContext) {
-		if !cozehandler.CheckAdminAuth(ctx) {
-			return
-		}
+	// DELETE /api/v1/skills/:name — uninstall a skill
+	skillAdmin.DELETE("/:name", func(_ context.Context, ctx *app.RequestContext) {
 		name := ctx.Param("name")
 		mgr.Uninstall(name)
 		ctx.JSON(200, map[string]any{"status": "uninstalled", "name": name})

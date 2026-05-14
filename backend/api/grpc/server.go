@@ -38,6 +38,7 @@ import (
 	"github.com/superagent-ai/superagent-base/backend/application/singleagent"
 	"github.com/superagent-ai/superagent-base/backend/pkg/agentdef"
 	"github.com/superagent-ai/superagent-base/backend/pkg/logs"
+	"github.com/superagent-ai/superagent-base/backend/pkg/tool"
 )
 
 // recoveryInterceptor catches panics in gRPC handlers and converts them to
@@ -56,7 +57,8 @@ func recoveryInterceptor() grpc.UnaryServerInterceptor {
 
 // NewServer creates a configured gRPC server and registers all service handlers.
 // rt may be nil if the agent runtime failed to start; handlers degrade gracefully.
-func NewServer(rt *agentdef.AgentRuntime) *grpc.Server {
+// toolMgr may be nil; the ToolHandler returns Unavailable in that case.
+func NewServer(rt *agentdef.AgentRuntime, toolMgr *tool.Manager) *grpc.Server {
 	s := grpc.NewServer(
 		grpc.ChainUnaryInterceptor(recoveryInterceptor()),
 	)
@@ -65,7 +67,7 @@ func NewServer(rt *agentdef.AgentRuntime) *grpc.Server {
 	agentv1.RegisterAgentServiceServer(s, NewAgentHandler(singleagent.SingleAgentSVC, rt))
 	conversationv1.RegisterConversationServiceServer(s, NewConversationHandler(conversation.ConversationSVC, rt))
 	modelv1.RegisterModelServiceServer(s, NewModelHandler(modelmgr.ModelmgrApplicationSVC))
-	toolv1.RegisterToolServiceServer(s, NewToolHandler())
+	toolv1.RegisterToolServiceServer(s, NewToolHandler(toolMgr))
 
 	// Enable reflection so grpcurl and other tools can introspect the server.
 	reflection.Register(s)
@@ -75,13 +77,13 @@ func NewServer(rt *agentdef.AgentRuntime) *grpc.Server {
 
 // ListenAndServe starts the gRPC server on the given address (e.g. ":50051").
 // It blocks until the server is stopped.
-func ListenAndServe(addr string, rt *agentdef.AgentRuntime) error {
+func ListenAndServe(addr string, rt *agentdef.AgentRuntime, toolMgr *tool.Manager) error {
 	lis, err := net.Listen("tcp", addr)
 	if err != nil {
 		return fmt.Errorf("grpc: failed to listen on %s: %w", addr, err)
 	}
 
-	s := NewServer(rt)
+	s := NewServer(rt, toolMgr)
 	logs.Infof("gRPC server listening on %s", addr)
 
 	if err := s.Serve(lis); err != nil {

@@ -3,7 +3,6 @@ package coze
 import (
 	"context"
 	"fmt"
-	"os"
 	"time"
 
 	"github.com/cloudwego/hertz/pkg/app"
@@ -13,27 +12,8 @@ import (
 	"github.com/superagent-ai/superagent-base/backend/pkg/logs"
 )
 
-// adminAPIKey is the token required for mutating admin operations (reload, logs).
-// Set via ADMIN_API_KEY env; when empty, admin write endpoints are disabled.
-var adminAPIKey = os.Getenv("ADMIN_API_KEY")
-
-// CheckAdminAuth validates the Authorization header for protected admin endpoints.
-// Returns true if authorized, false if rejected (response already written).
-// Exported for use by other route registrars (e.g., skill install/uninstall).
-func CheckAdminAuth(c *app.RequestContext) bool {
-	if adminAPIKey == "" {
-		// No key configured → allow (dev mode). Production should always set ADMIN_API_KEY.
-		return true
-	}
-	token := string(c.GetHeader("Authorization"))
-	if token == "Bearer "+adminAPIKey {
-		return true
-	}
-	c.JSON(403, map[string]string{"error": "forbidden: invalid or missing admin API key"})
-	return false
-}
-
 // AdminHandler provides endpoints for system monitoring and administration.
+// Authentication is enforced by middleware.AdminAuthMW applied at the route group level.
 type AdminHandler struct {
 	runtime *agentdef.AgentRuntime
 }
@@ -45,11 +25,7 @@ func NewAdminHandler(rt *agentdef.AgentRuntime) *AdminHandler {
 
 // HandleStatus returns aggregated runtime status.
 // GET /api/v1/admin/status
-// Protected by ADMIN_API_KEY when configured.
 func (h *AdminHandler) HandleStatus(_ context.Context, c *app.RequestContext) {
-	if !CheckAdminAuth(c) {
-		return
-	}
 	if h.runtime == nil {
 		c.JSON(503, map[string]string{"error": "runtime not available"})
 		return
@@ -81,11 +57,7 @@ func (h *AdminHandler) HandleStatus(_ context.Context, c *app.RequestContext) {
 
 // HandleReload triggers a hot-reload of all agent definitions.
 // POST /api/v1/admin/reload
-// Protected by ADMIN_API_KEY when configured.
 func (h *AdminHandler) HandleReload(ctx context.Context, c *app.RequestContext) {
-	if !CheckAdminAuth(c) {
-		return
-	}
 	if h.runtime == nil {
 		c.JSON(503, map[string]string{"error": "runtime not available"})
 		return
@@ -106,11 +78,7 @@ func (h *AdminHandler) HandleReload(ctx context.Context, c *app.RequestContext) 
 
 // HandleLogStream streams log entries as Server-Sent Events.
 // GET /api/v1/admin/logs
-// Protected by ADMIN_API_KEY when configured.
 func (h *AdminHandler) HandleLogStream(ctx context.Context, c *app.RequestContext) {
-	if !CheckAdminAuth(c) {
-		return
-	}
 	broadcaster := logs.GetBroadcaster()
 	logCh, unsubscribe := broadcaster.Subscribe()
 	defer unsubscribe()

@@ -19,12 +19,19 @@ package grpc
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	conversationv1 "github.com/superagent-ai/superagent-base/backend/api/grpc/gen/conversation/v1"
+	"github.com/superagent-ai/superagent-base/backend/api/model/conversation/common"
 	"github.com/superagent-ai/superagent-base/backend/application/conversation"
+	convEntity "github.com/superagent-ai/superagent-base/backend/domain/conversation/conversation/entity"
+	msgEntity "github.com/superagent-ai/superagent-base/backend/domain/conversation/message/entity"
+	convModel "github.com/superagent-ai/superagent-base/backend/crossdomain/conversation/model"
+	msgModel "github.com/superagent-ai/superagent-base/backend/crossdomain/message/model"
 	"github.com/superagent-ai/superagent-base/backend/pkg/agentdef"
 )
 
@@ -126,39 +133,128 @@ func (h *ConversationHandler) chatWithRuntime(req *conversationv1.ChatRequest, s
 }
 
 // CreateConversation creates a new conversation.
-func (h *ConversationHandler) CreateConversation(_ context.Context, req *conversationv1.CreateConversationRequest) (*conversationv1.CreateConversationResponse, error) {
+func (h *ConversationHandler) CreateConversation(ctx context.Context, req *conversationv1.CreateConversationRequest) (*conversationv1.CreateConversationResponse, error) {
 	if h.svc == nil {
 		return nil, status.Error(codes.Unavailable, "conversation service not initialised")
 	}
-	// TODO: delegate to h.svc.
+
+	conv, err := h.svc.ConversationDomainSVC.Create(ctx, &convEntity.CreateMeta{
+		AgentID:  req.AgentId,
+		Name:     req.Title,
+		Scene:    common.Scene_SceneOpenApi,
+	})
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "create conversation: %v", err)
+	}
+
 	return &conversationv1.CreateConversationResponse{
-		Conversation: &conversationv1.Conversation{
-			AgentId: req.AgentId,
-			UserId:  req.UserId,
-			Title:   req.Title,
-		},
+		Conversation: domainConvToProto(conv),
 	}, nil
 }
 
 // GetConversation retrieves a conversation with its messages.
-func (h *ConversationHandler) GetConversation(_ context.Context, req *conversationv1.GetConversationRequest) (*conversationv1.GetConversationResponse, error) {
+func (h *ConversationHandler) GetConversation(ctx context.Context, req *conversationv1.GetConversationRequest) (*conversationv1.GetConversationResponse, error) {
 	if h.svc == nil {
 		return nil, status.Error(codes.Unavailable, "conversation service not initialised")
 	}
-	// TODO: delegate to h.svc.
+
+	conv, err := h.svc.ConversationDomainSVC.GetByID(ctx, req.ConversationId)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "get conversation: %v", err)
+	}
+	if conv == nil {
+		return nil, status.Errorf(codes.NotFound, "conversation %d not found", req.ConversationId)
+	}
+
+	// Fetch the most recent 50 messages for this conversation.
+	listResult, err := h.svc.MessageDomainSVC.List(ctx, &msgEntity.ListMeta{
+		ConversationID: req.ConversationId,
+		Limit:          50,
+		Direction:      msgEntity.ScrollPageDirectionPrev,
+	})
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "list messages: %v", err)
+	}
+
+	msgs := make([]*conversationv1.Message, 0, len(listResult.Messages))
+	for _, m := range listResult.Messages {
+		msgs = append(msgs, domainMsgToProto(m))
+	}
+
 	return &conversationv1.GetConversationResponse{
-		Conversation: &conversationv1.Conversation{Id: req.ConversationId},
-		Messages:     []*conversationv1.Message{},
+		Conversation: domainConvToProto(conv),
+		Messages:     msgs,
 	}, nil
 }
 
 // ListConversations lists conversations for an agent/user.
-func (h *ConversationHandler) ListConversations(_ context.Context, _ *conversationv1.ListConversationsRequest) (*conversationv1.ListConversationsResponse, error) {
+func (h *ConversationHandler) ListConversations(ctx context.Context, req *conversationv1.ListConversationsRequest) (*conversationv1.ListConversationsResponse, error) {
 	if h.svc == nil {
 		return nil, status.Error(codes.Unavailable, "conversation service not initialised")
 	}
-	// TODO: delegate to h.svc.
+
+	pageSize := int(req.PageSize)
+	if pageSize <= 0 {
+		pageSize = 20
+	}
+	page := int(req.Page)
+	if page <= 0 {
+		page = 1
+	}
+
+	convs, hasMore, err := h.svc.ConversationDomainSVC.List(ctx, &convEntity.ListMeta{
+		AgentID: req.AgentId,
+		Page:    page,
+		Limit:   pageSize,
+		Scene:   common.Scene_SceneOpenApi,
+	})
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "list conversations: %v", err)
+	}
+
+	protoConvs := make([]*conversationv1.Conversation, 0, len(convs))
+	for _, c := range convs {
+		protoConvs = append(protoConvs, domainConvToProto(c))
+	}
+
 	return &conversationv1.ListConversationsResponse{
-		Conversations: []*conversationv1.Conversation{},
+		Conversations: protoConvs,
+		Total:         int32(len(protoConvs)),
+		HasMore:       hasMore,
 	}, nil
+}
+
+// domainConvToProto maps a domain Conversation to its proto representation.
+func domainConvToProto(c *convModel.Conversation) *conversationv1.Conversation {
+	proto := &conversationv1.Conversation{
+		Id:      c.ID,
+		AgentId: c.AgentID,
+		Title:   c.Name,
+	}
+	if c.UserID != nil {
+		// UserID is stored as a string in the domain model; best-effort zero for proto int64.
+		_ = c.UserID
+	}
+	if c.CreatedAt > 0 {
+		proto.CreatedAt = timestamppb.New(time.UnixMilli(c.CreatedAt))
+	}
+	if c.UpdatedAt > 0 {
+		proto.UpdatedAt = timestamppb.New(time.UnixMilli(c.UpdatedAt))
+	}
+	return proto
+}
+
+// domainMsgToProto maps a domain Message to its proto representation.
+func domainMsgToProto(m *msgModel.Message) *conversationv1.Message {
+	proto := &conversationv1.Message{
+		Id:             m.ID,
+		ConversationId: m.ConversationID,
+		Role:           string(m.Role),
+		Content:        m.Content,
+		ContentType:    string(m.ContentType),
+	}
+	if m.CreatedAt > 0 {
+		proto.CreatedAt = timestamppb.New(time.UnixMilli(m.CreatedAt))
+	}
+	return proto
 }
