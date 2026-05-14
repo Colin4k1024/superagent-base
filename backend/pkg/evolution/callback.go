@@ -90,7 +90,7 @@ func buildSuccessSignal(info *callbacks.RunInfo, output callbacks.CallbackOutput
 		sig.Type = "model_invoke"
 		if cbOut := model.ConvCallbackOutput(output); cbOut != nil && cbOut.Message != nil {
 			if cbOut.Message.Content != "" {
-				sig.Output = truncate(cbOut.Message.Content, 200)
+				sig.Output = Truncate(cbOut.Message.Content, 200)
 			}
 		}
 
@@ -130,7 +130,8 @@ func durationSince(t time.Time) time.Duration {
 	return time.Since(t)
 }
 
-func truncate(s string, max int) string {
+// Truncate shortens s to max characters, appending "..." if truncated.
+func Truncate(s string, max int) string {
 	if len(s) <= max {
 		return s
 	}

@@ -19,34 +19,61 @@ package evolution
 import (
 	"context"
 	"fmt"
+	"log"
+	"time"
 
 	experienceclient "github.com/Colin4k1024/Oris/sdks/go/experience"
 	"github.com/superagent-ai/superagent-base/backend/pkg/observe"
+)
+
+const (
+	maxConcurrentShares = 64
+	shareTimeout        = 5 * time.Second
 )
 
 // SignalCollector receives execution signals and forwards them to the
 // Oris Experience Repo via experience.Client.Share().
 type SignalCollector struct {
 	client *experienceclient.Client
+	sem    chan struct{}
 }
 
 func newSignalCollector(client *experienceclient.Client) *SignalCollector {
-	return &SignalCollector{client: client}
+	return &SignalCollector{
+		client: client,
+		sem:    make(chan struct{}, maxConcurrentShares),
+	}
 }
 
 // Collect serialises sig into an OEN payload and calls Share asynchronously.
-// This method is goroutine-safe and must not block the caller.
-func (c *SignalCollector) Collect(ctx context.Context, sig Signal) {
+// Goroutine count is bounded by maxConcurrentShares; the caller's context is
+// detached to avoid cancellation when the HTTP request completes.
+func (c *SignalCollector) Collect(_ context.Context, sig Signal) {
 	if c == nil || c.client == nil {
 		return
 	}
 	observe.EvolutionSignalsTotal.WithLabelValues(sig.Type).Inc()
-	go c.share(ctx, sig)
+
+	select {
+	case c.sem <- struct{}{}:
+		go c.share(sig)
+	default:
+		observe.EvolutionShareDropped.Inc()
+		log.Printf("[evolution] share dropped: semaphore full (type=%s component=%s)", sig.Type, sig.Component)
+	}
 }
 
-func (c *SignalCollector) share(ctx context.Context, sig Signal) {
+func (c *SignalCollector) share(sig Signal) {
+	defer func() { <-c.sem }()
+
+	ctx, cancel := context.WithTimeout(context.Background(), shareTimeout)
+	defer cancel()
+
 	payload := buildSharePayload(sig)
-	if _, err := c.client.Share(ctx, payload); err == nil {
+	if _, err := c.client.Share(ctx, payload); err != nil {
+		observe.EvolutionShareFailed.Inc()
+		log.Printf("[evolution] share failed: %v (type=%s)", err, sig.Type)
+	} else {
 		observe.EvolutionGenesShared.Inc()
 	}
 }

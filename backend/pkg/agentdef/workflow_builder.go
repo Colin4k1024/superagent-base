@@ -139,7 +139,7 @@ func (w *WorkflowAgent) executeNode(ctx context.Context, sessionID string, node 
 			sig.Type = "node_error"
 			sig.Error = execErr.Error()
 		} else {
-			sig.Output = truncateStr(result, 200)
+			sig.Output = evolution.Truncate(result, 200)
 		}
 		w.collector.Collect(ctx, sig)
 	}
@@ -147,12 +147,6 @@ func (w *WorkflowAgent) executeNode(ctx context.Context, sessionID string, node 
 	return result, execErr
 }
 
-func truncateStr(s string, max int) string {
-	if len(s) <= max {
-		return s
-	}
-	return s[:max] + "..."
-}
 
 // executeLLMNode runs an LLM inference step.  When a real model endpoint is
 // configured a lightweight einoChatAgent is created on the fly; otherwise the

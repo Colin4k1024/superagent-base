@@ -38,6 +38,7 @@ package evolution
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	experienceclient "github.com/Colin4k1024/Oris/sdks/go/experience"
@@ -81,6 +82,10 @@ type Engine struct {
 	advisor   *EvolutionAdvisor
 	cfg       Config
 	stopHub   context.CancelFunc // cancels the hub heartbeat goroutine
+
+	nodesMu    sync.RWMutex
+	nodesCache []hubclient.NodeInfo
+	nodesTTL   time.Time
 }
 
 // Init creates and warms up an Engine from cfg.
@@ -181,17 +186,35 @@ func (e *Engine) FederatedSearch(ctx context.Context, query string, minConfidenc
 	return result.Results, nil
 }
 
+const discoverNodesTTL = 30 * time.Second
+
 // DiscoverNodes returns peer nodes registered with the Hub.
+// Results are cached for 30 seconds to avoid per-request Hub calls.
 func (e *Engine) DiscoverNodes(ctx context.Context) ([]hubclient.NodeInfo, error) {
 	if e == nil || e.hubClient == nil {
 		return nil, nil
 	}
+
+	e.nodesMu.RLock()
+	if time.Now().Before(e.nodesTTL) {
+		cached := e.nodesCache
+		e.nodesMu.RUnlock()
+		return cached, nil
+	}
+	e.nodesMu.RUnlock()
+
 	result, err := e.hubClient.Discover(ctx, &hubclient.DiscoveryQuery{
 		Capabilities: []string{"evolve"},
 	})
 	if err != nil {
 		return nil, err
 	}
+
+	e.nodesMu.Lock()
+	e.nodesCache = result.Nodes
+	e.nodesTTL = time.Now().Add(discoverNodesTTL)
+	e.nodesMu.Unlock()
+
 	return result.Nodes, nil
 }
 

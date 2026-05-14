@@ -62,18 +62,12 @@ func (h *EvolutionAdminHandler) HandleListGenes(ctx context.Context, c *app.Requ
 	}
 
 	query := string(c.Query("q"))
-	minConf := parseQueryFloat(string(c.Query("min_confidence")), 0.0)
-	limit := parseQueryInt(string(c.Query("limit")), 20)
+	minConf := clampFloat(parseQueryFloat(string(c.Query("min_confidence")), 0.0), 0.0, 1.0)
+	limit := clampInt(parseQueryInt(string(c.Query("limit")), 20), 1, 100)
 
-	recs := h.engine.Advisor().Recommend(ctx, query)
+	recs := h.engine.Advisor().RecommendWithOpts(ctx, query, minConf, limit)
 	items := make([]geneItem, 0, len(recs))
 	for _, r := range recs {
-		if r.Confidence < minConf {
-			continue
-		}
-		if len(items) >= limit {
-			break
-		}
 		items = append(items, geneItem{
 			ID:          r.GeneID,
 			Strategy:    r.Strategy,
@@ -136,9 +130,12 @@ func (h *EvolutionAdminHandler) HandleFederatedSearch(ctx context.Context, c *ap
 	minConf := parseQueryFloat(string(c.Query("min_confidence")), 0.5)
 	limit := parseQueryInt(string(c.Query("limit")), 10)
 
+	minConf = clampFloat(minConf, 0.0, 1.0)
+	limit = clampInt(limit, 1, 100)
+
 	results, err := h.engine.FederatedSearch(ctx, query, minConf, limit)
 	if err != nil {
-		c.JSON(502, map[string]any{"error": err.Error()})
+		c.JSON(502, map[string]any{"error": "federated search unavailable"})
 		return
 	}
 	c.JSON(200, map[string]any{
@@ -167,4 +164,24 @@ func parseQueryInt(s string, def int) int {
 		return def
 	}
 	return i
+}
+
+func clampFloat(v, min, max float64) float64 {
+	if v < min {
+		return min
+	}
+	if v > max {
+		return max
+	}
+	return v
+}
+
+func clampInt(v, min, max int) int {
+	if v < min {
+		return min
+	}
+	if v > max {
+		return max
+	}
+	return v
 }
