@@ -244,6 +244,15 @@ func startHttpServer(agentRT *agentdef.AgentRuntime, skillMgr *skill.Manager) {
 	adminGroup.POST("/reload", adminH.HandleReload)
 	adminGroup.GET("/logs", adminH.HandleLogStream)
 
+	// Agent CRUD endpoints — protected by the same admin auth middleware.
+	agentAdmin := cozehandler.NewAgentAdminHandler(agentRT, getEnv("AGENT_CONFIG_DIR", "configs/agents"))
+	adminGroup.GET("/agents", agentAdmin.HandleList)
+	adminGroup.POST("/agents/validate", agentAdmin.HandleValidate)
+	adminGroup.GET("/agents/:name", agentAdmin.HandleGet)
+	adminGroup.POST("/agents", agentAdmin.HandleCreate)
+	adminGroup.PUT("/agents/:name", agentAdmin.HandleUpdate)
+	adminGroup.DELETE("/agents/:name", agentAdmin.HandleDelete)
+
 	// Skill management API endpoints.
 	registerSkillRoutes(s, skillMgr)
 
