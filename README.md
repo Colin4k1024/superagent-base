@@ -19,10 +19,11 @@
 | **Eino Dev 可视化编排** | 通过 VS Code "Eino Dev" 插件图形化编排 Eino Graph，导出原生 Go 代码后注册到 `pkg/graphs/`，YAML 引用即可热加载 |
 | **中断/恢复** | 检测确认请求 → 保存 checkpoint → HTTP Resume API 恢复对话 |
 | **A2UI 协议** | 结构化流式事件（text / thinking / tool_call / tool_result / code_block / interrupt / error / done / progress / agent_switch） |
-| **OpenTelemetry + Prometheus** | 分布式追踪 + 指标（Agent 请求数/延迟/错误率、Model Token、Tool 调用、活跃会话数），Eino callback 自动上报 |
+| **Experience Self-Evolution** | 集成 [Oris Go SDK](https://github.com/Colin4k1024/Oris)，自动收集执行信号 → 基因提炼 → 推荐注入 system prompt，支持 Hub 联邦搜索 |
+| **OpenTelemetry + Prometheus** | 分布式追踪 + 指标（Agent 请求数/延迟/错误率、Model Token、Tool 调用、活跃会话数、Evolution 信号），Eino callback 自动上报 |
 | **Monitor Dashboard** | 4 Tab 实时面板（Status / Metrics / Logs / Admin），纯 SVG 图表，SSE 日志流，热重载管理 |
 | **监控栈一键部署** | Prometheus + Grafana + OTel Collector，`docker compose -f docker/docker-compose-monitoring.yml up -d` |
-| **Admin API** | `GET /api/v1/admin/status`（运行状态）、`POST /api/v1/admin/reload`（热重载）、`GET /api/v1/admin/logs`（实时日志 SSE） |
+| **Admin API** | `GET /api/v1/admin/status`（运行状态）、`POST /api/v1/admin/reload`（热重载）、`GET /api/v1/admin/logs`（实时日志 SSE）、Evolution 管理 API |
 | **gRPC API** | AgentService / ConversationService / ModelService / ToolService |
 | **HTTP SSE 流式 API** | POST /api/v1/chat/stream，GET /api/v1/agents，POST /api/v1/chat/resume |
 | **前端认证** | API Key 认证门禁，localStorage 持久化，未授权自动跳转登录页 |
@@ -74,8 +75,10 @@
    │  pkg/modelrouter (capability/cost/latency + fallback)             │
    │  pkg/memory (builtin / Mem0 / Zep / Letta)                       │
    │  pkg/a2ui (Event 协议 + SSE 编码)                                 │
+   │  pkg/evolution (SignalCollector + Advisor + Hub Federation)       │
    └─────────────────────────────────┬─────────────────────────────────┘
                                      │ Eino SDK (CloudWeGo)
+                                     │ Oris SDK (Experience + Hub)
    ┌─────────────────────────────────▼─────────────────────────────────┐
    │              LLM 推理层 (github.com/cloudwego/eino)                │
    │   ChatModel · ReAct Agent (最多 10 步) · Stream Reader            │
@@ -143,6 +146,9 @@ make dev-down
 | `GET` | `/api/v1/admin/status` | 系统运行状态（uptime、agents、health、ready） |
 | `POST` | `/api/v1/admin/reload` | 触发 Agent 热重载 |
 | `GET` | `/api/v1/admin/logs` | SSE 实时日志流（结构化 JSON） |
+| `GET` | `/api/v1/admin/evolution/stats` | Evolution 引擎状态（连接、节点数、配置） |
+| `GET` | `/api/v1/admin/evolution/genes` | 基因列表（支持 `?q=&min_confidence=&limit=`） |
+| `GET` | `/api/v1/admin/evolution/federated` | Hub 联邦搜索（`?q=&min_confidence=&limit=`） |
 | `GET` | `/metrics` | Prometheus 指标端点 |
 | `GET` | `/health` | 健康检查 |
 | `GET` | `/ready` | 就绪检查（含 Agent Runtime 状态） |
@@ -204,6 +210,12 @@ spec:
     enabled: true
     checkpoint_backend: redis
     timeout_seconds: 300
+  evolution:
+    enabled: true           # 启用经验自进化
+    collect:                # 信号过滤（可选，为空则收集全部）
+      - tool_success
+      - tool_error
+      - model_invoke
   observability:
     tracing: true
     metrics: true
@@ -268,6 +280,65 @@ make dev-server
 | `superagent_model_errors_total{model_id, provider, error_type}` | Model 调用错误 |
 | `superagent_tool_invocations_total{tool_name, status}` | Tool 调用计数 |
 | `superagent_agent_reload_failures_total{agent_id}` | 热重载失败计数 |
+| `evolution_signals_total{signal_type}` | Evolution 信号收集计数 |
+| `evolution_genes_shared_total` | 基因共享成功计数 |
+| `evolution_share_failed_total` | 基因共享失败计数 |
+| `evolution_share_dropped_total` | 信号丢弃计数（背压保护） |
+| `evolution_recommendations_served_total` | 基因推荐服务计数 |
+
+---
+
+## Experience Self-Evolution (Oris 集成)
+
+Superagent Base 集成 [Oris Go SDK](https://github.com/Colin4k1024/Oris)，实现 Agent 的**经验自进化**——自动收集执行信号，提炼为"基因"（Gene），并在后续对话中推荐最优策略注入 system prompt。
+
+### 信号流
+
+```
+Agent 执行 → Eino Callback → SignalCollector.Collect() → [bounded goroutine pool]
+    → experience.Client.Share() → Oris Experience Repo → Gene 提炼
+```
+
+### 推荐流
+
+```
+AgentBuilder.Build() → EvolutionAdvisor.Recommend(query)
+    → experience.Client.Fetch() → Gene 列表
+    → 注入 system prompt 前缀（最优策略建议）
+```
+
+### 联邦搜索
+
+```
+Admin API → Engine.FederatedSearch() → hub.Client.Search()
+    → 跨节点基因发现 + 共享
+```
+
+### 环境变量
+
+| 变量 | 说明 | 默认值 |
+|------|------|--------|
+| `EVOLUTION_ENABLED` | 启用经验自进化 | `false` |
+| `ORIS_EXPERIENCE_URL` | Oris Experience Repo 地址 | — (必填当 enabled) |
+| `ORIS_HUB_URL` | Oris Hub 地址（可选，启用联邦） | — |
+| `ORIS_API_KEY` | Oris API Key | — |
+| `ORIS_SEED` | 加密种子 | — |
+| `ORIS_SENDER_ID` | 本节点 ID | `superagent-node-1` |
+| `ORIS_NODE_ENDPOINT` | 本节点回调地址（Hub 注册用） | — |
+| `ORIS_MIN_CONFIDENCE` | 推荐最低置信度 | `0.6` |
+| `ORIS_MAX_SUGGESTIONS` | 最大推荐数 | `3` |
+
+### 快速启用
+
+```bash
+# .env 追加
+EVOLUTION_ENABLED=true
+ORIS_EXPERIENCE_URL=http://localhost:9200
+ORIS_SENDER_ID=my-node
+
+# 启动后，执行对话即开始收集信号
+# 访问 http://localhost:3000/evolution 查看基因库
+```
 
 ---
 
@@ -341,6 +412,7 @@ spec:
 | 对话 | `/chat` | 流式对话，Agent 切换，多轮记忆 |
 | 监控 | `/monitor` | 系统状态、Prometheus 指标、实时日志、热重载管理 |
 | Skills | `/skills` | 搜索、安装、卸载技能 |
+| Evolution | `/evolution` | 经验自进化管理（概览 / 基因库 / 联邦搜索） |
 | 设置 | `/settings` | 模型增删、MCP Server 管理 |
 
 ---
@@ -375,6 +447,7 @@ superagent-base/
 │       ├── agentdef/         Agent YAML 运行时（schema/parser/builder/runtime/interrupt/workflow/orchestration）
 │       ├── graphs/           Eino Dev 图注册表 — 放入生成的图代码并 Register()（Coming Soon）
 │       ├── a2ui/             A2UI 协议（event.go + encoder.go）
+│       ├── evolution/        Experience Self-Evolution（Oris SDK 集成：Signal 收集 / Advisor 推荐 / Hub 联邦）
 │       ├── modelrouter/      Model Router（路由策略 + fallback）
 │       ├── mcp/              MCP Client（stdio/SSE）+ Server
 │       ├── memory/           记忆后端适配器
@@ -409,6 +482,7 @@ superagent-base/
 |------|------|
 | HTTP 框架 | [Hertz](https://github.com/cloudwego/hertz) (CloudWeGo) |
 | LLM SDK | [Eino](https://github.com/cloudwego/eino) (CloudWeGo) |
+| Evolution SDK | [Oris Go SDK](https://github.com/Colin4k1024/Oris) (Experience + Hub) |
 | LLM Provider | OpenAI / Claude / Gemini / DeepSeek / Ark / Ollama / Qwen |
 | gRPC | google.golang.org/grpc |
 | ORM | GORM + MySQL 8.x |
