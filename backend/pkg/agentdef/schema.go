@@ -79,6 +79,9 @@ type AgentSpec struct {
 	Workflow      *WorkflowSpec      `yaml:"workflow,omitempty"      json:"workflow,omitempty"`
 	// Interrupt controls interrupt/resume behaviour for this agent.
 	Interrupt     *InterruptConfig   `yaml:"interrupt,omitempty"     json:"interrupt,omitempty"`
+	// Graph is the registered Eino graph name for type=eino_graph.
+	// The name must match a factory registered via pkg/graphs.Register().
+	Graph         string             `yaml:"graph,omitempty"         json:"graph,omitempty"`
 }
 
 // WorkflowSpec defines a graph-based workflow composed of nodes and edges.

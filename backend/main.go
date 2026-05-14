@@ -26,6 +26,7 @@ import (
 	"runtime/debug"
 	"strings"
 
+	"github.com/cloudwego/eino-ext/devops"
 	"github.com/cloudwego/eino/callbacks"
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/app/server"
@@ -76,6 +77,12 @@ func main() {
 	// OBS-001: Register Eino observability callback globally so all model/tool
 	// invocations automatically report Prometheus metrics and OTel spans.
 	callbacks.AppendGlobalHandlers(observe.NewEinoObserveCallback())
+
+	// DEV-001: Start Eino DevOps server for IDE graph visualization and debugging.
+	// Listens on 127.0.0.1:52538 (local only). Requires "Eino Dev" plugin in VS Code 1.97.x+.
+	if err := devops.Init(ctx); err != nil {
+		logs.Warnf("eino devops server failed to start (IDE plugin unavailable): %v", err)
+	}
 
 	// Initialize SkillManager with internal SkillHub client + builtin skills.
 	var skillMgr *skill.Manager

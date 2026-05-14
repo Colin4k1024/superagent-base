@@ -68,7 +68,7 @@ func initOldModelConf(ctx context.Context, oss storage.Storage, c *ModelConfig) 
 	}
 
 	for _, q := range oldModels {
-		if q.Provider.IconURI != "" {
+		if q.Provider.IconURI != "" && oss != nil {
 			url, err := oss.GetObjectUrl(ctx, q.Provider.IconURI)
 			if err != nil {
 				logs.CtxWarnf(ctx, "get model icon url failed, err: %v", err)

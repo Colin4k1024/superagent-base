@@ -63,7 +63,7 @@ func (c *ModelConfig) GetProviderModelList(ctx context.Context) ([]*config.Provi
 	}
 
 	for _, provider := range modelProviderList {
-		if provider.IconURI != "" {
+		if provider.IconURI != "" && c.oss != nil {
 			url, err := c.oss.GetObjectUrl(ctx, provider.IconURI)
 			if err != nil {
 				logs.CtxWarnf(ctx, "get model icon url failed, err: %v", err)
@@ -211,7 +211,7 @@ func (c *ModelConfig) getModelByID(ctx context.Context, modelID int64) (*Model, 
 }
 
 func (c *ModelConfig) toModel(ctx context.Context, q *model.ModelInstance) *Model {
-	if q.Provider.IconURI != "" {
+	if q.Provider.IconURI != "" && c.oss != nil {
 		url, err := c.oss.GetObjectUrl(ctx, q.Provider.IconURI)
 		if err != nil {
 			logs.CtxWarnf(ctx, "get model icon url failed, err: %v", err)

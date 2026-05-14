@@ -1,0 +1,24 @@
+# Example: native Eino graph agent
+#
+# 1. Generate your graph with the Eino Dev VS Code plugin.
+# 2. Drop the Go file into backend/pkg/graphs/ and add:
+#
+#      func init() {
+#          graphs.Register("my-graph", graphs.CompileGraph(BuildMyGraph))
+#      }
+#
+# 3. Update spec.graph below to match the registered name.
+# 4. `make dev-server` — server restarts in ~3s, YAML hot-reloads instantly.
+
+apiVersion: superagent/v1
+kind: Agent
+metadata:
+  name: eino-graph-example
+  version: "1.0.0"
+  tags: [eino, graph, example]
+spec:
+  type: eino_graph
+  graph: hello-world              # must match graphs.Register("hello-world", ...)
+  system_prompt: "You are a helpful assistant powered by a native Eino graph."
+  observability:
+    metrics: true

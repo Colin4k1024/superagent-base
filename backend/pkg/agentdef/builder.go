@@ -41,6 +41,7 @@ import (
 
 	"github.com/superagent-ai/superagent-base/backend/infra/cache"
 	"github.com/superagent-ai/superagent-base/backend/infra/checkpoint"
+	"github.com/superagent-ai/superagent-base/backend/pkg/graphs"
 	"github.com/superagent-ai/superagent-base/backend/pkg/mcp"
 	"github.com/superagent-ai/superagent-base/backend/pkg/memory"
 	"github.com/superagent-ai/superagent-base/backend/pkg/modelrouter"
@@ -158,6 +159,8 @@ func (b *AgentBuilder) Build(ctx context.Context, def *AgentDefinition) (Agent, 
 		return b.buildPlanExecute(ctx, def)
 	case "workflow":
 		return b.buildWorkflow(def)
+	case "eino_graph":
+		return b.buildEinoGraph(ctx, def)
 	}
 
 	// deep_agent: prepend a step-by-step reasoning prefix to the system prompt.
@@ -926,6 +929,81 @@ func (b *AgentBuilder) buildWorkflow(def *AgentDefinition) (Agent, error) {
 		modelCfg:    b.modelConfig,
 		def:         def,
 	}, nil
+}
+
+// buildEinoGraph constructs an einoGraphAgent from a named entry in the
+// pkg/graphs registry.  The graph is compiled once at build time; the
+// resulting Runnable is reused across all Chat calls.
+func (b *AgentBuilder) buildEinoGraph(ctx context.Context, def *AgentDefinition) (Agent, error) {
+	graphName := def.Spec.Graph
+	if graphName == "" {
+		return nil, fmt.Errorf("agentdef: buildEinoGraph %q: spec.graph is required for type=eino_graph", def.Metadata.Name)
+	}
+	factory, ok := graphs.Get(graphName)
+	if !ok {
+		return nil, fmt.Errorf("agentdef: buildEinoGraph %q: graph %q not found in registry (registered: %v)", def.Metadata.Name, graphName, graphs.List())
+	}
+	runnable, err := factory(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("agentdef: buildEinoGraph %q: compile graph %q: %w", def.Metadata.Name, graphName, err)
+	}
+	return &einoGraphAgent{
+		def:          def,
+		systemPrompt: def.Spec.SystemPrompt,
+		runnable:     runnable,
+	}, nil
+}
+
+// einoGraphAgent wraps a compiled Eino graph Runnable as a superagent Agent.
+// It converts the string Chat interface to []*schema.Message → *schema.Message.
+type einoGraphAgent struct {
+	def          *AgentDefinition
+	systemPrompt string
+	runnable     compose.Runnable[[]*schema.Message, *schema.Message]
+}
+
+func (a *einoGraphAgent) Name() string                    { return a.def.Metadata.Name }
+func (a *einoGraphAgent) Description() string             { return a.systemPrompt }
+func (a *einoGraphAgent) GetDefinition() *AgentDefinition { return a.def }
+
+func (a *einoGraphAgent) Chat(ctx context.Context, _ string, message string) (<-chan string, error) {
+	msgs := make([]*schema.Message, 0, 2)
+	if a.systemPrompt != "" {
+		msgs = append(msgs, schema.SystemMessage(a.systemPrompt))
+	}
+	msgs = append(msgs, schema.UserMessage(message))
+
+	reader, err := a.runnable.Stream(ctx, msgs)
+	if err != nil {
+		return nil, fmt.Errorf("agentdef: eino_graph %q: stream: %w", a.def.Metadata.Name, err)
+	}
+
+	ch := make(chan string, 64)
+	go func() {
+		defer close(ch)
+		defer reader.Close()
+		for {
+			msg, recvErr := reader.Recv()
+			if errors.Is(recvErr, io.EOF) {
+				return
+			}
+			if recvErr != nil {
+				select {
+				case ch <- fmt.Sprintf("[error] %v", recvErr):
+				case <-ctx.Done():
+				}
+				return
+			}
+			if msg != nil && msg.Content != "" {
+				select {
+				case ch <- msg.Content:
+				case <-ctx.Done():
+					return
+				}
+			}
+		}
+	}()
+	return ch, nil
 }
 
 // ─── stub agent (no model config) ────────────────────────────────────────────
