@@ -127,8 +127,12 @@ func main() {
 		logs.Warnf("tool manager: register builtins failed: %v", err)
 	}
 
+	// MCP registry must be created before the AgentBuilder so agents can
+	// resolve mcp:// tool references at build time.
+	mcpRegistry := mcp.NewRegistry()
+
 	// Build the AgentRuntime that powers YAML-defined agents.
-	// Single builder construction — SkillManager is conditionally added.
+	// Single builder construction — SkillManager and MCPRegistry conditionally added.
 	builderOpts := []agentdef.BuilderOption{
 		agentdef.WithModelConfig(agentdef.ModelRuntimeConfig{
 			BaseURL: getEnv("MODEL_BASE_URL_0", "http://127.0.0.1:8000/v1"),
@@ -147,6 +151,7 @@ func main() {
 		}),
 	}
 	builderOpts = append(builderOpts, agentdef.WithToolManager(toolMgr))
+	builderOpts = append(builderOpts, agentdef.WithMCPRegistry(mcpRegistry))
 	if skillMgr != nil {
 		builderOpts = append(builderOpts, agentdef.WithSkillManager(skillMgr))
 	}
@@ -168,8 +173,6 @@ func main() {
 			logs.Errorf("gRPC server stopped: %v", err)
 		}
 	}()
-
-	mcpRegistry := mcp.NewRegistry()
 
 	// Initialize RBAC UserStore and seed a default admin user from ADMIN_API_KEY (if set).
 	userStore := rbac.NewUserStore()
