@@ -247,7 +247,7 @@ func (b *AgentBuilder) Build(ctx context.Context, def *AgentDefinition) (Agent, 
 	}
 
 	// Gather Eino-compatible tools from resolved refs.
-	einoTools := b.resolveEinoTools(toolRefs)
+	einoTools := b.resolveEinoTools(ctx, toolRefs)
 
 	if len(einoTools) > 0 {
 		// ReAct agent with tool calling.
@@ -718,9 +718,9 @@ func cacheKey(agentName, sessionID, message string) string {
 }
 
 // resolveEinoTools converts resolved tool refs to Eino einotool.BaseTool instances.
-// Supports builtin (via tool.Manager) and skill:// (via skill.Manager) refs.
-// MCP refs are silently skipped until their adapter is ready.
-func (b *AgentBuilder) resolveEinoTools(refs []resolvedTool) []einotool.BaseTool {
+// Supports builtin (via tool.Manager), skill:// (via skill.Manager), and
+// mcp:// (via MCP Registry + MCPToolAdapter) refs.
+func (b *AgentBuilder) resolveEinoTools(ctx context.Context, refs []resolvedTool) []einotool.BaseTool {
 	var result []einotool.BaseTool
 	for _, ref := range refs {
 		switch ref.scheme {
@@ -742,6 +742,30 @@ func (b *AgentBuilder) resolveEinoTools(refs []resolvedTool) []einotool.BaseTool
 				continue
 			}
 			result = append(result, t)
+		case "mcp":
+			if b.mcpRegistry == nil {
+				continue
+			}
+			// target format: "server-name/tool-name"
+			parts := strings.SplitN(ref.target, "/", 2)
+			if len(parts) != 2 {
+				continue
+			}
+			serverName, toolName := parts[0], parts[1]
+			client, ok := b.mcpRegistry.GetClient(serverName)
+			if !ok {
+				continue
+			}
+			tools, err := client.ListTools(ctx)
+			if err != nil {
+				continue
+			}
+			for _, td := range tools {
+				if td.Name == toolName {
+					result = append(result, mcp.NewMCPToolAdapter(client, td))
+					break
+				}
+			}
 		}
 	}
 	return result
