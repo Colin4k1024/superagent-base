@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
+import { useTranslation } from 'react-i18next'
 import { agentAdminApi, type AgentDetail } from '../lib/api'
 import Header from '../components/Header'
 import { Button } from '../components/ui/button'
@@ -76,6 +77,7 @@ function AgentCard({
   onDuplicate: () => void
   onDelete: () => void
 }) {
+  const { t } = useTranslation()
   const isWorkflow = agent.type?.toLowerCase().includes('workflow')
 
   return (
@@ -89,10 +91,10 @@ function AgentCard({
         </div>
         <CardMenu
           items={[
-            { label: 'Edit', onClick: onEdit },
-            ...(isWorkflow && onWorkflow ? [{ label: 'Graph Editor', onClick: onWorkflow }] : []),
-            { label: 'Duplicate', onClick: onDuplicate },
-            { label: 'Delete', onClick: onDelete, danger: true },
+            { label: t('agents.edit'), onClick: onEdit },
+            ...(isWorkflow && onWorkflow ? [{ label: t('agents.graphEditor'), onClick: onWorkflow }] : []),
+            { label: t('agents.duplicate'), onClick: onDuplicate },
+            { label: t('agents.delete'), onClick: onDelete, danger: true },
           ]}
         />
       </div>
@@ -123,6 +125,7 @@ function AgentCard({
 export default function AgentsPage() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const { t } = useTranslation()
   const [deleteTarget, setDeleteTarget] = useState<AgentDetail | null>(null)
 
   const { data, isLoading, error } = useQuery({
@@ -134,7 +137,7 @@ export default function AgentsPage() {
     mutationFn: (name: string) => agentAdminApi.delete(name),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['agents'] })
-      toast.success(`Agent "${deleteTarget?.name}" deleted`)
+      toast.success(t('agents.deleted', { name: deleteTarget?.name }))
       setDeleteTarget(null)
     },
     onError: (err: unknown) => {
@@ -161,10 +164,10 @@ export default function AgentsPage() {
   return (
     <div className="flex flex-col h-full">
       <Header
-        title="Agents"
+        title={t('agents.title')}
         actions={
           <Button size="sm" onClick={() => navigate('/agents/new')}>
-            + New Agent
+            + {t('agents.newAgent')}
           </Button>
         }
       />
@@ -173,7 +176,7 @@ export default function AgentsPage() {
         {isLoading && (
           <div className="flex items-center gap-2 text-sm text-gray-500">
             <span className="w-2 h-2 rounded-full bg-gray-400 animate-pulse" />
-            Loading agents…
+            {t('common.loading')}
           </div>
         )}
 
@@ -186,9 +189,9 @@ export default function AgentsPage() {
         {!isLoading && !error && agents.length === 0 && (
           <div className="flex flex-col items-center justify-center gap-4 py-20 text-center">
             <div className="text-4xl">🤖</div>
-            <p className="text-sm text-gray-500">No agents found. Create your first agent.</p>
+            <p className="text-sm text-gray-500">{t('agents.empty')}</p>
             <Button size="sm" onClick={() => navigate('/agents/new')}>
-              + New Agent
+              + {t('agents.newAgent')}
             </Button>
           </div>
         )}
@@ -213,15 +216,14 @@ export default function AgentsPage() {
       <Dialog
         open={!!deleteTarget}
         onClose={() => setDeleteTarget(null)}
-        title="Delete Agent"
+        title={t('agents.delete')}
       >
         <p className="text-sm text-gray-700 mb-6">
-          Are you sure you want to delete{' '}
-          <span className="font-semibold">{deleteTarget?.name}</span>? This action cannot be undone.
+          {t('agents.confirmDelete', { name: deleteTarget?.name })}
         </p>
         <div className="flex justify-end gap-2">
           <Button variant="ghost" size="sm" onClick={() => setDeleteTarget(null)}>
-            Cancel
+            {t('common.cancel')}
           </Button>
           <Button
             variant="destructive"
@@ -229,7 +231,7 @@ export default function AgentsPage() {
             loading={deleteMutation.isPending}
             onClick={() => deleteTarget && deleteMutation.mutate(deleteTarget.name)}
           >
-            Delete
+            {t('common.delete')}
           </Button>
         </div>
       </Dialog>
