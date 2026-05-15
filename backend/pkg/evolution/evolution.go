@@ -93,14 +93,19 @@ func Init(_ context.Context, cfg Config, db *gorm.DB) (*Engine, error) {
 		store: store,
 		cfg:   cfg,
 	}
-	e.collector = newSignalCollector(store)
+	e.collector = newSignalCollector(store, cfg.SenderID)
 	e.advisor = newEvolutionAdvisor(store, cfg.MinConfidence, cfg.MaxSuggestions)
 
 	return e, nil
 }
 
-// Shutdown is a no-op in local mode. Kept for API compatibility.
-func (e *Engine) Shutdown() {}
+// Shutdown drains in-flight signal saves before returning.
+func (e *Engine) Shutdown() {
+	if e == nil {
+		return
+	}
+	e.collector.Drain()
+}
 
 // Collector returns the SignalCollector for direct signal submission.
 func (e *Engine) Collector() *SignalCollector {

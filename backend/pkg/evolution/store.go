@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -80,7 +81,7 @@ func (s *LocalGeneStore) SaveGene(_ context.Context, payload map[string]any) (st
 	}
 
 	gene := Gene{
-		ID:        fmt.Sprintf("gene-%s", uuid.New().String()[:8]),
+		ID:        fmt.Sprintf("gene-%s", uuid.New().String()),
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
 	}
@@ -88,6 +89,11 @@ func (s *LocalGeneStore) SaveGene(_ context.Context, payload map[string]any) (st
 	// Extract label.
 	if v, ok := payload["label"].(string); ok {
 		gene.Label = v
+	}
+
+	// Extract sender_id.
+	if v, ok := payload["sender_id"].(string); ok {
+		gene.SenderID = v
 	}
 
 	// Extract signals.
@@ -125,15 +131,18 @@ func (s *LocalGeneStore) SaveGene(_ context.Context, payload map[string]any) (st
 		gene.Validation = string(b)
 	}
 
-	// Extract sender_id if present.
-	if v, ok := payload["sender_id"].(string); ok {
-		gene.SenderID = v
-	}
-
 	if err := s.db.Create(&gene).Error; err != nil {
 		return "", fmt.Errorf("evolution store: save gene: %w", err)
 	}
 	return gene.ID, nil
+}
+
+// escapeLike escapes SQL LIKE wildcard characters.
+func escapeLike(s string) string {
+	s = strings.ReplaceAll(s, "\\", "\\\\")
+	s = strings.ReplaceAll(s, "%", "\\%")
+	s = strings.ReplaceAll(s, "_", "\\_")
+	return s
 }
 
 // Search queries genes matching the text query with minimum confidence.
@@ -149,8 +158,12 @@ func (s *LocalGeneStore) Search(_ context.Context, query string, minConfidence f
 	tx := s.db.Model(&Gene{})
 
 	if query != "" {
-		pattern := "%" + query + "%"
-		tx = tx.Where("label LIKE ? OR component LIKE ? OR agent_name LIKE ?", pattern, pattern, pattern)
+		escaped := escapeLike(query)
+		pattern := "%" + escaped + "%"
+		tx = tx.Where(
+			"label LIKE ? ESCAPE '\\' OR component LIKE ? ESCAPE '\\' OR agent_name LIKE ? ESCAPE '\\'",
+			pattern, pattern, pattern,
+		)
 	}
 	if minConfidence > 0 {
 		tx = tx.Where("confidence >= ?", minConfidence)
@@ -173,16 +186,20 @@ func (s *LocalGeneStore) Stats(_ context.Context) (StoreStats, error) {
 	var stats StoreStats
 	s.db.Model(&Gene{}).Count(&stats.TotalGenes)
 
-	var avgConf float64
 	row := s.db.Model(&Gene{}).Select("COALESCE(AVG(confidence), 0)").Row()
 	if row != nil {
-		_ = row.Scan(&avgConf)
+		_ = row.Scan(&stats.AvgConfidence)
 	}
-	stats.AvgConfidence = avgConf
 
 	var totalUse, totalSuccess int64
-	s.db.Model(&Gene{}).Select("COALESCE(SUM(use_count), 0)").Row().Scan(&totalUse)
-	s.db.Model(&Gene{}).Select("COALESCE(SUM(success_count), 0)").Row().Scan(&totalSuccess)
+	row = s.db.Model(&Gene{}).Select("COALESCE(SUM(use_count), 0)").Row()
+	if row != nil {
+		_ = row.Scan(&totalUse)
+	}
+	row = s.db.Model(&Gene{}).Select("COALESCE(SUM(success_count), 0)").Row()
+	if row != nil {
+		_ = row.Scan(&totalSuccess)
+	}
 	if totalUse > 0 {
 		stats.SuccessRate = float64(totalSuccess) / float64(totalUse)
 	}

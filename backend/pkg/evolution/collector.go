@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"sync"
 	"time"
 
 	"github.com/superagent-ai/superagent-base/backend/pkg/observe"
@@ -28,19 +29,23 @@ import (
 const (
 	maxConcurrentShares = 64
 	shareTimeout        = 5 * time.Second
+	drainTimeout        = 10 * time.Second
 )
 
 // SignalCollector receives execution signals and persists them as Genes
 // in the local MySQL store.
 type SignalCollector struct {
-	store *LocalGeneStore
-	sem   chan struct{}
+	store    *LocalGeneStore
+	senderID string
+	sem      chan struct{}
+	wg       sync.WaitGroup
 }
 
-func newSignalCollector(store *LocalGeneStore) *SignalCollector {
+func newSignalCollector(store *LocalGeneStore, senderID string) *SignalCollector {
 	return &SignalCollector{
-		store: store,
-		sem:   make(chan struct{}, maxConcurrentShares),
+		store:    store,
+		senderID: senderID,
+		sem:      make(chan struct{}, maxConcurrentShares),
 	}
 }
 
@@ -54,6 +59,7 @@ func (c *SignalCollector) Collect(_ context.Context, sig Signal) {
 
 	select {
 	case c.sem <- struct{}{}:
+		c.wg.Add(1)
 		go c.save(sig)
 	default:
 		observe.EvolutionShareDropped.Inc()
@@ -61,13 +67,29 @@ func (c *SignalCollector) Collect(_ context.Context, sig Signal) {
 	}
 }
 
+// Drain waits for all in-flight save goroutines to complete, with a timeout.
+func (c *SignalCollector) Drain() {
+	if c == nil {
+		return
+	}
+	done := make(chan struct{})
+	go func() { c.wg.Wait(); close(done) }()
+	select {
+	case <-done:
+	case <-time.After(drainTimeout):
+		log.Printf("[evolution] drain timeout: some saves may be lost")
+	}
+}
+
 func (c *SignalCollector) save(sig Signal) {
+	defer c.wg.Done()
 	defer func() { <-c.sem }()
 
 	ctx, cancel := context.WithTimeout(context.Background(), shareTimeout)
 	defer cancel()
 
 	payload := buildSharePayload(sig)
+	payload["sender_id"] = c.senderID
 	if _, err := c.store.SaveGene(ctx, payload); err != nil {
 		observe.EvolutionShareFailed.Inc()
 		log.Printf("[evolution] local save failed: %v (type=%s)", err, sig.Type)
