@@ -22,7 +22,6 @@ import (
 	"log"
 	"time"
 
-	experienceclient "github.com/Colin4k1024/Oris/sdks/go/experience"
 	"github.com/superagent-ai/superagent-base/backend/pkg/observe"
 )
 
@@ -31,54 +30,53 @@ const (
 	shareTimeout        = 5 * time.Second
 )
 
-// SignalCollector receives execution signals and forwards them to the
-// Oris Experience Repo via experience.Client.Share().
+// SignalCollector receives execution signals and persists them as Genes
+// in the local MySQL store.
 type SignalCollector struct {
-	client *experienceclient.Client
-	sem    chan struct{}
+	store *LocalGeneStore
+	sem   chan struct{}
 }
 
-func newSignalCollector(client *experienceclient.Client) *SignalCollector {
+func newSignalCollector(store *LocalGeneStore) *SignalCollector {
 	return &SignalCollector{
-		client: client,
-		sem:    make(chan struct{}, maxConcurrentShares),
+		store: store,
+		sem:   make(chan struct{}, maxConcurrentShares),
 	}
 }
 
-// Collect serialises sig into an OEN payload and calls Share asynchronously.
-// Goroutine count is bounded by maxConcurrentShares; the caller's context is
-// detached to avoid cancellation when the HTTP request completes.
+// Collect serialises sig into a payload and saves it locally.
+// Goroutine count is bounded by maxConcurrentShares.
 func (c *SignalCollector) Collect(_ context.Context, sig Signal) {
-	if c == nil || c.client == nil {
+	if c == nil || c.store == nil {
 		return
 	}
 	observe.EvolutionSignalsTotal.WithLabelValues(sig.Type).Inc()
 
 	select {
 	case c.sem <- struct{}{}:
-		go c.share(sig)
+		go c.save(sig)
 	default:
 		observe.EvolutionShareDropped.Inc()
-		log.Printf("[evolution] share dropped: semaphore full (type=%s component=%s)", sig.Type, sig.Component)
+		log.Printf("[evolution] save dropped: semaphore full (type=%s component=%s)", sig.Type, sig.Component)
 	}
 }
 
-func (c *SignalCollector) share(sig Signal) {
+func (c *SignalCollector) save(sig Signal) {
 	defer func() { <-c.sem }()
 
 	ctx, cancel := context.WithTimeout(context.Background(), shareTimeout)
 	defer cancel()
 
 	payload := buildSharePayload(sig)
-	if _, err := c.client.Share(ctx, payload); err != nil {
+	if _, err := c.store.SaveGene(ctx, payload); err != nil {
 		observe.EvolutionShareFailed.Inc()
-		log.Printf("[evolution] share failed: %v (type=%s)", err, sig.Type)
+		log.Printf("[evolution] local save failed: %v (type=%s)", err, sig.Type)
 	} else {
 		observe.EvolutionGenesShared.Inc()
 	}
 }
 
-// buildSharePayload converts a Signal into the map accepted by experience.Client.Share().
+// buildSharePayload converts a Signal into the map stored as a Gene.
 func buildSharePayload(sig Signal) map[string]any {
 	outcome := "success"
 	if sig.Error != "" {

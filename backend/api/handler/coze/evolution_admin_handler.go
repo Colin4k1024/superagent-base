@@ -42,21 +42,22 @@ type geneItem struct {
 	ID          string  `json:"id"`
 	Strategy    any     `json:"strategy"`
 	Confidence  float64 `json:"confidence"`
-	QualityScore float64 `json:"quality_score"`
 	UseCount    int     `json:"use_count"`
-	SuccessCount int    `json:"success_count"`
 	SuccessRate float64 `json:"success_rate"`
-	ContributorID string `json:"contributor_id"`
+	Label       string  `json:"label"`
+	SignalType  string  `json:"signal_type"`
+	Component   string  `json:"component"`
 	CreatedAt   string  `json:"created_at"`
 }
 
-// HandleListGenes returns genes from the Experience Repo with optional search.
+// HandleListGenes returns genes from the local store with optional search.
 // GET /api/v1/admin/evolution/genes?q=<query>&min_confidence=0.5&limit=20
 func (h *EvolutionAdminHandler) HandleListGenes(ctx context.Context, c *app.RequestContext) {
 	if h.engine == nil {
 		c.JSON(200, map[string]any{
 			"enabled": false,
 			"genes":   []geneItem{},
+			"total":   0,
 		})
 		return
 	}
@@ -84,63 +85,39 @@ func (h *EvolutionAdminHandler) HandleListGenes(ctx context.Context, c *app.Requ
 	})
 }
 
-// HandleStats returns evolution engine status and Prometheus-mirrored counters.
+// HandleStats returns evolution engine status and local store statistics.
 // GET /api/v1/admin/evolution/stats
 func (h *EvolutionAdminHandler) HandleStats(ctx context.Context, c *app.RequestContext) {
 	if h.engine == nil {
 		c.JSON(200, map[string]any{
-			"enabled":      false,
-			"experience_url": "",
-			"hub_url":      "",
-			"sender_id":    "",
+			"enabled":   false,
+			"sender_id": "",
 		})
 		return
 	}
 
 	cfg := h.engine.Config()
-
-	// Peer node discovery (requires Hub; returns empty when not configured).
-	nodes, _ := h.engine.DiscoverNodes(ctx)
-	peerCount := len(nodes)
+	stats, _ := h.engine.Store().Stats(ctx)
 
 	c.JSON(200, map[string]any{
-		"enabled":        true,
-		"experience_url": cfg.ExperienceURL,
-		"hub_url":        cfg.HubURL,
-		"sender_id":      cfg.SenderID,
-		"peer_nodes":     peerCount,
-		"min_confidence": cfg.MinConfidence,
+		"enabled":         true,
+		"mode":            "local",
+		"sender_id":       cfg.SenderID,
+		"min_confidence":  cfg.MinConfidence,
 		"max_suggestions": cfg.MaxSuggestions,
+		"total_genes":     stats.TotalGenes,
+		"avg_confidence":  stats.AvgConfidence,
+		"success_rate":    stats.SuccessRate,
 	})
 }
 
-// HandleFederatedSearch queries genes across all Hub-connected nodes.
-// GET /api/v1/admin/evolution/federated?q=<query>&min_confidence=0.5&limit=10
-func (h *EvolutionAdminHandler) HandleFederatedSearch(ctx context.Context, c *app.RequestContext) {
-	if h.engine == nil {
-		c.JSON(200, map[string]any{"enabled": false, "results": []any{}})
-		return
-	}
-
-	query := string(c.Query("q"))
-	if query == "" {
-		c.JSON(400, map[string]any{"error": "query parameter 'q' is required"})
-		return
-	}
-	minConf := parseQueryFloat(string(c.Query("min_confidence")), 0.5)
-	limit := parseQueryInt(string(c.Query("limit")), 10)
-
-	minConf = clampFloat(minConf, 0.0, 1.0)
-	limit = clampInt(limit, 1, 100)
-
-	results, err := h.engine.FederatedSearch(ctx, query, minConf, limit)
-	if err != nil {
-		c.JSON(502, map[string]any{"error": "federated search unavailable"})
-		return
-	}
+// HandleFederatedSearch is a no-op in local-only mode.
+// GET /api/v1/admin/evolution/federated?q=<query>
+func (h *EvolutionAdminHandler) HandleFederatedSearch(_ context.Context, c *app.RequestContext) {
 	c.JSON(200, map[string]any{
-		"results": results,
-		"total":   len(results),
+		"results": []any{},
+		"total":   0,
+		"note":    "federated search is not available in local-only mode",
 	})
 }
 

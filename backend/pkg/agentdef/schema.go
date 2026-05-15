@@ -82,7 +82,7 @@ type AgentSpec struct {
 	// Graph is the registered Eino graph name for type=eino_graph.
 	// The name must match a factory registered via pkg/graphs.Register().
 	Graph         string             `yaml:"graph,omitempty"         json:"graph,omitempty"`
-	// Evolution enables experience self-evolution via the Oris SDK.
+	// Evolution enables local experience self-evolution.
 	Evolution     *EvolutionSpec     `yaml:"evolution,omitempty"     json:"evolution,omitempty"`
 }
 

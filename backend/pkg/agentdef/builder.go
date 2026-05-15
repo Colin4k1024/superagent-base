@@ -1338,7 +1338,7 @@ func buildEvolutionPromptPrefix(recs []evolution.Recommendation) string {
 		return ""
 	}
 	var sb strings.Builder
-	sb.WriteString("# Accumulated Experience (from Oris Gene repository)\n")
+	sb.WriteString("# Accumulated Experience (from local Gene store)\n")
 	sb.WriteString("The following strategies have been validated in previous executions:\n\n")
 	for i, r := range recs {
 		sb.WriteString(fmt.Sprintf("%d. [confidence=%.2f, success_rate=%.0f%%] %v\n",

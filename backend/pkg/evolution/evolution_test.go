@@ -20,10 +20,26 @@ import (
 	"context"
 	"testing"
 	"time"
+
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 )
 
+// testDB creates an in-memory SQLite GORM DB for testing.
+func testDB(t *testing.T) *gorm.DB {
+	t.Helper()
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{
+		Logger: logger.Discard,
+	})
+	if err != nil {
+		t.Fatalf("open test db: %v", err)
+	}
+	return db
+}
+
 func TestInitDisabled(t *testing.T) {
-	e, err := Init(context.Background(), Config{Enabled: false})
+	e, err := Init(context.Background(), Config{Enabled: false}, nil)
 	if err != nil {
 		t.Fatalf("expected nil error, got %v", err)
 	}
@@ -32,10 +48,35 @@ func TestInitDisabled(t *testing.T) {
 	}
 }
 
-func TestInitMissingURL(t *testing.T) {
-	_, err := Init(context.Background(), Config{Enabled: true, ExperienceURL: ""})
+func TestInitNilDB(t *testing.T) {
+	_, err := Init(context.Background(), Config{Enabled: true}, nil)
 	if err == nil {
-		t.Fatal("expected error when ExperienceURL is empty")
+		t.Fatal("expected error when DB is nil")
+	}
+}
+
+func TestInitSuccess(t *testing.T) {
+	db := testDB(t)
+	e, err := Init(context.Background(), Config{
+		Enabled:        true,
+		SenderID:       "test-node",
+		MinConfidence:  0.3,
+		MaxSuggestions: 5,
+	}, db)
+	if err != nil {
+		t.Fatalf("init failed: %v", err)
+	}
+	if e == nil {
+		t.Fatal("expected non-nil engine")
+	}
+	if e.Store() == nil {
+		t.Fatal("expected non-nil store")
+	}
+	if e.Collector() == nil {
+		t.Fatal("expected non-nil collector")
+	}
+	if e.Advisor() == nil {
+		t.Fatal("expected non-nil advisor")
 	}
 }
 
@@ -48,7 +89,11 @@ func TestNilEngineSafe(t *testing.T) {
 	if e.Advisor() != nil {
 		t.Fatal("expected nil advisor")
 	}
+	if e.Store() != nil {
+		t.Fatal("expected nil store")
+	}
 	_ = e.Config()
+	e.Shutdown() // no panic
 }
 
 func TestNilCollectorSafe(t *testing.T) {
@@ -101,6 +146,92 @@ func TestBuildSharePayloadError(t *testing.T) {
 	signals := p["signals"].(map[string]any)
 	if signals["outcome"] != "failure" {
 		t.Errorf("expected failure outcome, got: %v", signals["outcome"])
+	}
+}
+
+func TestLocalGeneStore_SaveAndSearch(t *testing.T) {
+	db := testDB(t)
+	store, err := NewLocalGeneStore(db)
+	if err != nil {
+		t.Fatalf("new store: %v", err)
+	}
+
+	ctx := context.Background()
+
+	// Save a gene.
+	payload := buildSharePayload(Signal{
+		Type:      "tool_success",
+		AgentName: "research-agent",
+		Component: "web_search",
+		Output:    "found 5 results",
+		Timestamp: time.Now(),
+		Duration:  200 * time.Millisecond,
+	})
+	id, err := store.SaveGene(ctx, payload)
+	if err != nil {
+		t.Fatalf("save gene: %v", err)
+	}
+	if id == "" {
+		t.Fatal("expected non-empty gene ID")
+	}
+
+	// Search by component name.
+	genes, err := store.Search(ctx, "web_search", 0.0, 10)
+	if err != nil {
+		t.Fatalf("search: %v", err)
+	}
+	if len(genes) != 1 {
+		t.Fatalf("expected 1 gene, got %d", len(genes))
+	}
+	if genes[0].ID != id {
+		t.Errorf("expected id %s, got %s", id, genes[0].ID)
+	}
+	if genes[0].Component != "web_search" {
+		t.Errorf("expected component web_search, got %s", genes[0].Component)
+	}
+
+	// Search with high confidence threshold should return nothing (0.6 gene vs 0.7 threshold).
+	genes, err = store.Search(ctx, "web_search", 0.7, 10)
+	if err != nil {
+		t.Fatalf("search: %v", err)
+	}
+	if len(genes) != 0 {
+		t.Fatalf("expected 0 genes with high threshold, got %d", len(genes))
+	}
+}
+
+func TestLocalGeneStore_Stats(t *testing.T) {
+	db := testDB(t)
+	store, err := NewLocalGeneStore(db)
+	if err != nil {
+		t.Fatalf("new store: %v", err)
+	}
+
+	ctx := context.Background()
+
+	// Empty store stats.
+	stats, err := store.Stats(ctx)
+	if err != nil {
+		t.Fatalf("stats: %v", err)
+	}
+	if stats.TotalGenes != 0 {
+		t.Errorf("expected 0 genes, got %d", stats.TotalGenes)
+	}
+
+	// Add a gene and check stats.
+	payload := buildSharePayload(Signal{
+		Type:      "tool_success",
+		Component: "calc",
+		Timestamp: time.Now(),
+	})
+	_, _ = store.SaveGene(ctx, payload)
+
+	stats, err = store.Stats(ctx)
+	if err != nil {
+		t.Fatalf("stats: %v", err)
+	}
+	if stats.TotalGenes != 1 {
+		t.Errorf("expected 1 gene, got %d", stats.TotalGenes)
 	}
 }
 

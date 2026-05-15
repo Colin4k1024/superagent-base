@@ -17,7 +17,6 @@
 package evolution
 
 import (
-	"encoding/base64"
 	"os"
 	"strconv"
 )
@@ -26,17 +25,6 @@ import (
 type Config struct {
 	// Enabled is the master switch; if false, Init returns nil without error.
 	Enabled bool
-	// ExperienceURL is the base URL of the Oris Experience Repo (e.g. http://localhost:8090).
-	ExperienceURL string
-	// HubURL is the optional Hub service URL for federated multi-node sharing.
-	HubURL string
-	// NodeEndpoint is the public HTTP endpoint of this superagent-base node
-	// reported to the Hub so peer nodes can reach it.
-	NodeEndpoint string
-	// APIKey is the API key for authenticating with the Experience Repo.
-	APIKey string
-	// Seed is the 32-byte Ed25519 seed for signing messages. Loaded from base64.
-	Seed [32]byte
 	// SenderID is the unique identifier for this superagent node.
 	SenderID string
 	// MinConfidence is the minimum confidence threshold for Advisor recommendations.
@@ -47,34 +35,17 @@ type Config struct {
 
 // LoadConfigFromEnv reads evolution configuration from environment variables.
 //
-//	EVOLUTION_ENABLED       (default: false)
-//	ORIS_EXPERIENCE_URL     (required when enabled)
-//	ORIS_HUB_URL            (optional)
-//	ORIS_API_KEY
-//	ORIS_SEED               (base64-encoded 32-byte Ed25519 seed)
-//	ORIS_SENDER_ID          (default: superagent-node-1)
-//	EVOLUTION_MIN_CONFIDENCE (default: 0.5)
-//	EVOLUTION_MAX_SUGGESTIONS (default: 3)
+//	EVOLUTION_ENABLED          (default: false)
+//	EVOLUTION_SENDER_ID        (default: superagent-node-1)
+//	EVOLUTION_MIN_CONFIDENCE   (default: 0.5)
+//	EVOLUTION_MAX_SUGGESTIONS  (default: 3)
 func LoadConfigFromEnv() Config {
-	c := Config{
+	return Config{
 		Enabled:        parseBool(os.Getenv("EVOLUTION_ENABLED"), false),
-		ExperienceURL:  getenv("ORIS_EXPERIENCE_URL", "http://localhost:8090"),
-		HubURL:         os.Getenv("ORIS_HUB_URL"),
-		NodeEndpoint:   os.Getenv("ORIS_NODE_ENDPOINT"),
-		APIKey:         os.Getenv("ORIS_API_KEY"),
-		SenderID:       getenv("ORIS_SENDER_ID", "superagent-node-1"),
+		SenderID:       getenv("EVOLUTION_SENDER_ID", "superagent-node-1"),
 		MinConfidence:  parseFloat(os.Getenv("EVOLUTION_MIN_CONFIDENCE"), 0.5),
 		MaxSuggestions: parseInt(os.Getenv("EVOLUTION_MAX_SUGGESTIONS"), 3),
 	}
-
-	if raw := os.Getenv("ORIS_SEED"); raw != "" {
-		b, err := base64.StdEncoding.DecodeString(raw)
-		if err == nil && len(b) == 32 {
-			copy(c.Seed[:], b)
-		}
-	}
-
-	return c
 }
 
 func getenv(key, def string) string {

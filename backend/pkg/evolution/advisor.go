@@ -18,25 +18,25 @@ package evolution
 
 import (
 	"context"
+	"encoding/json"
 
-	experienceclient "github.com/Colin4k1024/Oris/sdks/go/experience"
 	"github.com/superagent-ai/superagent-base/backend/pkg/observe"
 )
 
-// EvolutionAdvisor queries the Oris Experience Repo for relevant Gene
+// EvolutionAdvisor queries the local gene store for relevant Gene
 // recommendations that can be injected into agent system prompts.
 type EvolutionAdvisor struct {
-	client        *experienceclient.Client
-	minConfidence float64
+	store          *LocalGeneStore
+	minConfidence  float64
 	maxSuggestions int
 }
 
-func newEvolutionAdvisor(client *experienceclient.Client, minConfidence float64, maxSuggestions int) *EvolutionAdvisor {
+func newEvolutionAdvisor(store *LocalGeneStore, minConfidence float64, maxSuggestions int) *EvolutionAdvisor {
 	if maxSuggestions <= 0 {
 		maxSuggestions = 3
 	}
 	return &EvolutionAdvisor{
-		client:         client,
+		store:          store,
 		minConfidence:  minConfidence,
 		maxSuggestions: maxSuggestions,
 	}
@@ -50,7 +50,7 @@ func (a *EvolutionAdvisor) Recommend(ctx context.Context, query string) []Recomm
 // RecommendWithOpts fetches Gene recommendations with explicit confidence and limit overrides.
 // Zero values fall back to the configured defaults.
 func (a *EvolutionAdvisor) RecommendWithOpts(ctx context.Context, query string, minConfidence float64, limit int) []Recommendation {
-	if a == nil || a.client == nil || query == "" {
+	if a == nil || a.store == nil || query == "" {
 		return nil
 	}
 	if minConfidence <= 0 {
@@ -60,26 +60,29 @@ func (a *EvolutionAdvisor) RecommendWithOpts(ctx context.Context, query string, 
 		limit = a.maxSuggestions
 	}
 
-	results, err := a.client.Fetch(ctx, &experienceclient.FetchQuery{
-		Q:             query,
-		MinConfidence: minConfidence,
-		Limit:         limit,
-	})
-	if err != nil || results == nil {
+	genes, err := a.store.Search(ctx, query, minConfidence, limit)
+	if err != nil || len(genes) == 0 {
 		return nil
 	}
 
-	recs := make([]Recommendation, 0, len(results.Assets))
-	for _, asset := range results.Assets {
+	recs := make([]Recommendation, 0, len(genes))
+	for _, g := range genes {
 		var rate float64
-		if asset.UseCount > 0 {
-			rate = float64(asset.SuccessCount) / float64(asset.UseCount)
+		if g.UseCount > 0 {
+			rate = float64(g.SuccessCount) / float64(g.UseCount)
 		}
+
+		// Parse strategy back to any type for the recommendation.
+		var strategy any
+		if g.Strategy != "" {
+			_ = json.Unmarshal([]byte(g.Strategy), &strategy)
+		}
+
 		recs = append(recs, Recommendation{
-			GeneID:      asset.ID,
-			Strategy:    asset.Strategy,
-			Confidence:  asset.Confidence,
-			UseCount:    asset.UseCount,
+			GeneID:      g.ID,
+			Strategy:    strategy,
+			Confidence:  g.Confidence,
+			UseCount:    g.UseCount,
 			SuccessRate: rate,
 		})
 	}

@@ -41,6 +41,7 @@ import (
 	"github.com/superagent-ai/superagent-base/backend/api/router"
 	"github.com/superagent-ai/superagent-base/backend/application"
 	"github.com/superagent-ai/superagent-base/backend/infra/cache/impl/redis"
+	mysqlpkg "github.com/superagent-ai/superagent-base/backend/infra/orm/impl/mysql"
 	"github.com/superagent-ai/superagent-base/backend/pkg/agentdef"
 	"github.com/superagent-ai/superagent-base/backend/pkg/evolution"
 	"github.com/superagent-ai/superagent-base/backend/pkg/lang/conv"
@@ -83,14 +84,24 @@ func main() {
 	// invocations automatically report Prometheus metrics and OTel spans.
 	callbacks.AppendGlobalHandlers(observe.NewEinoObserveCallback())
 
-	// EVO-001: Initialise experience self-evolution engine (Oris SDK).
+	// EVO-001: Initialise local experience self-evolution engine (MySQL-backed).
 	// Non-fatal — returns nil when EVOLUTION_ENABLED is false or unset.
-	evoEngine, evoErr := evolution.Init(ctx, evolution.LoadConfigFromEnv())
-	if evoErr != nil {
-		logs.Warnf("evolution engine init failed (disabled): %v", evoErr)
-	} else if evoEngine != nil {
-		callbacks.AppendGlobalHandlers(evolution.NewEvolutionCallback(evoEngine))
-		logs.Infof("evolution engine enabled: %s", evoEngine.Config().ExperienceURL)
+	var evoEngine *evolution.Engine
+	evoCfg := evolution.LoadConfigFromEnv()
+	if evoCfg.Enabled {
+		evoDB, evoDBErr := mysqlpkg.New()
+		if evoDBErr != nil {
+			logs.Warnf("evolution: cannot open MySQL (disabled): %v", evoDBErr)
+		} else {
+			eng, initErr := evolution.Init(ctx, evoCfg, evoDB)
+			if initErr != nil {
+				logs.Warnf("evolution engine init failed (disabled): %v", initErr)
+			} else {
+				evoEngine = eng
+				callbacks.AppendGlobalHandlers(evolution.NewEvolutionCallback(evoEngine))
+				logs.Infof("evolution engine enabled (local MySQL)")
+			}
+		}
 	}
 
 	// DEV-001: Start Eino DevOps server for IDE graph visualization and debugging.
