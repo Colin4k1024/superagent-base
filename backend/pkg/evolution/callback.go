@@ -55,7 +55,7 @@ func (c *evolutionCallback) onStart(ctx context.Context, _ *callbacks.RunInfo, _
 }
 
 func (c *evolutionCallback) onEnd(ctx context.Context, info *callbacks.RunInfo, output callbacks.CallbackOutput) context.Context {
-	if c.engine == nil {
+	if c.engine == nil || info == nil {
 		return ctx
 	}
 	start, _ := ctx.Value(startKey{}).(time.Time)
@@ -65,7 +65,7 @@ func (c *evolutionCallback) onEnd(ctx context.Context, info *callbacks.RunInfo, 
 }
 
 func (c *evolutionCallback) onError(ctx context.Context, info *callbacks.RunInfo, err error) context.Context {
-	if c.engine == nil {
+	if c.engine == nil || info == nil {
 		return ctx
 	}
 	start, _ := ctx.Value(startKey{}).(time.Time)
@@ -130,10 +130,12 @@ func durationSince(t time.Time) time.Duration {
 	return time.Since(t)
 }
 
-// Truncate shortens s to max characters, appending "..." if truncated.
+// Truncate shortens s to max runes, appending "..." if truncated.
+// Uses rune conversion to avoid splitting multi-byte UTF-8 characters.
 func Truncate(s string, max int) string {
-	if len(s) <= max {
+	runes := []rune(s)
+	if len(runes) <= max {
 		return s
 	}
-	return s[:max] + "..."
+	return string(runes[:max]) + "..."
 }

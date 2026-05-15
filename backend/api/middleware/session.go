@@ -65,6 +65,9 @@ func SessionAuthMW() app.HandlerFunc {
 			return
 		}
 		// Prefix-based skip for paths with dynamic segments.
+		// IMPORTANT: /api/v1/admin/ routes are protected by APIKeyAdminAuthMW at
+		// the route group level (main.go). Do NOT register admin routes outside
+		// the adminGroup — they would bypass both session auth and admin key auth.
 		if strings.HasPrefix(path, "/api/v1/skills/") || strings.HasPrefix(path, "/api/v1/admin/") {
 			ctx.Next(c)
 			return

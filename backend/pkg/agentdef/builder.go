@@ -980,11 +980,7 @@ func (b *AgentBuilder) buildWorkflow(def *AgentDefinition) (Agent, error) {
 		def:         def,
 	}
 	// Inject evolution collector for node-level signal collection when enabled.
-	if b.evolutionAdvisor != nil && def.Spec.Evolution != nil && def.Spec.Evolution.Enabled {
-		// Advisor holds a reference to the expClient indirectly; we use the collector
-		// exposed via the advisor's internal client. Since collector is on the Engine,
-		// pass it from main.go via a dedicated field when available.
-		// Here we embed the collector if exposed via b.evolutionCollector.
+	if b.evolutionCollector != nil && def.Spec.Evolution != nil && def.Spec.Evolution.Enabled {
 		wa.collector = b.evolutionCollector
 	}
 	return wa, nil
