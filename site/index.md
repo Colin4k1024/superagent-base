@@ -58,7 +58,7 @@ features:
     linkText: 了解协议
   - icon: "\U0001F9EC"
     title: 经验自进化
-    details: 集成 Oris SDK，自动收集执行信号 → 基因提炼 → 策略推荐，Agent 越用越强
+    details: 本地 MySQL 存储执行经验，自动收集信号 → 基因提炼 → 策略推荐，零外部依赖
     link: /advanced/evolution
     linkText: 了解进化
 ---
@@ -83,7 +83,7 @@ features:
                     ▼              ▼              ▼               ▼
               ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────────┐
               │  Memory   │  │  Tools   │  │  Skills  │  │  Evolution   │
-              │  (Redis)  │  │ (MCP/内置)│  │(SkillHub)│  │(Oris SDK/Hub)│
+              │  (Redis)  │  │ (MCP/内置)│  │(SkillHub)│  │ (本地 MySQL) │
               └──────────┘  └──────────┘  └──────────┘  └──────────────┘
 ```
 

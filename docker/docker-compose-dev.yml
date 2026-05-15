@@ -31,20 +31,6 @@ services:
       timeout: 3s
       retries: 5
 
-  oris-experience:
-    image: ghcr.io/colin4k1024/oris-experience-repo:latest
-    container_name: sa-oris-experience
-    ports:
-      - "8090:8090"
-    environment:
-      - DATABASE_URL=sqlite:///data/genes.db
-    volumes:
-      - oris-data:/data
-    restart: unless-stopped
-
-volumes:
-  oris-data:
-
 networks:
   default:
     name: superagent-dev

@@ -14,35 +14,27 @@
  * limitations under the License.
  */
 
-// Package evolution integrates the Oris Go SDK to give superagent-base
-// experience self-evolution capability.
+// Package evolution provides local experience self-evolution capability.
 //
 // Signal flow:
 //
 //	Eino callback (Tool/Model events)
 //	  → SignalCollector.Collect()  (async goroutine)
-//	    → experience.Client.Share()  → Oris Experience Repo
+//	    → LocalGeneStore.SaveGene()  → MySQL
 //
-// Query flow (Phase 2):
+// Query flow:
 //
 //	AgentBuilder → EvolutionAdvisor.Recommend()
-//	  → experience.Client.Fetch()  → Oris Experience Repo
+//	  → LocalGeneStore.Search()  → MySQL
 //	    → Recommendation slice injected into system prompt
-//
-// Federation (Phase 3):
-//
-//	Hub client registers this node and sends periodic heartbeats.
-//	FederatedSearch queries genes across all connected nodes.
 package evolution
 
 import (
 	"context"
 	"fmt"
-	"sync"
 	"time"
 
-	experienceclient "github.com/Colin4k1024/Oris/sdks/go/experience"
-	hubclient "github.com/Colin4k1024/Oris/sdks/go/hub"
+	"gorm.io/gorm"
 )
 
 // Signal describes a single execution event observed during agent operation.
@@ -76,155 +68,39 @@ type Recommendation struct {
 // Engine is the top-level facade for the evolution capability.
 // Obtain one via Init(); a nil *Engine is safe (all methods are no-ops).
 type Engine struct {
-	expClient *experienceclient.Client
-	hubClient *hubclient.Client // nil when HubURL is empty
+	store     *LocalGeneStore
 	collector *SignalCollector
 	advisor   *EvolutionAdvisor
 	cfg       Config
-	stopHub   context.CancelFunc // cancels the hub heartbeat goroutine
-
-	nodesMu    sync.RWMutex
-	nodesCache []hubclient.NodeInfo
-	nodesTTL   time.Time
 }
 
-// Init creates and warms up an Engine from cfg.
+// Init creates and warms up an Engine backed by the provided *gorm.DB.
 // Returns nil, nil when cfg.Enabled is false so callers can treat nil as "disabled".
-func Init(ctx context.Context, cfg Config) (*Engine, error) {
+func Init(_ context.Context, cfg Config, db *gorm.DB) (*Engine, error) {
 	if !cfg.Enabled {
 		return nil, nil
 	}
-	if cfg.ExperienceURL == "" {
-		return nil, fmt.Errorf("evolution: ORIS_EXPERIENCE_URL is required when EVOLUTION_ENABLED=true")
+	if db == nil {
+		return nil, fmt.Errorf("evolution: *gorm.DB is required when EVOLUTION_ENABLED=true")
 	}
 
-	expClient := experienceclient.NewClient(experienceclient.Config{
-		BaseURL:  cfg.ExperienceURL,
-		APIKey:   cfg.APIKey,
-		Seed:     cfg.Seed,
-		SenderID: cfg.SenderID,
-	})
-
-	// Best-effort public key registration; failure is non-fatal.
-	_ = expClient.RegisterPublicKey(ctx)
+	store, err := NewLocalGeneStore(db)
+	if err != nil {
+		return nil, fmt.Errorf("evolution: init store: %w", err)
+	}
 
 	e := &Engine{
-		expClient: expClient,
-		cfg:       cfg,
+		store: store,
+		cfg:   cfg,
 	}
-	e.collector = newSignalCollector(expClient)
-	e.advisor = newEvolutionAdvisor(expClient, cfg.MinConfidence, cfg.MaxSuggestions)
-
-	// Phase 3: initialise Hub client when HubURL is configured.
-	if cfg.HubURL != "" {
-		e.hubClient = hubclient.NewClient(hubclient.Config{
-			BaseURL: cfg.HubURL,
-			APIKey:  cfg.APIKey,
-			Seed:    cfg.Seed,
-			NodeID:  cfg.SenderID,
-		})
-		if err := e.registerAndStartHeartbeat(ctx, cfg); err != nil {
-			// Non-fatal — federation is optional.
-			e.hubClient = nil
-		}
-	}
+	e.collector = newSignalCollector(store)
+	e.advisor = newEvolutionAdvisor(store, cfg.MinConfidence, cfg.MaxSuggestions)
 
 	return e, nil
 }
 
-// registerAndStartHeartbeat registers this node with the Hub and starts the
-// background heartbeat goroutine.
-func (e *Engine) registerAndStartHeartbeat(ctx context.Context, cfg Config) error {
-	resp, err := e.hubClient.Register(ctx, &hubclient.RegisterRequest{
-		NodeID:       cfg.SenderID,
-		Endpoint:     cfg.NodeEndpoint,
-		Capabilities: []string{"evolve", "experience"},
-		Version:      "0.1.0",
-	})
-	if err != nil {
-		return fmt.Errorf("hub register: %w", err)
-	}
-
-	interval := time.Duration(resp.HeartbeatIntervalSeconds) * time.Second
-	if interval <= 0 {
-		interval = 30 * time.Second
-	}
-
-	hbCtx, cancel := context.WithCancel(context.Background())
-	e.stopHub = cancel
-
-	go func() {
-		ticker := time.NewTicker(interval)
-		defer ticker.Stop()
-		for {
-			select {
-			case <-hbCtx.Done():
-				return
-			case <-ticker.C:
-				_, _ = e.hubClient.Heartbeat(hbCtx, hubclient.NodeStatusActive)
-			}
-		}
-	}()
-
-	return nil
-}
-
-// FederatedSearch queries genes across all Hub-connected nodes.
-// Returns nil when Hub is not configured.
-func (e *Engine) FederatedSearch(ctx context.Context, query string, minConfidence float64, limit int) ([]hubclient.GeneResult, error) {
-	if e == nil || e.hubClient == nil {
-		return nil, nil
-	}
-	result, err := e.hubClient.Search(ctx, &hubclient.FederatedQuery{
-		Query:         query,
-		MinConfidence: minConfidence,
-		Limit:         limit,
-	})
-	if err != nil {
-		return nil, err
-	}
-	return result.Results, nil
-}
-
-const discoverNodesTTL = 30 * time.Second
-
-// DiscoverNodes returns peer nodes registered with the Hub.
-// Results are cached for 30 seconds to avoid per-request Hub calls.
-func (e *Engine) DiscoverNodes(ctx context.Context) ([]hubclient.NodeInfo, error) {
-	if e == nil || e.hubClient == nil {
-		return nil, nil
-	}
-
-	e.nodesMu.RLock()
-	if time.Now().Before(e.nodesTTL) {
-		cached := e.nodesCache
-		e.nodesMu.RUnlock()
-		return cached, nil
-	}
-	e.nodesMu.RUnlock()
-
-	result, err := e.hubClient.Discover(ctx, &hubclient.DiscoveryQuery{
-		Capabilities: []string{"evolve"},
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	e.nodesMu.Lock()
-	e.nodesCache = result.Nodes
-	e.nodesTTL = time.Now().Add(discoverNodesTTL)
-	e.nodesMu.Unlock()
-
-	return result.Nodes, nil
-}
-
-// Shutdown stops the heartbeat goroutine gracefully.
-func (e *Engine) Shutdown() {
-	if e == nil || e.stopHub == nil {
-		return
-	}
-	e.stopHub()
-}
+// Shutdown is a no-op in local mode. Kept for API compatibility.
+func (e *Engine) Shutdown() {}
 
 // Collector returns the SignalCollector for direct signal submission.
 func (e *Engine) Collector() *SignalCollector {
@@ -240,6 +116,14 @@ func (e *Engine) Advisor() *EvolutionAdvisor {
 		return nil
 	}
 	return e.advisor
+}
+
+// Store returns the underlying LocalGeneStore for direct queries (admin API).
+func (e *Engine) Store() *LocalGeneStore {
+	if e == nil {
+		return nil
+	}
+	return e.store
 }
 
 // Config returns the effective configuration.

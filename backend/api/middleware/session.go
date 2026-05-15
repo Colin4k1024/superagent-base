@@ -65,7 +65,7 @@ func SessionAuthMW() app.HandlerFunc {
 			return
 		}
 		// Prefix-based skip for paths with dynamic segments.
-		if strings.HasPrefix(path, "/api/v1/skills/") {
+		if strings.HasPrefix(path, "/api/v1/skills/") || strings.HasPrefix(path, "/api/v1/admin/") {
 			ctx.Next(c)
 			return
 		}
