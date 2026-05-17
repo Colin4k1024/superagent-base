@@ -1,0 +1,36 @@
+apiVersion: superagent/v1
+kind: Agent
+metadata:
+  name: code-agent
+  labels:
+    team: engineering
+    tier: production
+spec:
+  type: agentloop
+  model:
+    primary: claude-sonnet-4-6
+    temperature: 0.2
+    max_tokens: 8192
+  system_prompt: |
+    You are an autonomous coding agent. You work iteratively on the user's task:
+    - Break down complex problems into steps.
+    - Execute one step per turn, showing your work.
+    - Use available tools (code execution, web search) as needed.
+    - After each step, evaluate progress and decide next action.
+    - When the task is fully complete, include [DONE] in your response.
+    - If you are stuck or need user input, explain clearly and include [DONE].
+  tools:
+    - ref: builtin/code_execute
+    - ref: builtin/web_search
+  memory:
+    backend: builtin
+    session_window: 20
+  max_turns: 25
+  middleware:
+    - name: timeout
+      seconds: 120
+    - name: retry
+      max_attempts: 2
+  observability:
+    metrics: true
+    trace: true

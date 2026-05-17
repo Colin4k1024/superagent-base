@@ -175,6 +175,8 @@ func (b *AgentBuilder) Build(ctx context.Context, def *AgentDefinition) (Agent, 
 		return b.buildWorkflow(def)
 	case "eino_graph":
 		return b.buildEinoGraph(ctx, def)
+	case "agentloop":
+		return b.buildAgentLoop(ctx, def)
 	}
 
 	// deep_agent: prepend a step-by-step reasoning prefix to the system prompt.
@@ -962,6 +964,42 @@ func (b *AgentBuilder) buildPlanExecute(ctx context.Context, def *AgentDefinitio
 		def:         def,
 		maxSteps:    maxSteps,
 	}, nil
+}
+
+// buildAgentLoop constructs an AgentLoopAgent. It builds a chat_model_agent
+// (with tools if configured) and wraps it in the autonomous loop.
+func (b *AgentBuilder) buildAgentLoop(ctx context.Context, def *AgentDefinition) (Agent, error) {
+	syntheticDef := &AgentDefinition{
+		APIVersion: def.APIVersion,
+		Kind:       def.Kind,
+		Metadata:   def.Metadata,
+		Spec: AgentSpec{
+			Type:          "chat_model_agent",
+			Model:         def.Spec.Model,
+			SystemPrompt:  def.Spec.SystemPrompt,
+			Tools:         def.Spec.Tools,
+			Memory:        def.Spec.Memory,
+			Observability: def.Spec.Observability,
+		},
+	}
+	mainAgent, err := b.Build(ctx, syntheticDef)
+	if err != nil {
+		return nil, fmt.Errorf("agentdef: buildAgentLoop %q: build main agent: %w", def.Metadata.Name, err)
+	}
+
+	maxTurns := defaultMaxTurns
+	if def.Spec.MaxTurns > 0 {
+		maxTurns = def.Spec.MaxTurns
+	}
+
+	agent := &AgentLoopAgent{
+		name:        def.Metadata.Name,
+		description: def.Spec.SystemPrompt,
+		mainAgent:   mainAgent,
+		def:         def,
+		maxTurns:    maxTurns,
+	}
+	return b.maybeWrapInterruptable(agent, def), nil
 }
 
 // buildWorkflow constructs a WorkflowAgent from a workflow spec.
