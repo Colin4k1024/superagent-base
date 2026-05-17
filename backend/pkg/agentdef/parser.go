@@ -39,6 +39,7 @@ var validAgentTypes = map[string]struct{}{
 	"parallel":         {},
 	"plan_execute":     {},
 	"eino_graph":       {}, // native Eino graph from pkg/graphs registry
+	"agentloop":        {}, // autonomous loop agent
 }
 
 // orchestrationTypes is the subset of validAgentTypes that represent
@@ -98,7 +99,7 @@ func Validate(def *AgentDefinition) error {
 		return fmt.Errorf("agentdef: metadata.name %q must match [a-z0-9-]+", def.Metadata.Name)
 	}
 	if _, ok := validAgentTypes[def.Spec.Type]; !ok {
-		return fmt.Errorf("agentdef: spec.type %q must be one of: chat_model_agent, deep_agent, workflow, supervisor, sequential, parallel, plan_execute", def.Spec.Type)
+		return fmt.Errorf("agentdef: spec.type %q must be one of: chat_model_agent, deep_agent, workflow, supervisor, sequential, parallel, plan_execute, agentloop", def.Spec.Type)
 	}
 	_, isOrchestration := orchestrationTypes[def.Spec.Type]
 	if isOrchestration {

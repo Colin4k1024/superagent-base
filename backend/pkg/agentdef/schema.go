@@ -57,7 +57,7 @@ type Metadata struct {
 // AgentSpec holds the behavioural configuration for the agent.
 type AgentSpec struct {
 	// Type selects the agent execution mode.
-	// Must be one of: chat_model_agent, deep_agent, workflow, supervisor, sequential, parallel, plan_execute.
+	// Must be one of: chat_model_agent, deep_agent, workflow, supervisor, sequential, parallel, plan_execute, agentloop.
 	Type         string           `yaml:"type"                    json:"type"`
 	// Model configures model selection and routing.
 	Model        ModelSpec        `yaml:"model"                   json:"model"`
@@ -82,6 +82,9 @@ type AgentSpec struct {
 	// Graph is the registered Eino graph name for type=eino_graph.
 	// The name must match a factory registered via pkg/graphs.Register().
 	Graph         string             `yaml:"graph,omitempty"         json:"graph,omitempty"`
+	// MaxTurns limits the number of autonomous iterations for type=agentloop.
+	// Defaults to 25 when zero or unset.
+	MaxTurns      int                `yaml:"max_turns,omitempty"     json:"max_turns,omitempty"`
 	// Evolution enables local experience self-evolution.
 	Evolution     *EvolutionSpec     `yaml:"evolution,omitempty"     json:"evolution,omitempty"`
 }
