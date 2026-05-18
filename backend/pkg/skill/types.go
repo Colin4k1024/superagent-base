@@ -16,7 +16,7 @@
 
 package skill
 
-// SkillMeta represents a skill's metadata from SkillsHub.
+// SkillMeta represents a skill's metadata from SkillsHub or external marketplaces.
 type SkillMeta struct {
 	Name         string        `json:"name"         yaml:"name"`
 	Version      string        `json:"version"      yaml:"version"`
@@ -28,6 +28,11 @@ type SkillMeta struct {
 	Output       *JSONSchema   `json:"output"       yaml:"output"`
 	Runtime      RuntimeConfig `json:"runtime"      yaml:"runtime"`
 	Dependencies []string      `json:"dependencies" yaml:"dependencies"`
+	// Marketplace fields (populated by skills.sh and similar sources).
+	Installs   int    `json:"installs,omitempty"    yaml:"installs,omitempty"`
+	Source     string `json:"source,omitempty"      yaml:"source,omitempty"`
+	InstallCmd string `json:"install_cmd,omitempty" yaml:"install_cmd,omitempty"`
+	URL        string `json:"url,omitempty"         yaml:"url,omitempty"`
 }
 
 // RuntimeConfig describes how a skill's runtime process is managed.

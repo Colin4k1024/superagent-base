@@ -36,6 +36,7 @@ func RegisterAll(invoker *skill.LocalInvoker) {
 	invoker.Register("datetime", DatetimeSkill)
 	invoker.Register("calculator", CalculatorSkill)
 	invoker.Register("uuid", UUIDSkill)
+	invoker.Register("find-skills", FindSkillsSkill)
 }
 
 // DatetimeSkill returns the current date/time.

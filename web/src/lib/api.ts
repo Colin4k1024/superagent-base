@@ -161,6 +161,12 @@ export interface SkillInfo {
   description: string
   type?: string
   installed?: boolean
+  // Marketplace fields (populated by skills.sh)
+  installs?: number
+  source?: string
+  author?: string
+  install_cmd?: string
+  url?: string
 }
 
 export const skillsApi = {
@@ -170,7 +176,7 @@ export const skillsApi = {
     if (!res.ok) throw new Error('Failed to fetch skills')
     return res.json()
   },
-  search: async (query: string): Promise<{ results: SkillInfo[] }> => {
+  search: async (query: string): Promise<{ skills: SkillInfo[] }> => {
     const res = await fetch(`${API_BASE}/skills/search?q=${encodeURIComponent(query)}`, { headers: authHeaders() })
     handleAuthError(res)
     if (!res.ok) throw new Error('Search failed')
