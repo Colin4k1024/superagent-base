@@ -61,6 +61,11 @@ features:
     details: 本地 MySQL 存储执行经验，自动收集信号 → 基因提炼 → 策略推荐，零外部依赖
     link: /advanced/evolution
     linkText: 了解进化
+  - icon: "\U0001F501"
+    title: Agent Loop 自主循环
+    details: 自主迭代执行模式 — Agent 自动分步推进任务，直到完成或达到最大轮次，无需人工干预
+    link: /advanced/agentloop
+    linkText: 了解循环
 ---
 
 <div class="vp-doc" style="padding: 0 24px;">
