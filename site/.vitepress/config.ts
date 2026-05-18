@@ -57,7 +57,8 @@ export default defineConfig({
             { text: 'Skill 开发', link: '/advanced/skill-development' },
             { text: '多 Agent 编排', link: '/advanced/multi-agent' },
             { text: 'MCP 集成', link: '/advanced/mcp' },
-            { text: '经验自进化', link: '/advanced/evolution' }
+            { text: '经验自进化', link: '/advanced/evolution' },
+            { text: 'Agent Loop 自主循环', link: '/advanced/agentloop' }
           ]
         }
       ]
