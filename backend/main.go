@@ -110,30 +110,40 @@ func main() {
 		logs.Warnf("eino devops server failed to start (IDE plugin unavailable): %v", err)
 	}
 
-	// Initialize SkillManager with internal SkillHub client + builtin skills.
+	// Initialize SkillManager with marketplace clients + builtin skills.
 	var skillMgr *skill.Manager
+
+	// skills.sh marketplace client (enabled by default, no API key required for CLI mode).
+	skillsShURL := getEnv("SKILLS_SH_URL", "https://skills.sh")
+	skillsShKey := getEnv("SKILLS_SH_API_KEY", "")
+	skillsShClient := skill.NewSkillsShClient(skill.SkillsShConfig{
+		BaseURL: skillsShURL,
+		APIKey:  skillsShKey,
+	})
+	skillbuiltin.InitFindSkills(skillsShClient)
+
+	// Internal SkillHub client (optional, for enterprise deployments).
 	skillHubURL := getEnv("SKILLHUB_URL", "")
+	var hubClient skill.HubClient
 	if skillHubURL != "" {
-		hubClient := skill.NewSkillHubClient(skill.SkillHubClientConfig{
+		internalHub := skill.NewSkillHubClient(skill.SkillHubClientConfig{
 			BaseURL:     skillHubURL,
 			AccessToken: getEnv("SKILLHUB_TOKEN", ""),
 		})
-		localInvoker := skill.NewLocalInvoker()
-		skillbuiltin.RegisterAll(localInvoker)
-		httpInvoker := skill.NewHTTPInvoker()
-		compositeInvoker := skill.NewCompositeInvoker(localInvoker, httpInvoker)
-		skillMgr = skill.NewManager(hubClient, compositeInvoker)
-		logs.Infof("SkillHub client initialized: %s", skillHubURL)
+		hubClient = skill.NewMultiHubClient(internalHub, skillsShClient)
+		logs.Infof("SkillHub + skills.sh marketplace initialized: %s + %s", skillHubURL, skillsShURL)
 	} else {
-		// Even without SkillHub, register builtin skills.
-		localInvoker := skill.NewLocalInvoker()
-		skillbuiltin.RegisterAll(localInvoker)
-		compositeInvoker := skill.NewCompositeInvoker(localInvoker, skill.NewHTTPInvoker())
-		skillMgr = skill.NewManager(nil, compositeInvoker)
+		hubClient = skillsShClient
+		logs.Infof("skills.sh marketplace initialized: %s", skillsShURL)
 	}
 
+	localInvoker := skill.NewLocalInvoker()
+	skillbuiltin.RegisterAll(localInvoker)
+	compositeInvoker := skill.NewCompositeInvoker(localInvoker, skill.NewHTTPInvoker())
+	skillMgr = skill.NewManager(hubClient, compositeInvoker)
+
 	// Pre-register builtin skills so they're accessible via skill://name in agent YAML.
-	for _, name := range []string{"datetime", "calculator", "uuid"} {
+	for _, name := range []string{"datetime", "calculator", "uuid", "find-skills"} {
 		skillMgr.RegisterLocal(skill.SkillMeta{
 			Name:        name,
 			Version:     "1.0.0",

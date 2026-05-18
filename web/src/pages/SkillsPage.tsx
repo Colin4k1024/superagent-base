@@ -12,6 +12,7 @@ const TYPE_BADGE: Record<string, string> = {
   builtin: 'bg-blue-100 text-blue-700',
   http: 'bg-green-100 text-green-700',
   composite: 'bg-purple-100 text-purple-700',
+  'skills.sh': 'bg-orange-100 text-orange-700',
 }
 
 function TypeBadge({ type }: { type?: string }) {
@@ -22,6 +23,13 @@ function TypeBadge({ type }: { type?: string }) {
       {type}
     </span>
   )
+}
+
+function formatInstalls(n?: number): string {
+  if (!n || n <= 0) return ''
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`
+  return String(n)
 }
 
 interface SkillCardProps {
@@ -36,17 +44,33 @@ function SkillCard({ skill, onInstall, onUninstall, installing, uninstalling }: 
   const { t } = useTranslation()
   const [confirmOpen, setConfirmOpen] = useState(false)
 
+  const installs = formatInstalls(skill.installs)
+  const source = skill.source || skill.type
+
   return (
     <>
       <div className="bg-white rounded-lg border border-gray-200 p-4 flex flex-col gap-2">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
             <p className="font-semibold text-gray-900 text-sm truncate">{skill.name}</p>
-            <span className="text-xs text-gray-400 font-mono">v{skill.version}</span>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-gray-400 font-mono">v{skill.version}</span>
+              {installs && (
+                <span className="text-xs text-gray-500">{installs} installs</span>
+              )}
+            </div>
           </div>
-          <TypeBadge type={skill.type} />
+          <TypeBadge type={source} />
         </div>
+        {skill.author && (
+          <p className="text-xs text-gray-400 truncate">by {skill.author}</p>
+        )}
         <p className="text-xs text-gray-600 leading-relaxed line-clamp-2">{skill.description}</p>
+        {skill.install_cmd && !skill.installed && (
+          <code className="text-xs bg-gray-50 border border-gray-200 rounded px-2 py-1 text-gray-600 truncate block">
+            {skill.install_cmd}
+          </code>
+        )}
         <div className="pt-1">
           {skill.installed ? (
             <Button
@@ -152,7 +176,7 @@ export default function SkillsPage() {
   })
 
   const installed = listData?.skills ?? []
-  const searchResults = searchData?.results ?? []
+  const searchResults = searchData?.skills ?? []
 
   return (
     <div className="flex flex-col h-full">
