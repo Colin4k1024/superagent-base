@@ -1,0 +1,271 @@
+<mxGraphModel>
+  <root>
+    <mxCell id="0"/>
+    <mxCell id="1" parent="0"/>
+    
+    <!-- Title -->
+    <mxCell id="title" value="Superagent Base — System Architecture" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=20;fontStyle=1;fontColor=#1a1a2e;" vertex="1" parent="1">
+      <mxGeometry x="250" y="10" width="420" height="40" as="geometry"/>
+    </mxCell>
+
+    <!-- ========== CLIENT LAYER ========== -->
+    <mxCell id="client-group" value="Client Layer" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e8f4fd;strokeColor=#4a90d9;dashed=1;verticalAlign=top;fontStyle=1;fontSize=12;spacingTop=5;" vertex="1" parent="1">
+      <mxGeometry x="40" y="60" width="840" height="80" as="geometry"/>
+    </mxCell>
+    <mxCell id="web-ui" value="Web UI&#xa;(React 18 + Vite 5&#xa;+ Tailwind 3.4)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#4fc3f7;strokeColor=#0277bd;fontColor=#ffffff;fontSize=11;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="80" y="80" width="140" height="50" as="geometry"/>
+    </mxCell>
+    <mxCell id="sactl" value="sactl CLI&#xa;(Go CLI Tool)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#4fc3f7;strokeColor=#0277bd;fontColor=#ffffff;fontSize=11;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="250" y="80" width="130" height="50" as="geometry"/>
+    </mxCell>
+    <mxCell id="grpc-client" value="gRPC Clients&#xa;(SDK / Agent)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#4fc3f7;strokeColor=#0277bd;fontColor=#ffffff;fontSize=11;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="410" y="80" width="130" height="50" as="geometry"/>
+    </mxCell>
+    <mxCell id="mcp-ext" value="MCP External&#xa;Clients" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#4fc3f7;strokeColor=#0277bd;fontColor=#ffffff;fontSize=11;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="570" y="80" width="130" height="50" as="geometry"/>
+    </mxCell>
+    <mxCell id="sse-client" value="A2UI SSE&#xa;Stream Consumer" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#4fc3f7;strokeColor=#0277bd;fontColor=#ffffff;fontSize=11;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="730" y="80" width="130" height="50" as="geometry"/>
+    </mxCell>
+
+    <!-- ========== API GATEWAY LAYER ========== -->
+    <mxCell id="api-group" value="API Gateway Layer (Hertz :8888 + gRPC :50051)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff3e0;strokeColor=#e65100;dashed=1;verticalAlign=top;fontStyle=1;fontSize=12;spacingTop=5;" vertex="1" parent="1">
+      <mxGeometry x="40" y="170" width="840" height="100" as="geometry"/>
+    </mxCell>
+    <mxCell id="middleware" value="Middleware Pipeline&#xa;ContextCache → RequestInspector → SetHost&#xa;→ CORS → AccessLog → Auth → I18n" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffb74d;strokeColor=#e65100;fontSize=10;fontStyle=0;" vertex="1" parent="1">
+      <mxGeometry x="60" y="195" width="310" height="55" as="geometry"/>
+    </mxCell>
+    <mxCell id="rest-handler" value="REST Handlers&#xa;(agent, chat, workflow,&#xa;knowledge, skill, model)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffb74d;strokeColor=#e65100;fontSize=10;" vertex="1" parent="1">
+      <mxGeometry x="390" y="195" width="160" height="55" as="geometry"/>
+    </mxCell>
+    <mxCell id="grpc-handler" value="gRPC Server&#xa;(Agent Run,&#xa;Tool Call)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffb74d;strokeColor=#e65100;fontSize=10;" vertex="1" parent="1">
+      <mxGeometry x="570" y="195" width="130" height="55" as="geometry"/>
+    </mxCell>
+    <mxCell id="sse-server" value="SSE Endpoint&#xa;(A2UI Protocol&#xa;Streaming)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffb74d;strokeColor=#e65100;fontSize=10;" vertex="1" parent="1">
+      <mxGeometry x="720" y="195" width="130" height="55" as="geometry"/>
+    </mxCell>
+
+    <!-- ========== APPLICATION LAYER ========== -->
+    <mxCell id="app-group" value="Application Layer (Use Cases &amp; Orchestration)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e8f5e9;strokeColor=#2e7d32;dashed=1;verticalAlign=top;fontStyle=1;fontSize=12;spacingTop=5;" vertex="1" parent="1">
+      <mxGeometry x="40" y="300" width="840" height="90" as="geometry"/>
+    </mxCell>
+    <mxCell id="app-agent" value="Agent&#xa;Service" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#66bb6a;strokeColor=#2e7d32;fontColor=#ffffff;fontSize=10;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="60" y="325" width="90" height="50" as="geometry"/>
+    </mxCell>
+    <mxCell id="app-conv" value="Conversation&#xa;Service" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#66bb6a;strokeColor=#2e7d32;fontColor=#ffffff;fontSize=10;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="165" y="325" width="90" height="50" as="geometry"/>
+    </mxCell>
+    <mxCell id="app-workflow" value="Workflow&#xa;Service" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#66bb6a;strokeColor=#2e7d32;fontColor=#ffffff;fontSize=10;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="270" y="325" width="90" height="50" as="geometry"/>
+    </mxCell>
+    <mxCell id="app-knowledge" value="Knowledge&#xa;Service" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#66bb6a;strokeColor=#2e7d32;fontColor=#ffffff;fontSize=10;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="375" y="325" width="90" height="50" as="geometry"/>
+    </mxCell>
+    <mxCell id="app-plugin" value="Plugin&#xa;Service" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#66bb6a;strokeColor=#2e7d32;fontColor=#ffffff;fontSize=10;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="480" y="325" width="90" height="50" as="geometry"/>
+    </mxCell>
+    <mxCell id="app-model" value="Model&#xa;Manager" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#66bb6a;strokeColor=#2e7d32;fontColor=#ffffff;fontSize=10;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="585" y="325" width="90" height="50" as="geometry"/>
+    </mxCell>
+    <mxCell id="app-user" value="User &amp;&#xa;Permission" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#66bb6a;strokeColor=#2e7d32;fontColor=#ffffff;fontSize=10;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="690" y="325" width="90" height="50" as="geometry"/>
+    </mxCell>
+
+    <!-- ========== CORE PKG LAYER ========== -->
+    <mxCell id="pkg-group" value="Core Packages (pkg/) — Agent Engine &amp; Platform Services" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fce4ec;strokeColor=#c62828;dashed=1;verticalAlign=top;fontStyle=1;fontSize=12;spacingTop=5;" vertex="1" parent="1">
+      <mxGeometry x="40" y="420" width="840" height="160" as="geometry"/>
+    </mxCell>
+    <!-- Row 1: Agent Core -->
+    <mxCell id="pkg-agentdef" value="AgentDef&#xa;(Schema + Parser&#xa;+ Builder + Runtime&#xa;+ Orchestration)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ef5350;strokeColor=#c62828;fontColor=#ffffff;fontSize=10;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="60" y="445" width="150" height="60" as="geometry"/>
+    </mxCell>
+    <mxCell id="pkg-modelrouter" value="Model Router&#xa;(Capability / Cost&#xa;/ Latency + Fallback)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ef5350;strokeColor=#c62828;fontColor=#ffffff;fontSize=10;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="225" y="445" width="145" height="60" as="geometry"/>
+    </mxCell>
+    <mxCell id="pkg-tool" value="Tool Manager&#xa;(URI Registry&#xa;+ Middleware Chain)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ef5350;strokeColor=#c62828;fontColor=#ffffff;fontSize=10;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="385" y="445" width="130" height="60" as="geometry"/>
+    </mxCell>
+    <mxCell id="pkg-mcp" value="MCP&#xa;(Client stdio/SSE&#xa;+ Server + Registry)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ef5350;strokeColor=#c62828;fontColor=#ffffff;fontSize=10;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="530" y="445" width="130" height="60" as="geometry"/>
+    </mxCell>
+    <mxCell id="pkg-skill" value="SkillsHub&#xa;(Local / HTTP&#xa;/ Composite)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ef5350;strokeColor=#c62828;fontColor=#ffffff;fontSize=10;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="675" y="445" width="120" height="60" as="geometry"/>
+    </mxCell>
+    <!-- Row 2: Supporting Packages -->
+    <mxCell id="pkg-memory" value="Memory&#xa;(builtin / mem0&#xa;/ zep / letta)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ef9a9a;strokeColor=#c62828;fontSize=10;" vertex="1" parent="1">
+      <mxGeometry x="60" y="520" width="120" height="50" as="geometry"/>
+    </mxCell>
+    <mxCell id="pkg-a2ui" value="A2UI Protocol&#xa;(SSE Events&#xa;+ Encoder)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ef9a9a;strokeColor=#c62828;fontSize=10;" vertex="1" parent="1">
+      <mxGeometry x="195" y="520" width="120" height="50" as="geometry"/>
+    </mxCell>
+    <mxCell id="pkg-observe" value="Observe&#xa;(OTel + Prometheus&#xa;+ Eino Callback)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ef9a9a;strokeColor=#c62828;fontSize=10;" vertex="1" parent="1">
+      <mxGeometry x="330" y="520" width="120" height="50" as="geometry"/>
+    </mxCell>
+    <mxCell id="pkg-evolution" value="Evolution&#xa;(Self-evolving&#xa;Agent Engine)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ef9a9a;strokeColor=#c62828;fontSize=10;" vertex="1" parent="1">
+      <mxGeometry x="465" y="520" width="120" height="50" as="geometry"/>
+    </mxCell>
+    <mxCell id="pkg-rbac" value="RBAC&#xa;(Role-Based&#xa;Access Control)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ef9a9a;strokeColor=#c62828;fontSize=10;" vertex="1" parent="1">
+      <mxGeometry x="600" y="520" width="120" height="50" as="geometry"/>
+    </mxCell>
+    <mxCell id="pkg-graphs" value="Graphs&#xa;(DAG Execution&#xa;Engine)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ef9a9a;strokeColor=#c62828;fontSize=10;" vertex="1" parent="1">
+      <mxGeometry x="735" y="520" width="110" height="50" as="geometry"/>
+    </mxCell>
+
+    <!-- ========== DOMAIN LAYER ========== -->
+    <mxCell id="domain-group" value="Domain Layer (Entities, Repositories &amp; Business Rules)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ede7f6;strokeColor=#4527a0;dashed=1;verticalAlign=top;fontStyle=1;fontSize=12;spacingTop=5;" vertex="1" parent="1">
+      <mxGeometry x="40" y="610" width="840" height="80" as="geometry"/>
+    </mxCell>
+    <mxCell id="dom-agent" value="Agent" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#7e57c2;strokeColor=#4527a0;fontColor=#ffffff;fontSize=10;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="60" y="635" width="75" height="40" as="geometry"/>
+    </mxCell>
+    <mxCell id="dom-conv" value="Conversation" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#7e57c2;strokeColor=#4527a0;fontColor=#ffffff;fontSize=10;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="148" y="635" width="90" height="40" as="geometry"/>
+    </mxCell>
+    <mxCell id="dom-workflow" value="Workflow" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#7e57c2;strokeColor=#4527a0;fontColor=#ffffff;fontSize=10;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="250" y="635" width="75" height="40" as="geometry"/>
+    </mxCell>
+    <mxCell id="dom-knowledge" value="Knowledge" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#7e57c2;strokeColor=#4527a0;fontColor=#ffffff;fontSize=10;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="338" y="635" width="80" height="40" as="geometry"/>
+    </mxCell>
+    <mxCell id="dom-app" value="App" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#7e57c2;strokeColor=#4527a0;fontColor=#ffffff;fontSize=10;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="432" y="635" width="60" height="40" as="geometry"/>
+    </mxCell>
+    <mxCell id="dom-connector" value="Connector" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#7e57c2;strokeColor=#4527a0;fontColor=#ffffff;fontSize=10;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="505" y="635" width="80" height="40" as="geometry"/>
+    </mxCell>
+    <mxCell id="dom-user" value="User" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#7e57c2;strokeColor=#4527a0;fontColor=#ffffff;fontSize=10;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="600" y="635" width="60" height="40" as="geometry"/>
+    </mxCell>
+    <mxCell id="dom-permission" value="Permission" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#7e57c2;strokeColor=#4527a0;fontColor=#ffffff;fontSize=10;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="675" y="635" width="80" height="40" as="geometry"/>
+    </mxCell>
+    <mxCell id="dom-upload" value="Upload" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#7e57c2;strokeColor=#4527a0;fontColor=#ffffff;fontSize=10;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="768" y="635" width="65" height="40" as="geometry"/>
+    </mxCell>
+
+    <!-- ========== INFRASTRUCTURE LAYER ========== -->
+    <mxCell id="infra-group" value="Infrastructure Layer (Adapters &amp; External Services)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e0e0e0;strokeColor=#424242;dashed=1;verticalAlign=top;fontStyle=1;fontSize=12;spacingTop=5;" vertex="1" parent="1">
+      <mxGeometry x="40" y="720" width="840" height="90" as="geometry"/>
+    </mxCell>
+    <mxCell id="infra-mysql" value="MySQL 8.4&#xa;(ORM/GORM)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#78909c;strokeColor=#37474f;fontColor=#ffffff;fontSize=10;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="60" y="745" width="100" height="50" as="geometry"/>
+    </mxCell>
+    <mxCell id="infra-redis" value="Redis 8.0&#xa;(Cache/Session)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#78909c;strokeColor=#37474f;fontColor=#ffffff;fontSize=10;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="175" y="745" width="100" height="50" as="geometry"/>
+    </mxCell>
+    <mxCell id="infra-es" value="Elasticsearch&#xa;(Search/Index)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#78909c;strokeColor=#37474f;fontColor=#ffffff;fontSize=10;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="290" y="745" width="100" height="50" as="geometry"/>
+    </mxCell>
+    <mxCell id="infra-minio" value="MinIO&#xa;(Object Storage)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#78909c;strokeColor=#37474f;fontColor=#ffffff;fontSize=10;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="405" y="745" width="100" height="50" as="geometry"/>
+    </mxCell>
+    <mxCell id="infra-milvus" value="Milvus&#xa;(Vector DB)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#78909c;strokeColor=#37474f;fontColor=#ffffff;fontSize=10;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="520" y="745" width="100" height="50" as="geometry"/>
+    </mxCell>
+    <mxCell id="infra-nsq" value="NSQ/Kafka&#xa;(Event Bus)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#78909c;strokeColor=#37474f;fontColor=#ffffff;fontSize=10;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="635" y="745" width="100" height="50" as="geometry"/>
+    </mxCell>
+    <mxCell id="infra-llm" value="LLM Providers&#xa;(OpenAI/Claude&#xa;/Gemini/...)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#78909c;strokeColor=#37474f;fontColor=#ffffff;fontSize=10;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="750" y="745" width="110" height="50" as="geometry"/>
+    </mxCell>
+
+    <!-- ========== CONFIG LAYER (right side) ========== -->
+    <mxCell id="config-group" value="Configuration" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff9c4;strokeColor=#f57f17;dashed=1;verticalAlign=top;fontStyle=1;fontSize=11;spacingTop=3;" vertex="1" parent="1">
+      <mxGeometry x="900" y="300" width="160" height="200" as="geometry"/>
+    </mxCell>
+    <mxCell id="cfg-yaml" value="Agent YAMLs&#xa;configs/agents/*.yaml" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff176;strokeColor=#f57f17;fontSize=9;" vertex="1" parent="1">
+      <mxGeometry x="910" y="325" width="140" height="35" as="geometry"/>
+    </mxCell>
+    <mxCell id="cfg-routing" value="Model Routing&#xa;routing-rules.yaml" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff176;strokeColor=#f57f17;fontSize=9;" vertex="1" parent="1">
+      <mxGeometry x="910" y="368" width="140" height="35" as="geometry"/>
+    </mxCell>
+    <mxCell id="cfg-env" value=".env / .env.debug&#xa;Environment Config" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff176;strokeColor=#f57f17;fontSize=9;" vertex="1" parent="1">
+      <mxGeometry x="910" y="411" width="140" height="35" as="geometry"/>
+    </mxCell>
+    <mxCell id="cfg-docker" value="Docker Compose&#xa;(dev / debug)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff176;strokeColor=#f57f17;fontSize=9;" vertex="1" parent="1">
+      <mxGeometry x="910" y="454" width="140" height="35" as="geometry"/>
+    </mxCell>
+
+    <!-- ========== AGENT TYPES (right side) ========== -->
+    <mxCell id="agent-types" value="Agent Types" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fbe9e7;strokeColor=#bf360c;dashed=1;verticalAlign=top;fontStyle=1;fontSize=11;spacingTop=3;" vertex="1" parent="1">
+      <mxGeometry x="900" y="60" width="160" height="220" as="geometry"/>
+    </mxCell>
+    <mxCell id="at-chat" value="chat_model_agent" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ff8a65;strokeColor=#bf360c;fontColor=#ffffff;fontSize=9;" vertex="1" parent="1">
+      <mxGeometry x="910" y="82" width="140" height="22" as="geometry"/>
+    </mxCell>
+    <mxCell id="at-deep" value="deep_agent" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ff8a65;strokeColor=#bf360c;fontColor=#ffffff;fontSize=9;" vertex="1" parent="1">
+      <mxGeometry x="910" y="108" width="140" height="22" as="geometry"/>
+    </mxCell>
+    <mxCell id="at-supervisor" value="supervisor" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ff8a65;strokeColor=#bf360c;fontColor=#ffffff;fontSize=9;" vertex="1" parent="1">
+      <mxGeometry x="910" y="134" width="140" height="22" as="geometry"/>
+    </mxCell>
+    <mxCell id="at-seq" value="sequential" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ff8a65;strokeColor=#bf360c;fontColor=#ffffff;fontSize=9;" vertex="1" parent="1">
+      <mxGeometry x="910" y="160" width="140" height="22" as="geometry"/>
+    </mxCell>
+    <mxCell id="at-parallel" value="parallel" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ff8a65;strokeColor=#bf360c;fontColor=#ffffff;fontSize=9;" vertex="1" parent="1">
+      <mxGeometry x="910" y="186" width="140" height="22" as="geometry"/>
+    </mxCell>
+    <mxCell id="at-plan" value="plan_execute" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ff8a65;strokeColor=#bf360c;fontColor=#ffffff;fontSize=9;" vertex="1" parent="1">
+      <mxGeometry x="910" y="212" width="140" height="22" as="geometry"/>
+    </mxCell>
+    <mxCell id="at-wf" value="workflow (DAG)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ff8a65;strokeColor=#bf360c;fontColor=#ffffff;fontSize=9;" vertex="1" parent="1">
+      <mxGeometry x="910" y="238" width="140" height="22" as="geometry"/>
+    </mxCell>
+
+    <!-- ========== EDGES: Client → API ========== -->
+    <mxCell id="e1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#666666;endArrow=classic;exitX=0.5;exitY=1;entryX=0.2;entryY=0;" edge="1" source="web-ui" target="api-group" parent="1">
+      <mxGeometry relative="1" as="geometry"/>
+    </mxCell>
+    <mxCell id="e2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#666666;endArrow=classic;exitX=0.5;exitY=1;entryX=0.35;entryY=0;" edge="1" source="sactl" target="api-group" parent="1">
+      <mxGeometry relative="1" as="geometry"/>
+    </mxCell>
+    <mxCell id="e3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#666666;endArrow=classic;exitX=0.5;exitY=1;entryX=0.55;entryY=0;" edge="1" source="grpc-client" target="api-group" parent="1">
+      <mxGeometry relative="1" as="geometry"/>
+    </mxCell>
+    <mxCell id="e4" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#666666;endArrow=classic;exitX=0.5;exitY=1;entryX=0.7;entryY=0;" edge="1" source="mcp-ext" target="api-group" parent="1">
+      <mxGeometry relative="1" as="geometry"/>
+    </mxCell>
+    <mxCell id="e5" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#666666;endArrow=classic;exitX=0.5;exitY=1;entryX=0.9;entryY=0;" edge="1" source="sse-client" target="api-group" parent="1">
+      <mxGeometry relative="1" as="geometry"/>
+    </mxCell>
+
+    <!-- ========== EDGES: API → Application ========== -->
+    <mxCell id="e6" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#888888;endArrow=classic;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" source="api-group" target="app-group" parent="1">
+      <mxGeometry relative="1" as="geometry"/>
+    </mxCell>
+
+    <!-- ========== EDGES: Application → PKG ========== -->
+    <mxCell id="e7" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#888888;endArrow=classic;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" source="app-group" target="pkg-group" parent="1">
+      <mxGeometry relative="1" as="geometry"/>
+    </mxCell>
+
+    <!-- ========== EDGES: PKG → Domain ========== -->
+    <mxCell id="e8" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#888888;endArrow=classic;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" source="pkg-group" target="domain-group" parent="1">
+      <mxGeometry relative="1" as="geometry"/>
+    </mxCell>
+
+    <!-- ========== EDGES: Domain → Infra ========== -->
+    <mxCell id="e9" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#888888;endArrow=classic;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" source="domain-group" target="infra-group" parent="1">
+      <mxGeometry relative="1" as="geometry"/>
+    </mxCell>
+
+    <!-- ========== EDGES: Config → PKG ========== -->
+    <mxCell id="e10" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#f57f17;endArrow=classic;dashed=1;exitX=0;exitY=0.5;entryX=1;entryY=0.3;" edge="1" source="cfg-yaml" target="pkg-group" parent="1">
+      <mxGeometry relative="1" as="geometry"/>
+    </mxCell>
+    <mxCell id="e11" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#f57f17;endArrow=classic;dashed=1;exitX=0;exitY=0.5;entryX=1;entryY=0.5;" edge="1" source="cfg-routing" target="pkg-group" parent="1">
+      <mxGeometry relative="1" as="geometry"/>
+    </mxCell>
+
+    <!-- ========== EDGES: ModelRouter → LLM ========== -->
+    <mxCell id="e12" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#c62828;endArrow=classic;exitX=0.5;exitY=1;entryX=0.85;entryY=0;" edge="1" source="pkg-modelrouter" target="infra-group" parent="1">
+      <mxGeometry relative="1" as="geometry"/>
+    </mxCell>
+
+    <!-- Legend -->
+    <mxCell id="legend" value="Legend:&#xa;→ Data/Request flow&#xa;⇢ Configuration input&#xa;&#xa;Ports: HTTP :8888 | gRPC :50051 | Web :3000" style="text;html=1;align=left;verticalAlign=top;resizable=0;points=[];autosize=1;strokeColor=#999999;fillColor=#f5f5f5;fontSize=10;rounded=1;" vertex="1" parent="1">
+      <mxGeometry x="900" y="530" width="180" height="90" as="geometry"/>
+    </mxCell>
+
+  </root>
+</mxGraphModel>

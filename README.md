@@ -38,62 +38,9 @@
 
 ## 架构总览
 
-```
-┌──────────────────────────────────────────────────────────────────────────┐
-│                          客户端层                                          │
-│   Web UI (React+Vite)   │   HTTP/SSE 客户端   │   gRPC 客户端            │
-└────────────┬────────────┴──────────┬───────────┴──────────┬──────────────┘
-             │ HTTP SSE              │ REST                  │ gRPC :50051
-┌────────────▼──────────────────────▼───────────────────────▼──────────────┐
-│                       网关层 (Hertz HTTP :8888)                            │
-│   CORS · 认证 · 日志 · RequestInspector · AccessLog                       │
-└────────────────────────────────────┬─────────────────────────────────────┘
-                                     │
-┌────────────────────────────────────▼─────────────────────────────────────┐
-│                           API 层 (backend/api/)                            │
-│   POST /api/v1/chat/stream   GET /api/v1/agents                           │
-│   POST /api/v1/chat/resume   GET /api/v1/chat/interrupt_state             │
-│   gRPC: AgentService / ConversationService / ModelService / ToolService   │
-└─────────────────────┬──────────────────────────────────────────────────-─┘
-                      │
-┌─────────────────────▼────────────────────────────────────────────────────┐
-│                       Application 层 (backend/application/)               │
-│   singleagent · conversation · knowledge · workflow · modelmgr ...       │
-└──────────────────┬─────────────────────────┬────────────────────────────-┘
-                   │                         │
-   ┌───────────────▼──────────┐  ┌───────────▼──────────────────────────┐
-   │   Domain / CrossDomain   │  │     Agent Runtime (pkg/agentdef/)    │
-   │   agent · conversation   │  │  schema · parser · builder · runtime  │
-   │   knowledge · memory     │  │  interrupt · workflow · orchestration │
-   └──────────────────────────┘  └──────────┬───────────────────────────┘
-                                             │
-   ┌─────────────────────────────────────────▼─────────────────────────┐
-   │                       工具与技能层                                   │
-   │  pkg/tool (Manager + middleware: retry/timeout/ratelimit/cache)    │
-   │  pkg/skill (LocalInvoker + HTTPInvoker + CompositeInvoker)        │
-   │  pkg/mcp (Client stdio/SSE + Server + Registry)                   │
-   │  pkg/modelrouter (capability/cost/latency + fallback)             │
-   │  pkg/memory (builtin / Mem0 / Zep / Letta)                       │
-   │  pkg/a2ui (Event 协议 + SSE 编码)                                 │
-   │  pkg/evolution (SignalCollector + Advisor + LocalGeneStore)       │
-   └─────────────────────────────────┬─────────────────────────────────┘
-                                     │ Eino SDK (CloudWeGo)
-                                     │ MySQL (evolution_genes 表)
-   ┌─────────────────────────────────▼─────────────────────────────────┐
-   │              LLM 推理层 (github.com/cloudwego/eino)                │
-   │   ChatModel · ReAct Agent (最多 10 步) · Stream Reader            │
-   └─────────────────────────────────┬─────────────────────────────────┘
-                                     │ OpenAI-compatible API
-   ┌─────────────────────────────────▼─────────────────────────────────┐
-   │              LLM Provider                                          │
-   │  LM Studio · Ollama · OpenAI · DeepSeek · Claude · Gemini · ...  │
-   └────────────────────────────────────────────────────────────────────┘
+> 完整架构文档：[docs/architecture.md](docs/architecture.md) | 可编辑源文件：[docs/architecture.drawio](docs/architecture.drawio)
 
-   ┌────────────────────────────────────────────────────────────────────┐
-   │  基础设施层 (backend/infra/)                                        │
-   │  MySQL · Redis · MinIO/S3 · Elasticsearch · NSQ/Kafka · Milvus   │
-   └────────────────────────────────────────────────────────────────────┘
-```
+![System Architecture](docs/architecture.svg)
 
 ---
 
