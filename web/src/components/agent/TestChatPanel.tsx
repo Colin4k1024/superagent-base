@@ -20,7 +20,7 @@ export function TestChatPanel({ agentName, open, onClose }: TestChatPanelProps) 
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
-  async function handleSend() {
+  function handleSend() {
     const text = input.trim()
     if (!text || !agentName || isLoading) return
 
@@ -29,11 +29,8 @@ export function TestChatPanel({ agentName, open, onClose }: TestChatPanelProps) 
     setIsLoading(true)
     setMessages((prev) => [...prev, { role: 'assistant', content: '' }])
 
-    await chatApi.sendMessage(
-      agentName,
-      sessionId,
-      text,
-      (token) => {
+    chatApi.sendMessage(agentName, sessionId, text, {
+      onToken: (token: string) => {
         setMessages((prev) => {
           const updated = [...prev]
           const last = updated[updated.length - 1]
@@ -43,8 +40,8 @@ export function TestChatPanel({ agentName, open, onClose }: TestChatPanelProps) 
           return updated
         })
       },
-      () => setIsLoading(false),
-      (err) => {
+      onDone: () => setIsLoading(false),
+      onError: (err: Error) => {
         setMessages((prev) => {
           const updated = [...prev]
           updated[updated.length - 1] = {
@@ -55,7 +52,7 @@ export function TestChatPanel({ agentName, open, onClose }: TestChatPanelProps) 
         })
         setIsLoading(false)
       },
-    )
+    })
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {

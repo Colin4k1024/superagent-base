@@ -330,6 +330,12 @@ func startHttpServer(agentRT *agentdef.AgentRuntime, skillMgr *skill.Manager, mc
 	adminGroup.GET("/evolution/genes", evoAdmin.HandleListGenes)
 	adminGroup.GET("/evolution/federated", evoAdmin.HandleFederatedSearch)
 
+	// 集团小海对接接口 (集团IT智能体输出规范 v1.0.0) — Api-Key 鉴权.
+	xiaohaiH := cozehandler.NewXiaohaiHandler(agentRT)
+	xiaohaiGroup := s.Group("/api/v1/xiaohai")
+	xiaohaiGroup.POST("/stream/:agent_id", xiaohaiH.HandleStream)
+	xiaohaiGroup.POST("/chat/:agent_id", xiaohaiH.HandleNonStream)
+
 	// Skill management API endpoints.
 	registerSkillRoutes(s, skillMgr, userStore)
 

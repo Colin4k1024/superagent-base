@@ -28,9 +28,41 @@ export interface Agent {
   description: string
 }
 
+export interface FileAttachment {
+  name: string
+  size?: number
+  type?: string
+  url?: string
+}
+
+export interface CardData {
+  title?: string
+  content: string
+}
+
+export interface Reference {
+  title: string
+  url?: string
+  source?: string
+}
+
+export interface ToolCallInfo {
+  name: string
+  args?: string
+  result?: string
+  status?: 'calling' | 'done' | 'error'
+}
+
 export interface ChatMessage {
   role: 'user' | 'assistant'
   content: string
+  type?: 'text' | 'card' | 'file' | 'thinking'
+  thinking?: string
+  thinkingSteps?: string[]
+  files?: FileAttachment[]
+  card?: CardData
+  references?: Reference[]
+  toolCalls?: ToolCallInfo[]
 }
 
 export interface AdminAgent {
@@ -240,56 +272,117 @@ export const modelConfigApi = {
   },
 }
 
+export interface ChatStreamCallbacks {
+  onToken: (token: string) => void
+  onThinking?: (text: string) => void
+  onToolCall?: (name: string, args: string) => void
+  onToolResult?: (name: string, result: string) => void
+  onDone: () => void
+  onError: (err: Error) => void
+}
+
 export const chatApi = {
-  async sendMessage(
+  /**
+   * Send a message and receive streaming response.
+   * Supports both A2UI JSON events and legacy raw text format.
+   * Returns an AbortController for cancellation.
+   */
+  sendMessage(
     agentId: string,
     sessionId: string,
     message: string,
-    onToken: (token: string) => void,
-    onDone: () => void,
-    onError: (err: Error) => void,
-  ): Promise<void> {
-    try {
-      const res = await fetch(`${API_BASE}/chat/stream`, {
-        method: 'POST',
-        headers: authHeaders(),
-        body: JSON.stringify({ agent_id: agentId, session_id: sessionId, message }),
-      })
+    callbacks: ChatStreamCallbacks,
+  ): AbortController {
+    const { onToken, onThinking, onToolCall, onToolResult, onDone, onError } = callbacks
+    const controller = new AbortController()
 
-      handleAuthError(res)
-      if (!res.ok) {
-        throw new Error(`HTTP ${res.status}`)
-      }
+    const run = async () => {
+      try {
+        const res = await fetch(`${API_BASE}/chat/stream`, {
+          method: 'POST',
+          headers: { ...authHeaders(), 'X-A2UI': 'true' },
+          body: JSON.stringify({ agent_id: agentId, session_id: sessionId, message }),
+          signal: controller.signal,
+        })
 
-      const reader = res.body?.getReader()
-      const decoder = new TextDecoder()
+        handleAuthError(res)
+        if (!res.ok) {
+          throw new Error(`HTTP ${res.status}`)
+        }
 
-      if (!reader) throw new Error('No readable stream on response')
+        const reader = res.body?.getReader()
+        const decoder = new TextDecoder()
 
-      let buffer = ''
-      while (true) {
-        const { done, value } = await reader.read()
-        if (done) break
+        if (!reader) throw new Error('No readable stream on response')
 
-        buffer += decoder.decode(value, { stream: true })
-        const lines = buffer.split('\n')
-        buffer = lines.pop() ?? ''
+        let buffer = ''
+        while (true) {
+          const { done, value } = await reader.read()
+          if (done) break
 
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
+          buffer += decoder.decode(value, { stream: true })
+          const lines = buffer.split('\n')
+          buffer = lines.pop() ?? ''
+
+          for (const line of lines) {
+            if (!line.startsWith('data: ')) continue
             const data = line.slice(6)
             if (data === '[DONE]') {
               onDone()
               return
             }
-            onToken(data)
+
+            // Try A2UI JSON format first
+            try {
+              const event = JSON.parse(data)
+              // A2UI format: {"type":"text","data":{"delta":"token"}} or {"type":"text","content":"token"}
+              const content = event.data?.delta || event.data?.content || event.content || ''
+              switch (event.type) {
+                case 'text':
+                  onToken(content)
+                  break
+                case 'thinking':
+                  onThinking?.(content)
+                  break
+                case 'tool_call': {
+                  const tcName = event.data?.name || event.name || ''
+                  const tcArgs = event.data?.arguments
+                  onToolCall?.(tcName, typeof tcArgs === 'object' ? JSON.stringify(tcArgs, null, 2) : String(tcArgs || ''))
+                  break
+                }
+                case 'tool_result': {
+                  const trName = event.data?.name || event.name || ''
+                  const trResult = event.data?.result || event.data?.content || content
+                  onToolResult?.(trName, typeof trResult === 'object' ? JSON.stringify(trResult, null, 2) : String(trResult))
+                }
+                  break
+                case 'error':
+                  onError(new Error(content || 'Unknown error'))
+                  return
+                case 'done':
+                  onDone()
+                  return
+                default:
+                  if (content) onToken(content)
+              }
+            } catch {
+              // Legacy format: raw text token
+              onToken(data)
+            }
           }
         }
+        onDone()
+      } catch (err) {
+        if ((err as Error).name === 'AbortError') {
+          onDone()
+          return
+        }
+        onError(err instanceof Error ? err : new Error(String(err)))
       }
-      onDone()
-    } catch (err) {
-      onError(err instanceof Error ? err : new Error(String(err)))
     }
+
+    run()
+    return controller
   },
 }
 
