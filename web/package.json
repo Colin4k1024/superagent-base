@@ -13,12 +13,17 @@
     "test:e2e:headed": "playwright test --headed"
   },
   "dependencies": {
+    "@aiui/card-settlement-process": "file:../../../../card-settlement-process",
+    "@ant-design/icons": "^5.0.0",
     "@hookform/resolvers": "^5.2.2",
     "@monaco-editor/react": "^4.7.0",
     "@tanstack/react-query": "^5.100.10",
     "@types/react-syntax-highlighter": "^15.5.13",
     "@xyflow/react": "^12.10.2",
+    "antd": "^5.4.0",
+    "axios": "^1.13.2",
     "clsx": "^2.1.1",
+    "dayjs": "^1.11.10",
     "i18next": "^26.1.0",
     "react": "^18.3.0",
     "react-dom": "^18.3.0",

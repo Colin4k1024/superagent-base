@@ -9,7 +9,7 @@ metadata:
 spec:
   type: chat_model_agent
   model:
-    primary: Qwen3-Coder-Next-4bit
+    primary: MiniMax-M2.7
   system_prompt: |
     You are a helpful research assistant. You answer questions clearly, concisely,
     and accurately. When you don't know something, you say so.

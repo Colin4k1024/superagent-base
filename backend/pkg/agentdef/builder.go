@@ -280,7 +280,8 @@ func (b *AgentBuilder) Build(ctx context.Context, def *AgentDefinition) (Agent, 
 			ToolsConfig: compose.ToolsNodeConfig{
 				Tools: einoTools,
 			},
-			MaxStep: 10,
+			MaxStep:                10,
+			StreamToolCallChecker: fullStreamToolCallChecker,
 		})
 		if err != nil {
 			return nil, fmt.Errorf("agentdef: Build: create react agent: %w", err)
@@ -322,7 +323,8 @@ func (b *AgentBuilder) Build(ctx context.Context, def *AgentDefinition) (Agent, 
 				ToolsConfig: compose.ToolsNodeConfig{
 					Tools: einoTools,
 				},
-				MaxStep: 10,
+				MaxStep:                10,
+				StreamToolCallChecker: fullStreamToolCallChecker,
 			})
 			if fbReactErr != nil {
 				return nil, fmt.Errorf("agentdef: Build: create fallback react agent: %w", fbReactErr)
@@ -1217,6 +1219,29 @@ func (a *einoChatAgent) Chat(ctx context.Context, sessionID string, message stri
 		}
 	}()
 	return ch, nil
+}
+
+// ─── StreamToolCallChecker ────────────────────────────────────────────────────
+
+// fullStreamToolCallChecker reads the entire stream to detect tool calls.
+// Unlike the default firstChunkStreamToolCallChecker which only checks the first
+// non-empty chunk, this implementation handles models (e.g. MiniMax, Claude) that
+// emit content (think tags, text) before tool_calls deltas in the same response.
+func fullStreamToolCallChecker(_ context.Context, sr *schema.StreamReader[*schema.Message]) (bool, error) {
+	defer sr.Close()
+
+	for {
+		msg, err := sr.Recv()
+		if err == io.EOF {
+			return false, nil
+		}
+		if err != nil {
+			return false, err
+		}
+		if len(msg.ToolCalls) > 0 {
+			return true, nil
+		}
+	}
 }
 
 // ─── Eino ReAct agent (with tools) ───────────────────────────────────────────

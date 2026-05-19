@@ -26,6 +26,11 @@ export default defineConfig({
         target: 'http://localhost:8888',
         changeOrigin: true,
       },
+      '/hrssc': {
+        target: 'https://hrssctest.haier.net',
+        changeOrigin: true,
+        secure: false,
+      },
     },
   },
   build: {

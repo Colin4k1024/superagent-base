@@ -9,7 +9,7 @@ metadata:
 spec:
   type: supervisor
   model:
-    primary: Qwen3-Coder-Next-4bit
+    primary: MiniMax-M2.7
   system_prompt: |
     You are a project manager. You coordinate sub-agents to complete complex tasks.
     When the user asks something, decide which sub-agent is best suited to handle it.

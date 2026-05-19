@@ -2,16 +2,16 @@ strategies:
   - name: capability-based
     rules:
       - match: {task: [reasoning, planning, coding, review, vision, fast-chat, simple]}
-        route: qwen3-coder
-    fallback: qwen3-coder
+        route: MiniMax-M2.7
+    fallback: MiniMax-M2.7
   - name: cost-optimized
     rules:
       - match: {complexity: [low, medium, high]}
-        route: qwen3-coder
-    fallback: qwen3-coder
+        route: MiniMax-M2.7
+    fallback: MiniMax-M2.7
 providers:
-  qwen3-coder:
+  MiniMax-M2.7:
     type: openai-compatible
-    endpoint: http://127.0.0.1:8000/v1
-    api_key: "123456"
-    model: "Qwen3-Coder-Next-4bit"
+    endpoint: https://api.minimaxi.com/v1
+    api_key: "sk-cp-7juy_M9ROyoUGl5q4efR9E3TJfimP3yAqw3Q3sxIaDRw_LOI5cHYHMkVUIbPG2-ReAg8yr9qhAZMIl6NxNO9LDzwXBjXIGPatnWvpgBGW7f0EaUCpaCFsBA"
+    model: "MiniMax-M2.7"
