@@ -216,6 +216,48 @@ spec:
 
 ---
 
+## 内置 Agent 案例（14 个）
+
+开箱即用的 Agent 模板，覆盖典型 AI Agent 场景（参考 [cloudwego/eino-examples](https://github.com/cloudwego/eino-examples)）：
+
+### 基础能力
+
+| Agent | 类型 | 场景 |
+|-------|------|------|
+| `research-agent` | chat_model_agent | 通用研究助手，清晰简洁地回答问题 |
+| `react-tools-agent` | chat_model_agent + 3 tools | ReAct 推理循环，自动调用 web_search / http_request / code_execute |
+| `rag-knowledge-agent` | chat_model_agent + search | RAG 知识问答，检索文档后附带引用来源回答 |
+| `code-assistant` | agentloop (15 轮) | 自主编程：分析需求 → 编写代码 → 执行验证 → 修复问题 |
+| `data-analyst` | chat_model_agent + code_execute | 数据分析：执行 Python 进行统计、处理和可视化 |
+
+### 多 Agent 编排
+
+| Agent | 类型 | 场景 |
+|-------|------|------|
+| `team-supervisor` | supervisor | 团队协调：分派任务给 researcher / coder / tools 三个子 Agent |
+| `project-manager` | supervisor | 项目管理：识别请求并委派给合适的 sub_agent |
+| `plan-execute-agent` | plan_execute | 先规划后执行：制定 3-7 步计划，逐步执行，动态调整 |
+| `parallel-analysis` | parallel | 并行多视角：同时从事实和技术两个角度分析，综合结论 |
+| `sequential-pipeline` | workflow (3 节点) | 顺序流水线：翻译 → 润色 → 校对 三步 DAG |
+
+### 人机协作
+
+| Agent | 类型 | 场景 |
+|-------|------|------|
+| `approval-agent` | chat_model_agent + interrupt | 安全确认：危险操作前暂停等待用户确认 |
+| `approval-workflow` | chat_model_agent + interrupt + tools | 审批工作流：敏感操作（发邮件、付款）自动触发审批门禁 |
+| `feedback-writer` | agentloop (8 轮) | 迭代写作：生成 → 等待反馈 → 修改，循环直到满意 |
+
+### 工作流
+
+| Agent | 类型 | 场景 |
+|-------|------|------|
+| `research-workflow` | workflow (3 节点) | 研究流水线：搜索 → 分析 → 格式化报告 |
+
+> 所有 Agent YAML 定义在 `backend/configs/agents/`，支持 fsnotify 热加载，修改后无需重启。
+
+---
+
 ## Make 命令
 
 | 命令 | 说明 |

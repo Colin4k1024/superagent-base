@@ -17,8 +17,8 @@ hero:
 
 features:
   - icon: "\U0001F680"
-    title: 5 分钟上手
-    details: 从零到运行只需 5 步 — 克隆、配置、启动、创建 Agent、多 Agent 协同
+    title: 14 个内置 Agent 开箱即用
+    details: 覆盖 ReAct 工具调用、RAG 知识问答、自主编程、Supervisor 多 Agent、Plan-Execute、审批工作流、迭代写作等典型场景，克隆即用
     link: /guide/quickstart
     linkText: 开始上手
   - icon: "\U0001F4DD"
@@ -145,6 +145,25 @@ features:
 | `plan_execute` | 先规划后执行的多 Agent 模式 |
 | `workflow` | DAG 图执行，拓扑排序 + 变量映射 |
 | `eino_graph` | 原生 Eino Graph，VS Code 插件可视化编排后注册 |
+
+## 内置 Agent 案例一览
+
+开箱即用的 14 个 Agent 模板，参考 [eino-examples](https://github.com/cloudwego/eino-examples) 官方案例：
+
+| 分类 | Agent | 场景 |
+|------|-------|------|
+| 基础能力 | `react-tools-agent` | ReAct 推理循环 + web_search / http_request / code_execute |
+| | `rag-knowledge-agent` | 检索增强生成，附带引用来源 |
+| | `code-assistant` | 自主编程循环（分析 → 编码 → 验证 → 修复） |
+| | `data-analyst` | Python 代码执行进行数据分析 |
+| 多 Agent | `team-supervisor` | Supervisor 协调 researcher / coder / tools 三人团队 |
+| | `plan-execute-agent` | 先规划 3-7 步，逐步执行，动态调整 |
+| | `parallel-analysis` | 多视角并行分析，综合结论 |
+| | `sequential-pipeline` | 翻译 → 润色 → 校对 三步 DAG 流水线 |
+| 人机协作 | `approval-workflow` | 敏感操作审批门禁（中断/恢复） |
+| | `feedback-writer` | 迭代写作：生成 → 反馈 → 优化循环 |
+
+> 所有定义在 `configs/agents/*.yaml`，热加载无需重启。
 
 ## 快速体验
 
