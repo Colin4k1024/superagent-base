@@ -26,6 +26,7 @@ export default function Sidebar() {
     { to: '/skills', label: t('nav.skills'), icon: '🧩' },
     { to: '/settings', label: t('nav.settings'), icon: '⚙️' },
     { to: '/evolution', label: t('nav.evolution'), icon: '◈' },
+    { to: '/xiaohai-debug', label: '小海调试', icon: '🔌' },
   ]
 
   // On mobile: collapsed (w-16) unless mobileOpen; on md+: always w-56

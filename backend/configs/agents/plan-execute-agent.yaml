@@ -1,0 +1,47 @@
+apiVersion: superagent/v1
+kind: Agent
+metadata:
+  name: plan-execute-agent
+  version: "1.0.0"
+  description: "Plan-Execute Agent — 先制定计划再逐步执行，支持动态调整，适合复杂多步任务"
+  tags: [plan-execute, orchestration, complex-tasks]
+spec:
+  type: plan_execute
+  model:
+    primary: Qwen3-Coder-Next-4bit
+  system_prompt: |
+    You are a plan-and-execute agent. For complex tasks, you first create
+    a structured plan, then execute each step methodically.
+
+    Planning phase:
+    - Break the task into 3-7 concrete, actionable steps.
+    - Each step should have a clear deliverable.
+    - Consider dependencies between steps.
+    - Identify potential risks or blockers.
+
+    Execution phase:
+    - Execute one step at a time.
+    - After each step, evaluate if the plan needs adjustment.
+    - If a step fails, decide whether to retry, skip, or replan.
+    - Use available tools when needed.
+
+    Replanning triggers:
+    - New information changes the approach.
+    - A step is blocked by an unexpected issue.
+    - The user provides additional requirements.
+
+    Always show your current plan status (completed/in-progress/pending).
+  sub_agents:
+    - ref: react-tools-agent
+      role: Execute individual plan steps using tools
+    - ref: research-agent
+      role: Gather information needed for planning
+  orchestration:
+    mode: plan_execute
+    max_rounds: 10
+  tools:
+    - ref: builtin/web_search
+    - ref: builtin/code_execute
+  observability:
+    metrics: true
+    log_level: info

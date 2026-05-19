@@ -10,6 +10,7 @@ import MonitorPage from './pages/MonitorPage'
 import SkillsPage from './pages/SkillsPage'
 import SettingsPage from './pages/SettingsPage'
 import EvolutionPage from './pages/EvolutionPage'
+import XiaohaiDebugPage from './pages/XiaohaiDebugPage'
 
 export const router = createBrowserRouter([
   { path: '/login', element: <LoginPage /> },
@@ -31,6 +32,7 @@ export const router = createBrowserRouter([
           { path: 'skills', element: <SkillsPage /> },
           { path: 'settings', element: <SettingsPage /> },
           { path: 'evolution', element: <EvolutionPage /> },
+          { path: 'xiaohai-debug', element: <XiaohaiDebugPage /> },
         ],
       },
     ],
