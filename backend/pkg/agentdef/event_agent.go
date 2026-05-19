@@ -20,6 +20,7 @@ import (
 	"context"
 	"strings"
 
+	"github.com/cloudwego/eino/callbacks"
 	"github.com/superagent-ai/superagent-base/backend/pkg/a2ui"
 )
 
@@ -47,6 +48,13 @@ func NewEventAgent(inner Agent) EventAgent {
 // the token stream are decoded; all other tokens become text delta events.
 func (e *eventAgentWrapper) ChatWithEvents(ctx context.Context, sessionID string, message string) (*a2ui.EventStream, error) {
 	stream := a2ui.NewEventStream(200)
+
+	// Attach the EventStream to context so the A2UI callback can emit
+	// tool_call/tool_result events during internal ReAct processing.
+	ctx = a2ui.WithEventStream(ctx, stream)
+
+	// Register the A2UI callback handler to intercept tool lifecycle events.
+	ctx = callbacks.InitCallbacks(ctx, &callbacks.RunInfo{Name: "a2ui-event-agent"}, a2ui.NewA2UICallback())
 
 	ch, err := e.Agent.Chat(ctx, sessionID, message)
 	if err != nil {

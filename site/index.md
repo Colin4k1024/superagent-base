@@ -91,6 +91,16 @@ features:
     details: 三级角色（viewer / editor / admin）+ API Key 认证门禁，前端未授权自动跳转登录页
     link: /guide/getting-started
     linkText: 查看认证
+  - icon: "\U0001F91D"
+    title: 集团小海对接
+    details: 兼容集团IT智能体输出规范 v1.0.0，作为二级智能体接入小海，支持流式/非流式双模式，execution_steps + answer + stream_end 标准事件
+    link: /api/http-sse
+    linkText: 查看接口
+  - icon: "\U0001F4AC"
+    title: 企业级 Chat UI
+    details: Markdown 渲染（代码高亮 + LaTeX）、深度思考可视化、工具调用卡片、智能滚动控制、停止生成，参考企业内部前端规范实现
+    link: /guide/getting-started
+    linkText: 查看 UI
   - icon: "\U0001F4BB"
     title: Web UI + CLI
     details: React + Vite + Tailwind 全功能前端（Agent 编辑器 / Workflow 画布 / 监控面板 / Skills 市场）+ sactl 命令行工具

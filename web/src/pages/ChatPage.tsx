@@ -1,8 +1,10 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { agentsApi, chatApi, type Agent, type ChatMessage } from '../lib/api'
+import { agentsApi, chatApi, type Agent, type ChatMessage, type ChatStreamCallbacks } from '../lib/api'
 import Header from '../components/Header'
+import MessageBubble from '../components/chat/MessageBubble'
+import ChatInput from '../components/chat/ChatInput'
 
 export default function ChatPage() {
   const { t } = useTranslation()
@@ -13,8 +15,14 @@ export default function ChatPage() {
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [sessionId] = useState(() => `session-${Date.now()}`)
-  const messagesEndRef = useRef<HTMLDivElement>(null)
+  const [showBackToBottom, setShowBackToBottom] = useState(false)
 
+  const messagesEndRef = useRef<HTMLDivElement>(null)
+  const scrollContainerRef = useRef<HTMLDivElement>(null)
+  const abortRef = useRef<AbortController | null>(null)
+  const userScrollingRef = useRef(false)
+
+  // Load agents
   useEffect(() => {
     agentsApi
       .list()
@@ -27,16 +35,40 @@ export default function ChatPage() {
           setSelectedAgent(list[0].name)
         }
       })
-      .catch(() => {
-        // Keep empty agents list on error — UI shows "No agents" state
-      })
+      .catch(() => {})
   }, [searchParams])
 
+  // Auto-scroll (only when user is not scrolling up)
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    if (!userScrollingRef.current) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    }
   }, [messages])
 
-  async function handleSend() {
+  // Scroll detection
+  const handleScroll = useCallback(() => {
+    const el = scrollContainerRef.current
+    if (!el) return
+    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight
+    userScrollingRef.current = distanceFromBottom > 100
+    setShowBackToBottom(distanceFromBottom > 300)
+  }, [])
+
+  const scrollToBottom = useCallback(() => {
+    userScrollingRef.current = false
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    setShowBackToBottom(false)
+  }, [])
+
+  // Stop generation
+  const handleStop = useCallback(() => {
+    abortRef.current?.abort()
+    abortRef.current = null
+    setIsLoading(false)
+  }, [])
+
+  // Send message
+  const handleSend = useCallback(() => {
     const text = input.trim()
     if (!text || !selectedAgent || isLoading) return
 
@@ -44,15 +76,14 @@ export default function ChatPage() {
     setMessages((prev) => [...prev, userMsg])
     setInput('')
     setIsLoading(true)
+    userScrollingRef.current = false
 
-    // Append empty assistant message; tokens will be appended via onToken
-    setMessages((prev) => [...prev, { role: 'assistant', content: '' }])
+    // Create assistant placeholder
+    const assistantMsg: ChatMessage = { role: 'assistant', content: '' }
+    setMessages((prev) => [...prev, assistantMsg])
 
-    await chatApi.sendMessage(
-      selectedAgent,
-      sessionId,
-      text,
-      (token) => {
+    const callbacks: ChatStreamCallbacks = {
+      onToken: (token) => {
         setMessages((prev) => {
           const updated = [...prev]
           const last = updated[updated.length - 1]
@@ -62,36 +93,82 @@ export default function ChatPage() {
           return updated
         })
       },
-      () => setIsLoading(false),
-      (err) => {
+      onThinking: (text) => {
         setMessages((prev) => {
           const updated = [...prev]
-          updated[updated.length - 1] = {
-            role: 'assistant',
-            content: `Error: ${err.message}`,
+          const last = updated[updated.length - 1]
+          if (last.role === 'assistant') {
+            updated[updated.length - 1] = {
+              ...last,
+              thinking: (last.thinking || '') + text,
+            }
+          }
+          return updated
+        })
+      },
+      onToolCall: (name, args) => {
+        setMessages((prev) => {
+          const updated = [...prev]
+          const last = updated[updated.length - 1]
+          if (last.role === 'assistant') {
+            const toolCalls = [...(last.toolCalls || [])]
+            toolCalls.push({ name, args, status: 'calling' })
+            updated[updated.length - 1] = { ...last, toolCalls }
+          }
+          return updated
+        })
+      },
+      onToolResult: (name: string, result: string) => {
+        setMessages((prev) => {
+          const updated = [...prev]
+          const last = updated[updated.length - 1]
+          if (last.role === 'assistant' && last.toolCalls) {
+            const toolCalls = [...last.toolCalls]
+            // Find last calling tool with this name
+            let idx = -1
+            for (let i = toolCalls.length - 1; i >= 0; i--) {
+              if (toolCalls[i].name === name && toolCalls[i].status === 'calling') {
+                idx = i
+                break
+              }
+            }
+            if (idx >= 0) {
+              toolCalls[idx] = { ...toolCalls[idx], result, status: 'done' }
+            }
+            updated[updated.length - 1] = { ...last, toolCalls }
+          }
+          return updated
+        })
+      },
+      onDone: () => {
+        setIsLoading(false)
+        abortRef.current = null
+      },
+      onError: (err) => {
+        setMessages((prev) => {
+          const updated = [...prev]
+          const last = updated[updated.length - 1]
+          if (last.role === 'assistant') {
+            updated[updated.length - 1] = { ...last, content: `Error: ${err.message}` }
           }
           return updated
         })
         setIsLoading(false)
+        abortRef.current = null
       },
-    )
-  }
-
-  function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault()
-      void handleSend()
     }
-  }
+
+    abortRef.current = chatApi.sendMessage(selectedAgent, sessionId, text, callbacks)
+  }, [input, selectedAgent, isLoading, sessionId])
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full bg-gradient-to-b from-gray-50 to-white">
       <Header
         title="Chat"
         actions={
           agents.length > 0 ? (
             <select
-              className="text-sm border border-gray-300 rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+              className="text-sm border border-gray-300 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white shadow-sm"
               value={selectedAgent}
               onChange={(e) => setSelectedAgent(e.target.value)}
             >
@@ -107,76 +184,71 @@ export default function ChatPage() {
         }
       />
 
-      {/* Message list */}
-      <div className="flex-1 overflow-y-auto p-6 space-y-4">
-        {messages.length === 0 && (
-          <div className="flex flex-col items-center justify-center h-full text-gray-400 gap-2">
-            <svg
-              className="w-10 h-10 opacity-30"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={1.5}
-                d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
-              />
-            </svg>
-            <p className="text-sm">{t('chat.placeholder')}</p>
-          </div>
-        )}
-
-        {messages.map((msg, i) => (
-          <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-            <div
-              className={`max-w-xl px-4 py-2.5 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap ${
-                msg.role === 'user'
-                  ? 'bg-blue-600 text-white rounded-br-none'
-                  : 'bg-white border border-gray-200 text-gray-800 rounded-bl-none'
-              }`}
-            >
-              {msg.content}
-              {msg.role === 'assistant' && isLoading && i === messages.length - 1 && (
-                <span className="inline-block w-1.5 h-3.5 bg-gray-400 animate-pulse ml-0.5 align-middle" />
+      {/* Message area */}
+      <div
+        ref={scrollContainerRef}
+        onScroll={handleScroll}
+        className="flex-1 overflow-y-auto"
+      >
+        <div className="max-w-[840px] mx-auto px-4 py-6 space-y-4">
+          {messages.length === 0 && (
+            <div className="flex flex-col items-center justify-center min-h-[50vh] text-gray-400 gap-3">
+              <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center">
+                <svg className="w-8 h-8 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={1.5}
+                    d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
+                  />
+                </svg>
+              </div>
+              <p className="text-sm">{t('chat.placeholder')}</p>
+              {selectedAgent && (
+                <p className="text-xs text-gray-300">
+                  当前 Agent: <span className="font-mono">{selectedAgent}</span>
+                </p>
               )}
             </div>
-          </div>
-        ))}
+          )}
 
-        <div ref={messagesEndRef} />
-      </div>
+          {messages.map((msg, i) => (
+            <MessageBubble
+              key={i}
+              message={msg}
+              isStreaming={isLoading}
+              isLast={i === messages.length - 1}
+            />
+          ))}
 
-      {/* Input area */}
-      <div className="border-t border-gray-200 bg-white p-4">
-        <div className="flex items-end gap-2 max-w-3xl mx-auto">
-          <textarea
-            className="flex-1 resize-none rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            rows={2}
-            placeholder={t('chat.placeholder')}
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            disabled={isLoading}
-          />
-          <button
-            className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
-            onClick={() => void handleSend()}
-            disabled={!input.trim() || isLoading}
-          >
-            {isLoading ? (
-              <span className="flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-white animate-bounce" />
-                <span className="w-2 h-2 rounded-full bg-white animate-bounce [animation-delay:0.15s]" />
-                <span className="w-2 h-2 rounded-full bg-white animate-bounce [animation-delay:0.3s]" />
-              </span>
-            ) : (
-              t('chat.send')
-            )}
-          </button>
+          <div ref={messagesEndRef} />
         </div>
       </div>
+
+      {/* Back to bottom button */}
+      {showBackToBottom && (
+        <div className="absolute bottom-24 left-1/2 -translate-x-1/2 z-10">
+          <button
+            onClick={scrollToBottom}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white border border-gray-200 shadow-lg text-xs text-gray-600 hover:bg-gray-50 transition-all"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+            </svg>
+            回到底部
+          </button>
+        </div>
+      )}
+
+      {/* Input area */}
+      <ChatInput
+        value={input}
+        onChange={setInput}
+        onSend={handleSend}
+        onStop={handleStop}
+        isLoading={isLoading}
+        disabled={!selectedAgent}
+      />
     </div>
   )
 }
