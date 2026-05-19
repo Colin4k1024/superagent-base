@@ -410,6 +410,161 @@ curl -N -X POST http://localhost:8888/api/v1/chat/stream \
   -d '{"agent_id":"research-agent","session_id":"s1","message":"hello"}'
 ```
 
+## 集团小海对接 API（集团IT智能体输出规范 v1.0.0）
+
+Superagent Base 可作为**二级智能体**接入海尔小海一级智能体平台，对外提供符合《集团IT智能体输出规范 v1.0.0》的标准接口。对接方式为**普通 API（Http 接口调用）**，支持流式和非流式两种模式。
+
+### 接口总览
+
+| 方法 | 路径 | 模式 | 说明 |
+|------|------|------|------|
+| `POST` | `/api/v1/xiaohai/stream/:agent_id` | 流式 SSE | 实时流式返回，每个 token/事件独立推送 |
+| `POST` | `/api/v1/xiaohai/chat/:agent_id` | 非流式 JSON | 等待完整响应后一次性返回 |
+
+### 请求规范
+
+**Header**：
+
+| 名称 | 说明 | 是否必填 |
+|------|------|---------|
+| `Api-Key` | 鉴权密钥（对应环境变量 `ADMIN_API_KEY`，空则不验证） | 否（生产必填） |
+| `Access-Token` | 用户身份 token | 否 |
+| `Content-Type` | 固定 `application/json` | 是 |
+
+**Request Body**：
+
+```json
+{
+  "userQuery": "用户输入的问题",
+  "userToken": "用户身份token",
+  "terminalType": "PC",
+  "sessionId": "会话ID（用于多轮对话上下文）",
+  "hisMsg": [
+    {"human": "第一轮问题", "ai": "第一轮回答"},
+    {"human": "第二轮问题", "ai": "第二轮回答"}
+  ],
+  "fileList": [
+    {"fileName": "文件名", "fileUrl": "文件地址"}
+  ],
+  "ext_param": {
+    "biz_id": "业务自定义参数"
+  }
+}
+```
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `userQuery` | string | 是 | 用户输入内容 |
+| `userToken` | string | 否 | 用户身份 token |
+| `terminalType` | string | 否 | 终端类型：`PC` / `MOBILE` |
+| `sessionId` | string | 否 | 会话 ID，用于多轮对话（不传则自动生成） |
+| `hisMsg` | array | 否 | 历史对话（最多 5 轮） |
+| `fileList` | array | 否 | 文件附件列表 |
+| `ext_param` | object | 否 | 业务自定义扩展参数 |
+
+### 流式输出规范
+
+每条 SSE `data:` 行输出一个 JSON 对象，严格遵循集团规范格式：
+
+```json
+{"type":"<业务类型>","data":{"content_type":"<格式>","content":"<内容>"},"version":"1.0.0"}
+```
+
+**支持的业务类型（type）**：
+
+| type | 说明 | 触发时机 |
+|------|------|---------|
+| `execution_steps` | 执行步骤 | Agent 调用工具时，告知用户正在执行什么 |
+| `execution_steps_end` | 执行步骤结束 | 工具调用完成 |
+| `think` | 深度思考 | 模型推理过程（如启用 thinking） |
+| `answer` | 回答内容 | 文本/Markdown 流式输出 |
+| `stream_end` | 流式结束 | 整个响应完成 |
+
+**content_type 类型**：
+
+| content_type | 说明 |
+|------|------|
+| `text` | 纯文本 |
+| `markdown` | Markdown 富文本（默认） |
+| `card` | 卡片（one 链打开） |
+| `link` | 链接（侧边/跳转打开） |
+| `json` | 结构化 JSON 数据 |
+
+### 流式输出完整示例
+
+```bash
+curl -N -X POST http://localhost:8888/api/v1/xiaohai/stream/react-tools-agent \
+  -H "Api-Key: your-key" \
+  -H "Access-Token: user-token" \
+  -H "Content-Type: application/json" \
+  -d '{"userQuery":"帮我查一下今天北京的天气","sessionId":"s1","terminalType":"PC"}'
+```
+
+**响应（SSE 逐行推送）**：
+
+```
+data: {"type":"execution_steps","data":{"content_type":"markdown","content":"正在调用 web_search ..."},"version":"1.0.0"}
+
+data: {"type":"execution_steps_end","version":"1.0.0"}
+
+data: {"type":"answer","data":{"content_type":"markdown","content":"根据"},"version":"1.0.0"}
+
+data: {"type":"answer","data":{"content_type":"markdown","content":"搜索结果"},"version":"1.0.0"}
+
+data: {"type":"answer","data":{"content_type":"markdown","content":"，北京今天晴转多云..."},"version":"1.0.0"}
+
+data: {"type":"stream_end","version":"1.0.0"}
+```
+
+### 非流式输出示例
+
+```bash
+curl -X POST http://localhost:8888/api/v1/xiaohai/chat/research-agent \
+  -H "Api-Key: your-key" \
+  -H "Content-Type: application/json" \
+  -d '{"userQuery":"1+1等于几","sessionId":"s2","terminalType":"PC"}'
+```
+
+**响应**：
+
+```json
+{
+  "code": 0,
+  "data": {
+    "type": "answer",
+    "data": {
+      "content_type": "markdown",
+      "content": "1 + 1 等于 **2**。"
+    },
+    "version": "1.0.0"
+  }
+}
+```
+
+### 错误响应
+
+| HTTP 状态码 | 说明 |
+|------------|------|
+| 400 | 参数错误（缺少 userQuery 或请求体格式错误） |
+| 401 | Api-Key 验证失败 |
+| 404 | Agent 不存在（agent_id 无效） |
+| 500 | 服务端内部错误 |
+
+```json
+{"code": 1, "message": "agent not found: unknown-agent"}
+```
+
+### 与内部 A2UI 接口的关系
+
+| 接口 | 格式 | 用途 |
+|------|------|------|
+| `/api/v1/chat/stream` | A2UI 结构化事件 | 平台内部前端使用 |
+| `/api/v1/xiaohai/stream/:agent_id` | 集团 IT 智能体规范 | 对外对接小海一级智能体 |
+
+两套接口共享同一个 Agent 引擎，输出格式通过适配器层自动转换，互不影响。
+
+---
+
 ## 技术栈
 
 | 层 | 选型 |
