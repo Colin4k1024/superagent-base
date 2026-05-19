@@ -146,24 +146,251 @@ features:
 | `workflow` | DAG 图执行，拓扑排序 + 变量映射 |
 | `eino_graph` | 原生 Eino Graph，VS Code 插件可视化编排后注册 |
 
-## 内置 Agent 案例一览
+## 内置 Agent 案例一览（14 个）
 
-开箱即用的 14 个 Agent 模板，参考 [eino-examples](https://github.com/cloudwego/eino-examples) 官方案例：
+开箱即用的典型 AI Agent 模板，参考 [cloudwego/eino-examples](https://github.com/cloudwego/eino-examples) 官方案例设计，覆盖所有主流 Agent 架构模式。
 
-| 分类 | Agent | 场景 |
-|------|-------|------|
-| 基础能力 | `react-tools-agent` | ReAct 推理循环 + web_search / http_request / code_execute |
-| | `rag-knowledge-agent` | 检索增强生成，附带引用来源 |
-| | `code-assistant` | 自主编程循环（分析 → 编码 → 验证 → 修复） |
-| | `data-analyst` | Python 代码执行进行数据分析 |
-| 多 Agent | `team-supervisor` | Supervisor 协调 researcher / coder / tools 三人团队 |
-| | `plan-execute-agent` | 先规划 3-7 步，逐步执行，动态调整 |
-| | `parallel-analysis` | 多视角并行分析，综合结论 |
-| | `sequential-pipeline` | 翻译 → 润色 → 校对 三步 DAG 流水线 |
-| 人机协作 | `approval-workflow` | 敏感操作审批门禁（中断/恢复） |
-| | `feedback-writer` | 迭代写作：生成 → 反馈 → 优化循环 |
+### 基础能力 — 单 Agent 场景
 
-> 所有定义在 `configs/agents/*.yaml`，热加载无需重启。
+#### `research-agent` — 通用研究助手
+
+| 字段 | 值 |
+|------|---|
+| 类型 | `chat_model_agent` |
+| 工具 | 无（纯对话） |
+| 场景 | 通用问答、信息整理、知识解释 |
+
+```yaml
+spec:
+  type: chat_model_agent
+  system_prompt: "You are a helpful research assistant..."
+```
+
+#### `react-tools-agent` — ReAct 工具调用
+
+| 字段 | 值 |
+|------|---|
+| 类型 | `chat_model_agent` + 3 工具 |
+| 工具 | `builtin/web_search` + `builtin/http_request` + `builtin/code_execute` |
+| 场景 | 需要搜索、API 调用或代码执行的复杂任务 |
+| 模式 | Think → Act → Observe → Respond 循环 |
+
+```yaml
+spec:
+  type: chat_model_agent
+  tools:
+    - ref: builtin/web_search
+    - ref: builtin/http_request
+    - ref: builtin/code_execute
+```
+
+#### `rag-knowledge-agent` — RAG 知识问答
+
+| 字段 | 值 |
+|------|---|
+| 类型 | `chat_model_agent` + search |
+| 场景 | 基于文档检索回答问题，附带引用来源 |
+| 特点 | 搜索 → 分析 → 综合 → 引用来源 |
+
+```yaml
+spec:
+  type: chat_model_agent
+  system_prompt: |
+    Answer based on retrieved documents. Always cite sources.
+    Never fabricate information not found in documents.
+  tools:
+    - ref: builtin/web_search
+```
+
+#### `code-assistant` — 自主编程循环
+
+| 字段 | 值 |
+|------|---|
+| 类型 | `agentloop`（最多 15 轮） |
+| 工具 | `builtin/code_execute` + `builtin/web_search` |
+| 场景 | 自主编码：分析需求 → 编写代码 → 执行验证 → 修复问题 |
+| 完成信号 | 输出 `[DONE]` 终止循环 |
+
+```yaml
+spec:
+  type: agentloop
+  max_turns: 15
+  tools:
+    - ref: builtin/code_execute
+    - ref: builtin/web_search
+```
+
+#### `data-analyst` — 数据分析
+
+| 字段 | 值 |
+|------|---|
+| 类型 | `chat_model_agent` + code_execute |
+| 场景 | 统计分析、数据清洗、趋势识别 |
+| 输出 | Summary → Key Findings → Details → Recommendations |
+
+```yaml
+spec:
+  type: chat_model_agent
+  model:
+    temperature: 0.1
+  tools:
+    - ref: builtin/code_execute
+    - ref: builtin/http_request
+```
+
+---
+
+### 多 Agent 编排 — 协作场景
+
+#### `team-supervisor` — 团队 Supervisor
+
+| 字段 | 值 |
+|------|---|
+| 类型 | `supervisor`（最多 8 轮） |
+| 子 Agent | `research-agent` + `code-assistant` + `react-tools-agent` |
+| 场景 | 复杂任务自动分派给专业子 Agent 协作完成 |
+
+```yaml
+spec:
+  type: supervisor
+  sub_agents:
+    - ref: research-agent
+      role: Research and factual questions
+    - ref: code-assistant
+      role: Code writing and debugging
+    - ref: react-tools-agent
+      role: Web search and API calls
+  orchestration:
+    mode: supervisor
+    max_rounds: 8
+```
+
+#### `plan-execute-agent` — 先规划后执行
+
+| 字段 | 值 |
+|------|---|
+| 类型 | `plan_execute`（最多 10 轮） |
+| 子 Agent | `react-tools-agent` + `research-agent` |
+| 场景 | 制定 3-7 步计划 → 逐步执行 → 动态调整 |
+| 特点 | 遇到新信息或阻塞时自动重新规划 |
+
+```yaml
+spec:
+  type: plan_execute
+  sub_agents:
+    - ref: react-tools-agent
+    - ref: research-agent
+  orchestration:
+    mode: plan_execute
+    max_rounds: 10
+```
+
+#### `parallel-analysis` — 并行多视角分析
+
+| 字段 | 值 |
+|------|---|
+| 类型 | `parallel` |
+| 子 Agent | `research-agent`（事实分析）+ `react-tools-agent`（技术分析） |
+| 场景 | 同时从多角度分析，综合得出结论 |
+
+```yaml
+spec:
+  type: parallel
+  sub_agents:
+    - ref: research-agent
+      role: "Factual analysis — data and evidence"
+    - ref: react-tools-agent
+      role: "Technical analysis — feasibility and trade-offs"
+```
+
+#### `sequential-pipeline` — 顺序流水线
+
+| 字段 | 值 |
+|------|---|
+| 类型 | `workflow`（3 节点 DAG） |
+| 流程 | 翻译 → 润色 → 校对 |
+| 场景 | 每步输出作为下一步输入的固定流程 |
+
+```yaml
+spec:
+  type: workflow
+  workflow:
+    nodes:
+      - id: translate
+        type: llm_call
+        prompt: "Translate the text..."
+      - id: polish
+        type: llm_call
+        prompt: "Polish the translation..."
+      - id: proofread
+        type: llm_call
+        prompt: "Proofread for errors..."
+    edges:
+      - { from: START, to: translate }
+      - { from: translate, to: polish }
+      - { from: polish, to: proofread }
+      - { from: proofread, to: END }
+```
+
+#### `research-workflow` — 研究报告流水线
+
+| 字段 | 值 |
+|------|---|
+| 类型 | `workflow`（3 节点 DAG） |
+| 流程 | 搜索 → 分析 → 格式化 Markdown 报告 |
+
+---
+
+### 人机协作 — 中断/审批场景
+
+#### `approval-agent` — 安全确认
+
+| 字段 | 值 |
+|------|---|
+| 类型 | `chat_model_agent` + interrupt |
+| 场景 | 执行危险操作（删除、发送、支付）前暂停等待确认 |
+| 恢复 | `POST /api/v1/chat/resume` 传入确认结果 |
+
+#### `approval-workflow` — 审批工作流
+
+| 字段 | 值 |
+|------|---|
+| 类型 | `chat_model_agent` + interrupt + tools |
+| 工具 | `builtin/http_request` + `builtin/code_execute` |
+| 场景 | 完整审批门禁：识别敏感操作 → 暂停 → 确认/取消 → 执行/放弃 |
+| 超时 | 600 秒未确认自动过期 |
+
+```yaml
+spec:
+  type: chat_model_agent
+  tools:
+    - ref: builtin/http_request
+    - ref: builtin/code_execute
+  interrupt:
+    enabled: true
+    checkpoint_backend: memory
+    timeout_seconds: 600
+```
+
+#### `feedback-writer` — 迭代写作
+
+| 字段 | 值 |
+|------|---|
+| 类型 | `agentloop`（最多 8 轮） |
+| 场景 | 生成内容 → 等待用户反馈 → 根据反馈修改 → 循环直到满意 |
+| 输出 | 每次修改说明变更原因和保留原因 |
+
+```yaml
+spec:
+  type: agentloop
+  model:
+    temperature: 0.7
+  max_turns: 8
+```
+
+---
+
+> 所有 Agent 定义在 `backend/configs/agents/*.yaml`，支持 fsnotify **热加载**，修改后无需重启即生效。
 
 ## 快速体验
 
