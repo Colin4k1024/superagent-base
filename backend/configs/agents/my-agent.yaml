@@ -1,0 +1,15 @@
+apiVersion: superagent/v1
+kind: Agent
+metadata:
+  name: my-agent
+  version: "1.0.0"
+spec:
+  type: chat_model_agent
+  model:
+      primary: MiniMax-M2
+      fallback: MiniMax-M2
+      base_url: https://api.minimaxi.com/v1
+      api_key_env: sk-cp-7juy_M9ROyoUGl5q4efR9E3TJfimP3yAqw3Q3sxIaDRw_LOI5cHYHMkVUIbPG2-ReAg8yr9qhAZMIl6NxNO9LDzwXBjXIGPatnWvpgBGW7f0EaUCpaCFsBA
+  system_prompt: |
+    HR-Agent
+  tools: []
