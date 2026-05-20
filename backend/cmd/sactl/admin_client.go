@@ -66,17 +66,17 @@ type ValidateResult struct {
 
 // ApplyAgent sends the YAML definition to the admin API.
 // It first extracts the agent name from the YAML, then attempts
-// PUT /api/v1/admin/agents/:name.  On a 404 it falls back to
-// POST /api/v1/admin/agents.
+// PUT /api/v2/admin/agents/:name.  On a 404 it falls back to
+// POST /api/v2/admin/agents.
 func (c *AdminClient) ApplyAgent(name string, yamlContent []byte) (*ApplyResult, error) {
 	// Try PUT (update) first.
-	body, status, err := c.doRequest(http.MethodPut, "/api/v1/admin/agents/"+name, yamlContent)
+	body, status, err := c.doRequest(http.MethodPut, "/api/v2/admin/agents/"+name, yamlContent)
 	if err != nil {
 		return nil, err
 	}
 	if status == http.StatusNotFound {
 		// Fall back to POST (create).
-		body, status, err = c.doRequest(http.MethodPost, "/api/v1/admin/agents", yamlContent)
+		body, status, err = c.doRequest(http.MethodPost, "/api/v2/admin/agents", yamlContent)
 		if err != nil {
 			return nil, err
 		}
@@ -98,9 +98,9 @@ func (c *AdminClient) ApplyAgent(name string, yamlContent []byte) (*ApplyResult,
 }
 
 // ValidateAgent sends the YAML definition to the remote validate endpoint.
-// POST /api/v1/admin/agents/validate
+// POST /api/v2/admin/agents/validate
 func (c *AdminClient) ValidateAgent(yamlContent []byte) (*ValidateResult, error) {
-	body, status, err := c.doRequest(http.MethodPost, "/api/v1/admin/agents/validate", yamlContent)
+	body, status, err := c.doRequest(http.MethodPost, "/api/v2/admin/agents/validate", yamlContent)
 	if err != nil {
 		return nil, err
 	}

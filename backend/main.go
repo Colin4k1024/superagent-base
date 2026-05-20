@@ -177,6 +177,12 @@ func main() {
 	// resolve mcp:// tool references at build time.
 	mcpRegistry := mcp.NewRegistry()
 
+	// Shared Redis client — used by memory backend, interrupt checkpoint store, and webhook store.
+	// Created once at startup so all subsystems share the same connection pool.
+	redisAddr := getEnv("REDIS_ADDR", "127.0.0.1:6379")
+	redisPwd := getEnv("REDIS_PASSWORD", "")
+	redisClient := redis.NewWithAddrAndPassword(redisAddr, redisPwd)
+
 	// Build the AgentRuntime that powers YAML-defined agents.
 	// Single builder construction — SkillManager and MCPRegistry conditionally added.
 	builderOpts := []agentdef.BuilderOption{
@@ -186,15 +192,15 @@ func main() {
 			ModelID: getEnv("MODEL_ID_0", "Qwen3-Coder-Next-4bit"),
 		}),
 		agentdef.WithMemoryFactory(func(cfg memory.BackendConfig) (memory.Backend, error) {
-			redisAddr := getEnv("REDIS_ADDR", "127.0.0.1:6379")
-			redisPwd := getEnv("REDIS_PASSWORD", "")
-			c := redis.NewWithAddrAndPassword(redisAddr, redisPwd)
-			b := builtin.NewWithCache(c)
+			b := builtin.NewWithCache(redisClient)
 			if err := b.Init(ctx, cfg); err != nil {
 				return nil, err
 			}
 			return b, nil
 		}),
+		// INJ-001: Inject Redis client so interrupt checkpoint state is stored in Redis,
+		// enabling cross-pod resume in multi-replica deployments.
+		agentdef.WithRedisClient(redisClient),
 	}
 	builderOpts = append(builderOpts, agentdef.WithToolManager(toolMgr))
 	builderOpts = append(builderOpts, agentdef.WithMCPRegistry(mcpRegistry))
@@ -237,8 +243,17 @@ func main() {
 	}
 
 	// WHK-001: Initialise webhook dispatcher and register global accessor.
+	// WHK-002: Use Redis-backed store when Redis is available so subscriptions survive
+	// pod restarts and are visible across all replicas. Falls back to MemoryStore otherwise.
 	webhookWorkers := int(conv.StrToInt64D(getEnv("WEBHOOK_WORKERS", "4"), 4))
-	webhookStore := webhook.NewMemoryStore()
+	var webhookStore webhook.Store
+	if redisClient != nil {
+		webhookStore = webhook.NewRedisStore(redisClient)
+		logs.Infof("webhook store: using Redis backend")
+	} else {
+		webhookStore = webhook.NewMemoryStore()
+		logs.Infof("webhook store: using in-memory backend (Redis unavailable)")
+	}
 	webhookDispatcher := webhook.NewDispatcher(webhookStore, webhookWorkers)
 	webhookDispatcher.Start(ctx)
 	webhook.InitGlobalDispatcher(webhookDispatcher)
@@ -313,12 +328,12 @@ func startHttpServer(agentRT *agentdef.AgentRuntime, skillMgr *skill.Manager, mc
 
 	// Agent SSE endpoints — direct streaming without the Coze conversation pipeline.
 	chatSSE := cozehandler.NewChatSSEHandler(agentRT)
-	s.POST("/api/v1/chat/stream", chatSSE.HandleChatStream)
-	s.GET("/api/v1/agents", chatSSE.HandleListAgents)
+	s.POST("/api/v1/chat/stream", middleware.DeprecationMW("/api/v2"), chatSSE.HandleChatStream)
+	s.GET("/api/v1/agents", middleware.DeprecationMW("/api/v2"), chatSSE.HandleListAgents)
 
 	// Admin/monitoring endpoints — protected by AdminAuthMW (key validation + rate limiting).
 	adminH := cozehandler.NewAdminHandler(agentRT)
-	adminGroup := s.Group("/api/v1/admin", middleware.APIKeyAdminAuthMW(userStore))
+	adminGroup := s.Group("/api/v1/admin", middleware.APIKeyAdminAuthMW(userStore), middleware.DeprecationMW("/api/v2"))
 	adminGroup.GET("/status", adminH.HandleStatus)
 	adminGroup.POST("/reload", adminH.HandleReload)
 	adminGroup.GET("/logs", adminH.HandleLogStream)
@@ -368,10 +383,151 @@ func startHttpServer(agentRT *agentdef.AgentRuntime, skillMgr *skill.Manager, mc
 	xiaohaiGroup.POST("/stream/:agent_id", xiaohaiH.HandleStream)
 	xiaohaiGroup.POST("/chat/:agent_id", xiaohaiH.HandleNonStream)
 
-	// Skill management API endpoints.
+	// Skill management API endpoints (v1, deprecated).
 	registerSkillRoutes(s, skillMgr, userStore)
 
+	// V2 canonical API — same handlers, no deprecation headers.
+	registerV2Routes(s, chatSSE, adminH, agentAdmin, userAdmin, mcpAdmin, evoAdmin, webhookH, xiaohaiH, skillMgr, userStore)
+
 	s.Spin()
+}
+
+// registerV2Routes registers all v2 canonical routes using the same handlers as v1.
+// v2 routes do not carry deprecation headers.
+func registerV2Routes(
+	s *server.Hertz,
+	chatSSE *cozehandler.ChatSSEHandler,
+	adminH *cozehandler.AdminHandler,
+	agentAdmin *cozehandler.AgentAdminHandler,
+	userAdmin *cozehandler.UserAdminHandler,
+	mcpAdmin *cozehandler.MCPAdminHandler,
+	evoAdmin *cozehandler.EvolutionAdminHandler,
+	webhookH *cozehandler.WebhookHandler,
+	xiaohaiH *cozehandler.XiaohaiHandler,
+	skillMgr *skill.Manager,
+	userStore *rbac.UserStore,
+) {
+	// Chat endpoints.
+	s.POST("/api/v2/chat/stream", chatSSE.HandleChatStream)
+	s.GET("/api/v2/agents", chatSSE.HandleListAgents)
+
+	// Admin/monitoring endpoints — same auth as v1.
+	adminGroup := s.Group("/api/v2/admin", middleware.APIKeyAdminAuthMW(userStore))
+	adminGroup.GET("/status", adminH.HandleStatus)
+	adminGroup.POST("/reload", adminH.HandleReload)
+	adminGroup.GET("/logs", adminH.HandleLogStream)
+
+	// Agent CRUD.
+	adminGroup.GET("/agents", middleware.RequirePermission("agents", "read"), agentAdmin.HandleList)
+	adminGroup.POST("/agents/validate", middleware.RequirePermission("agents", "read"), agentAdmin.HandleValidate)
+	adminGroup.GET("/agents/:name", middleware.RequirePermission("agents", "read"), agentAdmin.HandleGet)
+	adminGroup.POST("/agents", middleware.RequirePermission("agents", "write"), agentAdmin.HandleCreate)
+	adminGroup.PUT("/agents/:name", middleware.RequirePermission("agents", "write"), agentAdmin.HandleUpdate)
+	adminGroup.DELETE("/agents/:name", middleware.RequirePermission("agents", "delete"), agentAdmin.HandleDelete)
+
+	// User CRUD.
+	adminGroup.GET("/users", userAdmin.HandleList)
+	adminGroup.POST("/users", userAdmin.HandleCreate)
+	adminGroup.PUT("/users/:id", userAdmin.HandleUpdate)
+	adminGroup.DELETE("/users/:id", userAdmin.HandleDelete)
+
+	// MCP server management.
+	adminGroup.GET("/mcp/servers", mcpAdmin.HandleList)
+	adminGroup.POST("/mcp/servers", middleware.RequirePermission("config", "write"), mcpAdmin.HandleConnect)
+	adminGroup.DELETE("/mcp/servers/:name", middleware.RequirePermission("config", "write"), mcpAdmin.HandleDisconnect)
+	adminGroup.GET("/mcp/servers/:name/tools", mcpAdmin.HandleListTools)
+
+	// Evolution management.
+	adminGroup.GET("/evolution/stats", evoAdmin.HandleStats)
+	adminGroup.GET("/evolution/genes", evoAdmin.HandleListGenes)
+	adminGroup.GET("/evolution/federated", evoAdmin.HandleFederatedSearch)
+
+	// Webhook management.
+	adminGroup.POST("/webhooks", webhookH.HandleCreate)
+	adminGroup.GET("/webhooks", webhookH.HandleList)
+	adminGroup.GET("/webhooks/:id", webhookH.HandleGet)
+	adminGroup.PUT("/webhooks/:id", webhookH.HandleUpdate)
+	adminGroup.DELETE("/webhooks/:id", webhookH.HandleDelete)
+	adminGroup.POST("/webhooks/:id/test", webhookH.HandleTest)
+	adminGroup.GET("/webhooks/:id/logs", webhookH.HandleLogs)
+
+	// 集团小海 — v2 path uses same handlers.
+	xiaohaiGroup := s.Group("/api/v2/xiaohai")
+	xiaohaiGroup.POST("/stream/:agent_id", xiaohaiH.HandleStream)
+	xiaohaiGroup.POST("/chat/:agent_id", xiaohaiH.HandleNonStream)
+
+	// Skill management (v2).
+	registerSkillV2Routes(s, skillMgr, userStore)
+}
+
+func registerSkillV2Routes(s *server.Hertz, mgr *skill.Manager, userStore *rbac.UserStore) {
+	if mgr == nil {
+		return
+	}
+
+	// GET /api/v2/skills
+	s.GET("/api/v2/skills", func(c context.Context, ctx *app.RequestContext) {
+		installed := mgr.ListInstalled()
+		items := make([]map[string]any, 0, len(installed))
+		for _, inst := range installed {
+			items = append(items, map[string]any{
+				"name":        inst.Meta.Name,
+				"version":     inst.Meta.Version,
+				"description": inst.Meta.Description,
+				"status":      inst.Status,
+			})
+		}
+		ctx.JSON(200, map[string]any{"skills": items})
+	})
+
+	// GET /api/v2/skills/search?q=
+	s.GET("/api/v2/skills/search", func(c context.Context, ctx *app.RequestContext) {
+		query := string(ctx.QueryArgs().Peek("q"))
+		if query == "" {
+			ctx.JSON(400, map[string]any{"error": "query parameter 'q' is required"})
+			return
+		}
+		results, err := mgr.Search(c, query, skill.SearchOpts{Limit: 20})
+		if err != nil {
+			ctx.JSON(502, map[string]any{"error": err.Error()})
+			return
+		}
+		ctx.JSON(200, map[string]any{"skills": results})
+	})
+
+	skillAdmin := s.Group("/api/v2/skills",
+		middleware.APIKeyAdminAuthMW(userStore),
+		middleware.RequirePermission("config", "write"),
+	)
+
+	skillAdmin.POST("/install", func(c context.Context, ctx *app.RequestContext) {
+		var req struct {
+			Name    string `json:"name"`
+			Version string `json:"version"`
+		}
+		if err := ctx.BindJSON(&req); err != nil {
+			ctx.JSON(400, map[string]any{"error": "invalid request body"})
+			return
+		}
+		if req.Name == "" {
+			ctx.JSON(400, map[string]any{"error": "name is required"})
+			return
+		}
+		if req.Version == "" {
+			req.Version = "latest"
+		}
+		if err := mgr.Install(c, req.Name, req.Version); err != nil {
+			ctx.JSON(502, map[string]any{"error": err.Error()})
+			return
+		}
+		ctx.JSON(200, map[string]any{"status": "installed", "name": req.Name, "version": req.Version})
+	})
+
+	skillAdmin.DELETE("/:name", func(_ context.Context, ctx *app.RequestContext) {
+		name := ctx.Param("name")
+		mgr.Uninstall(name)
+		ctx.JSON(200, map[string]any{"status": "uninstalled", "name": name})
+	})
 }
 
 func registerSkillRoutes(s *server.Hertz, mgr *skill.Manager, userStore *rbac.UserStore) {
@@ -380,7 +536,7 @@ func registerSkillRoutes(s *server.Hertz, mgr *skill.Manager, userStore *rbac.Us
 	}
 
 	// GET /api/v1/skills — list installed skills (public, no auth required)
-	s.GET("/api/v1/skills", func(c context.Context, ctx *app.RequestContext) {
+	s.GET("/api/v1/skills", middleware.DeprecationMW("/api/v2"), func(c context.Context, ctx *app.RequestContext) {
 		installed := mgr.ListInstalled()
 		items := make([]map[string]any, 0, len(installed))
 		for _, inst := range installed {
@@ -395,7 +551,7 @@ func registerSkillRoutes(s *server.Hertz, mgr *skill.Manager, userStore *rbac.Us
 	})
 
 	// GET /api/v1/skills/search?q= — search SkillHub (public, no auth required)
-	s.GET("/api/v1/skills/search", func(c context.Context, ctx *app.RequestContext) {
+	s.GET("/api/v1/skills/search", middleware.DeprecationMW("/api/v2"), func(c context.Context, ctx *app.RequestContext) {
 		query := string(ctx.QueryArgs().Peek("q"))
 		if query == "" {
 			ctx.JSON(400, map[string]any{"error": "query parameter 'q' is required"})
@@ -413,6 +569,7 @@ func registerSkillRoutes(s *server.Hertz, mgr *skill.Manager, userStore *rbac.Us
 	skillAdmin := s.Group("/api/v1/skills",
 		middleware.APIKeyAdminAuthMW(userStore),
 		middleware.RequirePermission("config", "write"),
+		middleware.DeprecationMW("/api/v2"),
 	)
 
 	// POST /api/v1/skills/install — install a skill

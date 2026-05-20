@@ -27,18 +27,18 @@ class AdminClient:
     async def status(self) -> Dict[str, Any]:
         """Return system status.
 
-        Calls ``GET /api/v1/admin/status``.
+        Calls ``GET /api/v2/admin/status``.
         """
-        resp = await self._http.get("/api/v1/admin/status")
+        resp = await self._http.get("/api/v2/admin/status")
         _raise_for_status(resp)
         return resp.json()
 
     async def reload(self) -> Dict[str, Any]:
         """Hot-reload all agent YAML files.
 
-        Calls ``POST /api/v1/admin/reload``.
+        Calls ``POST /api/v2/admin/reload``.
         """
-        resp = await self._http.post("/api/v1/admin/reload")
+        resp = await self._http.post("/api/v2/admin/reload")
         _raise_for_status(resp)
         return resp.json()
 
@@ -49,9 +49,9 @@ class AdminClient:
     async def list_agents(self) -> List[AgentInfo]:
         """Return all registered agents.
 
-        Calls ``GET /api/v1/admin/agents``.
+        Calls ``GET /api/v2/admin/agents``.
         """
-        resp = await self._http.get("/api/v1/admin/agents")
+        resp = await self._http.get("/api/v2/admin/agents")
         _raise_for_status(resp)
         payload = resp.json()
         agents_raw = payload.get("agents", payload) if isinstance(payload, dict) else payload
@@ -60,22 +60,22 @@ class AdminClient:
     async def get_agent(self, name: str) -> Dict[str, Any]:
         """Return full definition and raw YAML for a single agent.
 
-        Calls ``GET /api/v1/admin/agents/:name``.
+        Calls ``GET /api/v2/admin/agents/:name``.
         """
-        resp = await self._http.get(f"/api/v1/admin/agents/{name}")
+        resp = await self._http.get(f"/api/v2/admin/agents/{name}")
         _raise_for_status(resp)
         return resp.json()
 
     async def create_agent(self, yaml_content: str) -> ApplyResult:
         """Create a new agent from YAML.
 
-        Calls ``POST /api/v1/admin/agents``.
+        Calls ``POST /api/v2/admin/agents``.
 
         Args:
             yaml_content: Full agent YAML definition string.
         """
         resp = await self._http.post(
-            "/api/v1/admin/agents",
+            "/api/v2/admin/agents",
             json={"yaml": yaml_content},
         )
         _raise_for_status(resp)
@@ -84,14 +84,14 @@ class AdminClient:
     async def update_agent(self, name: str, yaml_content: str) -> ApplyResult:
         """Update an existing agent's YAML definition.
 
-        Calls ``PUT /api/v1/admin/agents/:name``.
+        Calls ``PUT /api/v2/admin/agents/:name``.
 
         Args:
             name: Agent name (must match ``metadata.name`` in the YAML).
             yaml_content: Updated agent YAML definition string.
         """
         resp = await self._http.put(
-            f"/api/v1/admin/agents/{name}",
+            f"/api/v2/admin/agents/{name}",
             json={"yaml": yaml_content},
         )
         _raise_for_status(resp)
@@ -100,21 +100,21 @@ class AdminClient:
     async def delete_agent(self, name: str) -> None:
         """Delete an agent by name.
 
-        Calls ``DELETE /api/v1/admin/agents/:name``.
+        Calls ``DELETE /api/v2/admin/agents/:name``.
         """
-        resp = await self._http.delete(f"/api/v1/admin/agents/{name}")
+        resp = await self._http.delete(f"/api/v2/admin/agents/{name}")
         _raise_for_status(resp)
 
     async def validate_agent(self, yaml_content: str) -> ValidateResult:
         """Validate an agent YAML without persisting it.
 
-        Calls ``POST /api/v1/admin/agents/validate``.
+        Calls ``POST /api/v2/admin/agents/validate``.
 
         Args:
             yaml_content: Agent YAML definition string to validate.
         """
         resp = await self._http.post(
-            "/api/v1/admin/agents/validate",
+            "/api/v2/admin/agents/validate",
             json={"yaml": yaml_content},
         )
         _raise_for_status(resp)

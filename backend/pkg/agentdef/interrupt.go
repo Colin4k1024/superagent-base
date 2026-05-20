@@ -178,20 +178,20 @@ func (a *InterruptableAgent) Chat(ctx context.Context, sessionID string, message
 
 // Resume continues execution from an interrupted state with user-supplied input.
 func (a *InterruptableAgent) Resume(ctx context.Context, sessionID string, input map[string]any) (<-chan string, error) {
-	state, ok := a.getInterruptState(sessionID)
+	state, ok := a.getInterruptState(ctx, sessionID)
 	if !ok {
 		return nil, fmt.Errorf("agentdef: Resume: no interrupt state for session %q", sessionID)
 	}
 
-	a.clearInterruptState(sessionID)
+	a.clearInterruptState(a.interruptKey(sessionID))
 
 	resumeMsg := formatResumeInput(state, input)
 	return a.inner.Chat(ctx, sessionID, resumeMsg)
 }
 
 // GetInterruptState returns the current interrupt state for a session.
-func (a *InterruptableAgent) GetInterruptState(_ context.Context, sessionID string) (*InterruptState, bool) {
-	return a.getInterruptState(sessionID)
+func (a *InterruptableAgent) GetInterruptState(ctx context.Context, sessionID string) (*InterruptState, bool) {
+	return a.getInterruptState(ctx, sessionID)
 }
 
 // ─── internal helpers ─────────────────────────────────────────────────────────
@@ -216,7 +216,10 @@ func (a *InterruptableAgent) detectInterrupt(response, sessionID string) *Interr
 }
 
 // saveInterruptState persists the interrupt state both in-memory and in the store.
+// Both memory and store use interruptKey(sessionID) so multi-replica resume works.
 func (a *InterruptableAgent) saveInterruptState(ctx context.Context, sessionID string, state *InterruptState) error {
+	key := a.interruptKey(sessionID)
+
 	a.mu.Lock()
 	// Evict expired entries and enforce maxSize (LRU by expiry).
 	now := time.Now()
@@ -239,7 +242,7 @@ func (a *InterruptableAgent) saveInterruptState(ctx context.Context, sessionID s
 			delete(a.interrupts, oldestKey)
 		}
 	}
-	a.interrupts[sessionID] = &interruptEntry{
+	a.interrupts[key] = &interruptEntry{
 		state:     state,
 		expiresAt: time.Now().Add(a.timeout),
 	}
@@ -250,34 +253,75 @@ func (a *InterruptableAgent) saveInterruptState(ctx context.Context, sessionID s
 		if err != nil {
 			return fmt.Errorf("agentdef: saveInterruptState: marshal: %w", err)
 		}
-		if err := a.store.Set(ctx, state.CheckpointID, data); err != nil {
+		if err := a.store.Set(ctx, key, data); err != nil {
 			return fmt.Errorf("agentdef: saveInterruptState: store.Set: %w", err)
 		}
 	}
 	return nil
 }
 
-// getInterruptState returns the interrupt state for a session, checking
-// expiry. Returns false if not found or expired.
-func (a *InterruptableAgent) getInterruptState(sessionID string) (*InterruptState, bool) {
-	a.mu.RLock()
-	entry, ok := a.interrupts[sessionID]
-	a.mu.RUnlock()
-	if !ok {
-		return nil, false
-	}
-	if time.Now().After(entry.expiresAt) {
-		a.clearInterruptState(sessionID)
-		return nil, false
-	}
-	return entry.state, true
+// interruptKey returns the storage key for a session's interrupt state.
+// Using a dedicated key helper ensures both memory and Redis use the same
+// namespace, which is required for cross-pod resume in multi-replica deployments.
+func (a *InterruptableAgent) interruptKey(sessionID string) string {
+	return "interrupt:" + sessionID
 }
 
-// clearInterruptState removes the interrupt entry for a session.
-func (a *InterruptableAgent) clearInterruptState(sessionID string) {
+// getInterruptState returns the interrupt state for a session, checking
+// expiry. Returns false if not found or expired.
+// On a memory miss it falls back to the CheckpointStore (Redis) so that
+// resume requests routed to a different pod can still locate the state.
+func (a *InterruptableAgent) getInterruptState(ctx context.Context, sessionID string) (*InterruptState, bool) {
+	key := a.interruptKey(sessionID)
+
+	// 1. Check in-memory cache first (fast path).
+	a.mu.RLock()
+	entry, ok := a.interrupts[key]
+	a.mu.RUnlock()
+	if ok {
+		if time.Now().After(entry.expiresAt) {
+			a.clearInterruptState(key)
+			return nil, false
+		}
+		return entry.state, true
+	}
+
+	// 2. Memory miss — fall back to CheckpointStore (Redis in multi-replica mode).
+	if a.store != nil {
+		data, found, err := a.store.Get(ctx, key)
+		// Empty data is a tombstone written by clearInterruptState; treat as absent.
+		if err == nil && found && len(data) > 0 {
+			var state InterruptState
+			if jsonErr := json.Unmarshal(data, &state); jsonErr == nil {
+				// Populate memory cache so subsequent calls are fast.
+				a.mu.Lock()
+				a.interrupts[key] = &interruptEntry{
+					state:     &state,
+					expiresAt: time.Now().Add(a.timeout),
+				}
+				a.mu.Unlock()
+				return &state, true
+			}
+		}
+	}
+
+	return nil, false
+}
+
+// clearInterruptState removes the interrupt entry for a session from both memory
+// and the CheckpointStore. The key parameter must already be the full storage key
+// (i.e. the result of interruptKey).
+// A zero-byte tombstone is written to the store so that a Redis-fallback lookup
+// on a different pod cannot resurrect a cleared (resumed) state.
+func (a *InterruptableAgent) clearInterruptState(key string) {
 	a.mu.Lock()
-	delete(a.interrupts, sessionID)
+	delete(a.interrupts, key)
 	a.mu.Unlock()
+
+	// Write a tombstone (zero bytes) so the store fallback treats this key as absent.
+	if a.store != nil {
+		_ = a.store.Set(context.Background(), key, []byte{})
+	}
 }
 
 // formatResumeInput builds a user message from the interrupt state and the

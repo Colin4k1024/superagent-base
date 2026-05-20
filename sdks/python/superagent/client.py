@@ -102,7 +102,7 @@ class SuperagentClient:
         ``async for`` or :meth:`~superagent.streaming.A2UIStream.collect`
         to consume events.
 
-        Calls ``POST /api/v1/chat/stream`` with the ``X-A2UI: true`` header.
+        Calls ``POST /api/v2/chat/stream`` with the ``X-A2UI: true`` header.
 
         Args:
             agent_id: Name of the target agent.
@@ -112,7 +112,7 @@ class SuperagentClient:
         return _LazyStream(
             client=self._http,
             method="POST",
-            url="/api/v1/chat/stream",
+            url="/api/v2/chat/stream",
             json={
                 "agent_id": agent_id,
                 "message": message,
@@ -129,7 +129,7 @@ class SuperagentClient:
     ) -> A2UIStream:
         """Resume a paused agent after an interrupt.
 
-        Calls ``POST /api/v1/chat/resume``.
+        Calls ``POST /api/v2/chat/resume``.
 
         Args:
             agent_id: Name of the agent that raised the interrupt.
@@ -141,7 +141,7 @@ class SuperagentClient:
         """
         req = self._http.build_request(
             "POST",
-            "/api/v1/chat/resume",
+            "/api/v2/chat/resume",
             json={"agent_id": agent_id, "session_id": session_id, "input": input},
             headers={"X-A2UI": "true", "Accept": "text/event-stream"},
         )
@@ -156,9 +156,9 @@ class SuperagentClient:
     async def list_agents(self) -> List[AgentInfo]:
         """Return all live agents exposed by the server.
 
-        Calls ``GET /api/v1/agents``.
+        Calls ``GET /api/v2/agents``.
         """
-        resp = await self._http.get("/api/v1/agents")
+        resp = await self._http.get("/api/v2/agents")
         _raise_for_status(resp)
         payload = resp.json()
         agents_raw = payload.get("agents", payload) if isinstance(payload, dict) else payload
