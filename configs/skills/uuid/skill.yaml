@@ -1,0 +1,23 @@
+name: uuid
+version: "1.0.0"
+author: superagent-ai
+description: Generates a cryptographically random UUID v4.
+tags:
+  - utility
+  - id
+triggers:
+  - "generate uuid"
+  - "new uuid"
+  - "random id"
+  - "生成UUID"
+input:
+  type: object
+  properties: {}
+output:
+  type: object
+  properties:
+    uuid:
+      type: string
+      description: UUID v4 string, e.g. "550e8400-e29b-41d4-a716-446655440000"
+runtime:
+  type: embedded

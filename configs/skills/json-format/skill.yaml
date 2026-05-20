@@ -1,0 +1,46 @@
+name: json-format
+version: "1.0.0"
+author: superagent-ai
+description: Formats, validates, minifies JSON strings, or extracts top-level keys.
+tags:
+  - utility
+  - json
+triggers:
+  - "format json"
+  - "validate json"
+  - "minify json"
+  - "格式化JSON"
+input:
+  type: object
+  required:
+    - json
+    - operation
+  properties:
+    json:
+      type: string
+      description: Raw JSON string to process
+    operation:
+      type: string
+      description: "One of: pretty, minify, validate, keys"
+    indent:
+      type: integer
+      description: Indent spaces for pretty operation (default 2)
+output:
+  type: object
+  properties:
+    result:
+      type: string
+      description: Processed JSON string (pretty/minify operations)
+    valid:
+      type: boolean
+      description: Whether the JSON is valid (validate operation)
+    keys:
+      type: array
+      description: Top-level keys (keys operation)
+      items:
+        type: string
+    error:
+      type: string
+      description: Parse error message if JSON is invalid
+runtime:
+  type: embedded

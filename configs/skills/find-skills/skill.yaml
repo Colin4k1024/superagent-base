@@ -1,0 +1,51 @@
+name: find-skills
+version: "1.0.0"
+author: superagent-ai
+description: Searches the skills.sh marketplace for agent skills by keyword.
+tags:
+  - marketplace
+  - discovery
+triggers:
+  - "find skills"
+  - "search skills"
+  - "查找技能"
+input:
+  type: object
+  required:
+    - query
+  properties:
+    query:
+      type: string
+      description: Search keyword, e.g. "react testing", "deployment"
+    limit:
+      type: integer
+      description: Maximum number of results to return (default 10)
+output:
+  type: object
+  properties:
+    skills:
+      type: array
+      description: List of matching skills
+      items:
+        type: object
+        properties:
+          name:
+            type: string
+          source:
+            type: string
+          description:
+            type: string
+          installs:
+            type: integer
+          url:
+            type: string
+          install_cmd:
+            type: string
+    count:
+      type: integer
+      description: Number of results returned
+    tip:
+      type: string
+      description: Usage suggestion for the agent
+runtime:
+  type: embedded
