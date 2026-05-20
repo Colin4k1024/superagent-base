@@ -58,3 +58,4 @@ tests/e2e/reports/
 # Playwright
 web/test-results/
 web/playwright-report/
+backend/backend
