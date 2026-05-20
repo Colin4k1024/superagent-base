@@ -22,16 +22,19 @@
 //	sactl skill install <name>@<version>
 //	sactl skill list
 //	sactl skill uninstall <name>
-//	sactl agent apply -f <yaml-file>
+//	sactl agent apply   -f <yaml-file> [--dry-run] [--output json|table]
+//	sactl agent validate -f <yaml-file> [--remote]  [--output json|table]
 package main
 
 import (
 	"context"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
 	"strings"
 
+	"github.com/superagent-ai/superagent-base/backend/pkg/agentdef"
 	"github.com/superagent-ai/superagent-base/backend/pkg/skill"
 )
 
@@ -57,15 +60,24 @@ func printUsage() {
 	fmt.Fprintln(os.Stderr, `sactl - Superagent control CLI
 
 Usage:
-  sactl skill search <query>
-  sactl skill install <name>@<version>
-  sactl skill list
-  sactl skill uninstall <name>
-  sactl agent apply -f <yaml-file>
+  sactl skill search <query>              Search the SkillsHub for skills
+  sactl skill install <name>@<version>    Install a skill
+  sactl skill list                        List installed skills
+  sactl skill uninstall <name>            Uninstall a skill
+
+  sactl agent apply    -f <yaml-file>     Apply an agent definition
+                       [--dry-run]          Validate only, do not send to server
+                       [--output json|table] Output format (default: table)
+
+  sactl agent validate -f <yaml-file>     Validate an agent definition locally
+                       [--remote]           Also validate against the server
+                       [--output json|table] Output format (default: table)
 
 Environment variables:
-  SKILLSHUB_URL    Base URL for the SkillsHub service (default: http://localhost:8080)
-  SKILLSHUB_TOKEN  Authentication token for the SkillsHub service`)
+  SKILLSHUB_URL         Base URL for the SkillsHub service (default: http://localhost:8080)
+  SKILLSHUB_TOKEN       Authentication token for the SkillsHub service
+  SUPERAGENT_URL        Base URL for the Superagent server  (default: http://localhost:8888)
+  SUPERAGENT_ADMIN_KEY  Bearer token for admin API endpoints`)
 }
 
 // hubClient returns a configured HubClient using environment variables.
@@ -188,14 +200,27 @@ func runSkillUninstall(args []string) {
 }
 
 func runAgent(args []string) {
-	fs := flag.NewFlagSet("agent apply", flag.ExitOnError)
-	yamlFile := fs.String("f", "", "path to agent YAML definition file")
-	if err := fs.Parse(args); err != nil {
+	if len(args) < 1 {
+		fmt.Fprintln(os.Stderr, "usage: sactl agent <apply|validate> -f <yaml-file>")
 		os.Exit(1)
 	}
+	switch args[0] {
+	case "apply":
+		runAgentApply(args[1:])
+	case "validate":
+		runAgentValidate(args[1:])
+	default:
+		fmt.Fprintf(os.Stderr, "unknown agent subcommand: %s\n", args[0])
+		os.Exit(1)
+	}
+}
 
-	if fs.NArg() == 0 || fs.Arg(0) != "apply" {
-		fmt.Fprintln(os.Stderr, "usage: sactl agent apply -f <yaml-file>")
+func runAgentApply(args []string) {
+	fs := flag.NewFlagSet("agent apply", flag.ExitOnError)
+	yamlFile := fs.String("f", "", "path to agent YAML definition file")
+	dryRun := fs.Bool("dry-run", false, "validate only, do not send to server")
+	output := fs.String("output", "table", "output format: table or json")
+	if err := fs.Parse(args); err != nil {
 		os.Exit(1)
 	}
 	if *yamlFile == "" {
@@ -203,6 +228,135 @@ func runAgent(args []string) {
 		os.Exit(1)
 	}
 
-	// Placeholder: agent apply is not yet implemented.
-	fmt.Printf("[placeholder] would apply agent definition from: %s\n", *yamlFile)
+	data, err := os.ReadFile(*yamlFile)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error reading file: %v\n", err)
+		os.Exit(1)
+	}
+
+	// Local validation.
+	errs := localValidate(data)
+	if len(errs) > 0 {
+		printValidateResult("", false, errs, *output)
+		os.Exit(1)
+	}
+
+	// Parse once more to extract the name for the PUT path.
+	def, _ := agentdef.Parse(data)
+
+	if *dryRun {
+		printApplyResult(def.Metadata.Name, string(def.Spec.Type), "dry-run", "local validation passed", *output)
+		return
+	}
+
+	client := NewAdminClient()
+	result, err := client.ApplyAgent(def.Metadata.Name, data)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "apply failed: %v\n", err)
+		os.Exit(1)
+	}
+	agentType := string(def.Spec.Type)
+	printApplyResult(result.Name, agentType, result.Status, result.Message, *output)
+}
+
+func runAgentValidate(args []string) {
+	fs := flag.NewFlagSet("agent validate", flag.ExitOnError)
+	yamlFile := fs.String("f", "", "path to agent YAML definition file")
+	remote := fs.Bool("remote", false, "also validate against the server")
+	output := fs.String("output", "table", "output format: table or json")
+	if err := fs.Parse(args); err != nil {
+		os.Exit(1)
+	}
+	if *yamlFile == "" {
+		fmt.Fprintln(os.Stderr, "error: -f flag is required")
+		os.Exit(1)
+	}
+
+	data, err := os.ReadFile(*yamlFile)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error reading file: %v\n", err)
+		os.Exit(1)
+	}
+
+	// Local validation.
+	errs := localValidate(data)
+	if len(errs) > 0 {
+		printValidateResult(*yamlFile, false, errs, *output)
+		os.Exit(1)
+	}
+
+	// Remote validation (optional).
+	if *remote {
+		client := NewAdminClient()
+		result, err := client.ValidateAgent(data)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "remote validate failed: %v\n", err)
+			os.Exit(1)
+		}
+		if !result.Valid {
+			printValidateResult(*yamlFile, false, result.Errors, *output)
+			os.Exit(1)
+		}
+		printValidateResult(*yamlFile, true, nil, *output)
+		return
+	}
+
+	printValidateResult(*yamlFile, true, nil, *output)
+}
+
+// localValidate parses and validates YAML content using the agentdef package.
+// Returns a slice of error strings (empty means valid).
+func localValidate(yamlContent []byte) []string {
+	_, err := agentdef.Parse(yamlContent)
+	if err != nil {
+		return []string{err.Error()}
+	}
+	return nil
+}
+
+// printApplyResult prints the result of an apply operation in the requested format.
+func printApplyResult(name, agentType, status, message, format string) {
+	if format == "json" {
+		out := map[string]string{
+			"name":    name,
+			"type":    agentType,
+			"status":  status,
+			"message": message,
+		}
+		b, _ := json.Marshal(out)
+		fmt.Println(string(b))
+		return
+	}
+	// table
+	fmt.Printf("%-30s %-20s %-10s %s\n", "NAME", "TYPE", "STATUS", "MESSAGE")
+	fmt.Printf("%-30s %-20s %-10s %s\n", name, agentType, status, message)
+}
+
+// printValidateResult prints the result of a validate operation.
+func printValidateResult(name string, valid bool, errs []string, format string) {
+	if name == "" {
+		name = "-"
+	}
+	validStr := "true"
+	if !valid {
+		validStr = "false"
+	}
+	errStr := strings.Join(errs, "; ")
+
+	if format == "json" {
+		out := map[string]interface{}{
+			"name":   name,
+			"valid":  valid,
+			"errors": errs,
+		}
+		if errs == nil {
+			out["errors"] = []string{}
+		}
+		b, _ := json.Marshal(out)
+		fmt.Println(string(b))
+		return
+	}
+	// table
+	fmt.Printf("%-30s %-7s %s\n", "NAME", "VALID", "ERRORS")
+	fmt.Printf("%-30s %-7s %s\n", name, validStr, errStr)
 }
