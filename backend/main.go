@@ -621,25 +621,44 @@ func loadEnv() (err error) {
 // resolveClaudeSkillsDir returns the directory that contains Claude Code SKILL.md files.
 // Resolution order:
 //  1. CLAUDE_SKILLS_DIR env var (explicit override)
-//  2. <cwd>/.claude/skills (typical development layout)
-//  3. <exe-dir>/../.claude/skills (deployment layout where binary is in bin/)
+//  2. Walk up from cwd looking for .claude/skills (handles `cd backend && go run .`)
+//  3. Walk up from exe dir looking for .claude/skills (deployment layout)
+//  4. /skills (system-wide fallback)
 func resolveClaudeSkillsDir() string {
 	if dir := os.Getenv("CLAUDE_SKILLS_DIR"); dir != "" {
 		return dir
 	}
-	// Try cwd/.claude/skills
+	// Walk up from cwd — handles both project-root and backend/ launch paths.
 	if cwd, err := os.Getwd(); err == nil {
-		candidate := filepath.Join(cwd, ".claude", "skills")
-		if info, err := os.Stat(candidate); err == nil && info.IsDir() {
-			return candidate
+		if dir := walkUpForSkills(cwd); dir != "" {
+			return dir
 		}
 	}
-	// Try exe-dir/../.claude/skills (when running from bin/)
+	// Walk up from the executable's real path.
 	if exe, err := os.Executable(); err == nil {
-		candidate := filepath.Join(filepath.Dir(exe), "..", ".claude", "skills")
+		if dir := walkUpForSkills(filepath.Dir(exe)); dir != "" {
+			return dir
+		}
+	}
+	// System-wide fallback.
+	return "/skills"
+}
+
+// walkUpForSkills traverses from start toward the filesystem root, stopping at
+// the first directory that contains a .claude/skills subdirectory.
+// Stops after 8 levels to avoid unbounded traversal.
+func walkUpForSkills(start string) string {
+	dir := start
+	for i := 0; i < 8; i++ {
+		candidate := filepath.Join(dir, ".claude", "skills")
 		if info, err := os.Stat(candidate); err == nil && info.IsDir() {
 			return candidate
 		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			break // reached filesystem root
+		}
+		dir = parent
 	}
 	return ""
 }
