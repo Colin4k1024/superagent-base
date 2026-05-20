@@ -12,7 +12,12 @@ vendor/
 backend/.env
 backend/.env.*
 !backend/.env.example
+backend/backend
+backend/bin/
 crash.log
+
+# Protobuf generated (re-generate with: make proto-gen)
+backend/api/grpc/gen/**/*.pb.go
 
 # Docker data
 docker/data/
