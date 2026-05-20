@@ -29,6 +29,9 @@ import (
 	"github.com/superagent-ai/superagent-base/backend/pkg/observe"
 )
 
+// Ensure DefaultRouter satisfies the extended interface at compile time.
+var _ Router = (*DefaultRouter)(nil)
+
 // Router selects a model for a given RouteRequest.
 type Router interface {
 	// Route selects the primary model and its fallback chain.
@@ -63,9 +66,10 @@ type RouteResult struct {
 // slice of strategies; Route() tries each strategy in order and returns on the
 // first successful match.
 type DefaultRouter struct {
-	mu         sync.RWMutex
+	mu        sync.RWMutex
 	strategies []Strategy
 	providers  map[string]ProviderConfig
+	feedback   *FeedbackCollector // nil when feedback is disabled
 }
 
 // NewDefaultRouter constructs a DefaultRouter from a RouterConfig.
@@ -75,6 +79,32 @@ func NewDefaultRouter(cfg *RouterConfig) (*DefaultRouter, error) {
 		return nil, err
 	}
 	return r, nil
+}
+
+// RecordOutcome feeds real-time outcome data back into the adaptive routing
+// subsystem. It is a no-op when feedback is disabled.
+//
+// latency is the time-to-first-token (TTFT).
+// totalDur is the full request duration (used for TPS calculation).
+// inputTokens and outputTokens are the token counts for cost tracking.
+// callErr is non-nil when the model call failed.
+func (r *DefaultRouter) RecordOutcome(modelID string, latency, totalDur time.Duration, inputTokens, outputTokens int, callErr error) {
+	r.mu.RLock()
+	fc := r.feedback
+	r.mu.RUnlock()
+
+	if fc == nil {
+		return
+	}
+
+	outcome := OutcomeSuccess
+	if callErr != nil {
+		outcome = OutcomeFailure
+	}
+
+	fc.RecordLatency(modelID, latency, totalDur, outputTokens)
+	fc.RecordOutcome(modelID, outcome)
+	fc.RecordTokens(modelID, inputTokens, outputTokens)
 }
 
 // Reload replaces the running configuration atomically. Safe to call concurrently.
@@ -94,11 +124,68 @@ func (r *DefaultRouter) Reload(cfg *RouterConfig) error {
 		providers[k] = v
 	}
 
+	var fc *FeedbackCollector
+	if cfg.Feedback != nil && cfg.Feedback.Enabled {
+		fc = buildFeedbackCollector(cfg)
+		// Prepend the AdaptiveStrategy so it runs before static strategies.
+		adaptive := buildAdaptiveStrategy(cfg, fc)
+		strategies = append([]Strategy{adaptive}, strategies...)
+	}
+
 	r.mu.Lock()
 	r.strategies = strategies
 	r.providers = providers
+	r.feedback = fc
 	r.mu.Unlock()
 	return nil
+}
+
+// buildFeedbackCollector constructs a FeedbackCollector from a RouterConfig.
+func buildFeedbackCollector(cfg *RouterConfig) *FeedbackCollector {
+	fb := cfg.Feedback
+	alpha := fb.EMAAlpha
+	if alpha <= 0 {
+		alpha = 0.1
+	}
+	minSamples := fb.MinSamples
+	if minSamples <= 0 {
+		minSamples = 5
+	}
+	staleDur := 5 * time.Minute
+	if fb.StaleDuration != "" {
+		if d, err := time.ParseDuration(fb.StaleDuration); err == nil {
+			staleDur = d
+		}
+	}
+
+	pricing := make(map[string]PricingInfo, len(cfg.Providers))
+	for id, pc := range cfg.Providers {
+		pricing[id] = pc.Pricing
+	}
+
+	cbCfg := fb.CircuitBreaker
+	if cbCfg.ErrorThreshold <= 0 {
+		cbCfg = DefaultCircuitBreakerConfig()
+	}
+
+	return NewFeedbackCollector(alpha, minSamples, staleDur, pricing, cbCfg)
+}
+
+// buildAdaptiveStrategy constructs an AdaptiveStrategy using all known provider
+// IDs as candidates and the default score weights.
+func buildAdaptiveStrategy(cfg *RouterConfig, fc *FeedbackCollector) *AdaptiveStrategy {
+	candidates := make([]string, 0, len(cfg.Providers))
+	for id := range cfg.Providers {
+		candidates = append(candidates, id)
+	}
+
+	// Default fallback: first provider alphabetically (deterministic).
+	fallback := ""
+	if len(cfg.Strategies) > 0 && cfg.Strategies[0].Fallback != "" {
+		fallback = cfg.Strategies[0].Fallback
+	}
+
+	return NewAdaptiveStrategy(fc, candidates, DefaultScoreWeights(), fallback)
 }
 
 // Route iterates over strategies in order and returns on the first match.
@@ -170,6 +257,8 @@ func newStrategyFromConfig(sc StrategyConfig) Strategy {
 		return NewCostStrategy(sc)
 	case "latency-optimized":
 		return NewLatencyStrategy(sc)
+	// "adaptive" is wired separately via buildAdaptiveStrategy when
+	// feedback.enabled=true; skip it here to avoid a no-op placeholder.
 	default:
 		// Generic rule-based strategy for any other named strategy.
 		return &ruleBasedStrategy{

@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 )
 
 // ─── mock agent ──────────────────────────────────────────────────────────────
@@ -512,5 +513,399 @@ spec:
 	_, err := Parse([]byte(yaml))
 	if err == nil {
 		t.Fatal("expected error when sub_agents ref is empty, got nil")
+	}
+}
+
+// ─── SupervisorAgent V2 delegation tests ─────────────────────────────────────
+
+// mockMainAgentDelegating returns a JSON delegation directive on the first call,
+// then a plain-text final answer on the second call.
+type mockMainAgentDelegating struct {
+	name      string
+	callCount int
+	responses []string
+	def       *AgentDefinition
+}
+
+func (m *mockMainAgentDelegating) Name() string                    { return m.name }
+func (m *mockMainAgentDelegating) Description() string             { return "delegating mock" }
+func (m *mockMainAgentDelegating) GetDefinition() *AgentDefinition { return m.def }
+
+func (m *mockMainAgentDelegating) Chat(_ context.Context, _ string, _ string) (<-chan string, error) {
+	ch := make(chan string, 1)
+	resp := ""
+	if m.callCount < len(m.responses) {
+		resp = m.responses[m.callCount]
+	}
+	m.callCount++
+	ch <- resp
+	close(ch)
+	return ch, nil
+}
+
+func TestSupervisorV2_SingleDelegation(t *testing.T) {
+	subA := newMockAgent("worker-a", "worker-a result")
+
+	main := &mockMainAgentDelegating{
+		name: "main",
+		// Round 1: delegate to worker-a; Round 2: final answer
+		responses: []string{
+			`{"delegations":[{"agent_name":"worker-a","task":"do the thing"}]}`,
+			"Final answer based on worker-a result.",
+		},
+		def: newMockAgent("main", "").def,
+	}
+
+	def := &AgentDefinition{
+		APIVersion: "superagent/v1",
+		Kind:       "Agent",
+		Metadata:   Metadata{Name: "sv"},
+		Spec: AgentSpec{
+			Type:         "supervisor",
+			SystemPrompt: "You coordinate.",
+			SubAgents:    []SubAgentRef{{Ref: "worker-a"}},
+			Orchestration: &OrchestrationSpec{
+				Mode:      "supervisor",
+				MaxRounds: 5,
+			},
+		},
+	}
+
+	dt := &delegateTool{
+		subAgents:   map[string]Agent{"worker-a": subA},
+		timeout:     5 * time.Second,
+		fallback:    "ask_supervisor",
+		parallelMax: 3,
+	}
+
+	sv := &SupervisorAgent{
+		name:      "sv",
+		mainAgent: main,
+		subAgents: map[string]Agent{"worker-a": subA},
+		maxRounds: 5,
+		delegate:  dt,
+		def:       def,
+	}
+
+	ch, err := sv.Chat(context.Background(), "session-1", "start task")
+	if err != nil {
+		t.Fatalf("Chat error: %v", err)
+	}
+	var buf strings.Builder
+	for tok := range ch {
+		buf.WriteString(tok)
+	}
+	output := buf.String()
+	if !strings.Contains(output, "Final answer") {
+		t.Errorf("expected final answer in output, got: %q", output)
+	}
+}
+
+func TestSupervisorV2_ParallelDelegation(t *testing.T) {
+	subA := newMockAgent("agent-a", "result-a")
+	subB := newMockAgent("agent-b", "result-b")
+
+	main := &mockMainAgentDelegating{
+		name: "main",
+		responses: []string{
+			`{"delegations":[{"agent_name":"agent-a","task":"task A"},{"agent_name":"agent-b","task":"task B"}]}`,
+			"Both done.",
+		},
+		def: newMockAgent("main", "").def,
+	}
+
+	def := &AgentDefinition{
+		APIVersion: "superagent/v1",
+		Kind:       "Agent",
+		Metadata:   Metadata{Name: "sv-par"},
+		Spec: AgentSpec{
+			Type:         "supervisor",
+			SystemPrompt: "Coordinate.",
+			SubAgents:    []SubAgentRef{{Ref: "agent-a"}, {Ref: "agent-b"}},
+			Orchestration: &OrchestrationSpec{
+				Mode:      "supervisor",
+				MaxRounds: 5,
+				Delegation: &DelegationConfig{
+					ParallelMax: 2,
+					Timeout:     "5s",
+				},
+			},
+		},
+	}
+
+	dt := &delegateTool{
+		subAgents:   map[string]Agent{"agent-a": subA, "agent-b": subB},
+		timeout:     5 * time.Second,
+		fallback:    "ask_supervisor",
+		parallelMax: 2,
+	}
+
+	sv := &SupervisorAgent{
+		name:      "sv-par",
+		mainAgent: main,
+		subAgents: map[string]Agent{"agent-a": subA, "agent-b": subB},
+		maxRounds: 5,
+		delegate:  dt,
+		def:       def,
+	}
+
+	ch, err := sv.Chat(context.Background(), "session-2", "start")
+	if err != nil {
+		t.Fatalf("Chat error: %v", err)
+	}
+	var buf strings.Builder
+	for tok := range ch {
+		buf.WriteString(tok)
+	}
+	output := buf.String()
+	if !strings.Contains(output, "Both done") {
+		t.Errorf("expected final 'Both done' in output, got: %q", output)
+	}
+}
+
+func TestSupervisorV2_MaxRoundsExceeded(t *testing.T) {
+	subA := newMockAgent("worker", "result")
+
+	// main always delegates — never produces a final answer.
+	main := &mockMainAgentDelegating{
+		name: "main",
+		responses: []string{
+			`{"delegations":[{"agent_name":"worker","task":"loop"}]}`,
+			`{"delegations":[{"agent_name":"worker","task":"loop"}]}`,
+			`{"delegations":[{"agent_name":"worker","task":"loop"}]}`,
+		},
+		def: newMockAgent("main", "").def,
+	}
+
+	def := &AgentDefinition{
+		Metadata: Metadata{Name: "sv-loop"},
+		Spec: AgentSpec{
+			Type:         "supervisor",
+			SystemPrompt: "Loop forever.",
+			Orchestration: &OrchestrationSpec{
+				Mode:      "supervisor",
+				MaxRounds: 2,
+			},
+		},
+	}
+
+	dt := &delegateTool{
+		subAgents:   map[string]Agent{"worker": subA},
+		timeout:     5 * time.Second,
+		fallback:    "ask_supervisor",
+		parallelMax: 3,
+	}
+
+	sv := &SupervisorAgent{
+		name:      "sv-loop",
+		mainAgent: main,
+		subAgents: map[string]Agent{"worker": subA},
+		maxRounds: 2,
+		delegate:  dt,
+		def:       def,
+	}
+
+	ch, err := sv.Chat(context.Background(), "session-3", "start")
+	if err != nil {
+		t.Fatalf("Chat error: %v", err)
+	}
+	var buf strings.Builder
+	for tok := range ch {
+		buf.WriteString(tok)
+	}
+	output := buf.String()
+	if !strings.Contains(output, "max rounds") {
+		t.Errorf("expected max rounds message, got: %q", output)
+	}
+}
+
+func TestSupervisorV2_TimeoutFallback(t *testing.T) {
+	// slowAgent blocks until context is cancelled.
+	slowAgent := &mockAgentSlow{name: "slow", delay: 500 * time.Millisecond}
+
+	main := &mockMainAgentDelegating{
+		name: "main",
+		responses: []string{
+			`{"delegations":[{"agent_name":"slow","task":"be slow"}]}`,
+			"Done after timeout.",
+		},
+		def: newMockAgent("main", "").def,
+	}
+
+	def := &AgentDefinition{
+		Metadata: Metadata{Name: "sv-timeout"},
+		Spec: AgentSpec{
+			Type:         "supervisor",
+			SystemPrompt: "Test timeout.",
+			Orchestration: &OrchestrationSpec{
+				Mode:      "supervisor",
+				MaxRounds: 5,
+				Delegation: &DelegationConfig{
+					Timeout:          "10ms",
+					FallbackStrategy: "ask_supervisor",
+				},
+			},
+		},
+	}
+
+	dt := &delegateTool{
+		subAgents:   map[string]Agent{"slow": slowAgent},
+		timeout:     10 * time.Millisecond,
+		fallback:    "ask_supervisor",
+		parallelMax: 3,
+	}
+
+	sv := &SupervisorAgent{
+		name:      "sv-timeout",
+		mainAgent: main,
+		subAgents: map[string]Agent{"slow": slowAgent},
+		maxRounds: 5,
+		delegate:  dt,
+		def:       def,
+	}
+
+	ch, err := sv.Chat(context.Background(), "session-4", "start")
+	if err != nil {
+		t.Fatalf("Chat error: %v", err)
+	}
+	var buf strings.Builder
+	for tok := range ch {
+		buf.WriteString(tok)
+	}
+	output := buf.String()
+	// The slow agent times out; supervisor gets a "timeout" result and then
+	// the main agent produces a final answer on the next round.
+	if !strings.Contains(output, "Done after timeout") {
+		t.Errorf("expected final answer after timeout, got: %q", output)
+	}
+}
+
+// mockAgentSlow sleeps for `delay` before returning, simulating a slow sub-agent.
+type mockAgentSlow struct {
+	name  string
+	delay time.Duration
+	def   *AgentDefinition
+}
+
+func (m *mockAgentSlow) Name() string                    { return m.name }
+func (m *mockAgentSlow) Description() string             { return "slow mock" }
+func (m *mockAgentSlow) GetDefinition() *AgentDefinition { return m.def }
+
+func (m *mockAgentSlow) Chat(ctx context.Context, _ string, _ string) (<-chan string, error) {
+	ch := make(chan string, 1)
+	go func() {
+		defer close(ch)
+		select {
+		case <-time.After(m.delay):
+			ch <- "slow result"
+		case <-ctx.Done():
+		}
+	}()
+	return ch, nil
+}
+
+// ─── delegateTool unit tests ──────────────────────────────────────────────────
+
+func TestDelegateTool_Execute_Success(t *testing.T) {
+	worker := newMockAgent("w", "worker output")
+	dt := &delegateTool{
+		subAgents:   map[string]Agent{"w": worker},
+		timeout:     5 * time.Second,
+		fallback:    "skip",
+		parallelMax: 3,
+	}
+
+	out := dt.execute(context.Background(), DelegateToolInput{
+		AgentName: "w",
+		Task:      "do work",
+	})
+	if out.Status != "success" {
+		t.Errorf("status = %q, want success", out.Status)
+	}
+	if out.Result != "worker output" {
+		t.Errorf("result = %q, want %q", out.Result, "worker output")
+	}
+}
+
+func TestDelegateTool_Execute_MissingAgent(t *testing.T) {
+	dt := &delegateTool{
+		subAgents:   map[string]Agent{},
+		timeout:     5 * time.Second,
+		fallback:    "skip",
+		parallelMax: 3,
+	}
+	out := dt.execute(context.Background(), DelegateToolInput{AgentName: "ghost", Task: "x"})
+	if out.Status != "error" {
+		t.Errorf("status = %q, want error", out.Status)
+	}
+}
+
+func TestDelegateTool_ExecuteDelegations_Parallel(t *testing.T) {
+	a := newMockAgent("a", "result-a")
+	b := newMockAgent("b", "result-b")
+	dt := &delegateTool{
+		subAgents:   map[string]Agent{"a": a, "b": b},
+		timeout:     5 * time.Second,
+		fallback:    "skip",
+		parallelMax: 2,
+	}
+
+	results := dt.executeDelegations(context.Background(), []DelegateToolInput{
+		{AgentName: "a", Task: "task a"},
+		{AgentName: "b", Task: "task b"},
+	})
+	if len(results) != 2 {
+		t.Fatalf("expected 2 results, got %d", len(results))
+	}
+	for _, r := range results {
+		if r.output.Status != "success" {
+			t.Errorf("agent %q status = %q, want success", r.output.AgentName, r.output.Status)
+		}
+	}
+}
+
+func TestAggregateResults_Concat(t *testing.T) {
+	results := []delegationResult{
+		{output: DelegateToolOutput{AgentName: "a", Result: "res-a", Status: "success"}},
+		{output: DelegateToolOutput{AgentName: "b", Result: "res-b", Status: "success"}},
+	}
+	out := aggregateResults(results, "concat")
+	if !strings.Contains(out, "res-a") || !strings.Contains(out, "res-b") {
+		t.Errorf("concat output missing results: %q", out)
+	}
+}
+
+func TestAggregateResults_Structured(t *testing.T) {
+	results := []delegationResult{
+		{output: DelegateToolOutput{AgentName: "a", Result: "r", Status: "success"}},
+	}
+	out := aggregateResults(results, "structured")
+	if !strings.Contains(out, `"agent_name"`) {
+		t.Errorf("structured output should contain JSON: %q", out)
+	}
+}
+
+func TestParseDelegationDecision_ValidJSON(t *testing.T) {
+	input := `{"delegations":[{"agent_name":"x","task":"do X"}]}`
+	delegations, isFinal := parseDelegationDecision(input)
+	if isFinal {
+		t.Error("expected isFinal=false for valid delegation JSON")
+	}
+	if len(delegations) != 1 || delegations[0].AgentName != "x" {
+		t.Errorf("unexpected delegations: %+v", delegations)
+	}
+}
+
+func TestParseDelegationDecision_PlainText(t *testing.T) {
+	_, isFinal := parseDelegationDecision("Here is my final answer.")
+	if !isFinal {
+		t.Error("expected isFinal=true for plain text")
+	}
+}
+
+func TestParseDelegationDecision_EmptyDelegations(t *testing.T) {
+	_, isFinal := parseDelegationDecision(`{"delegations":[]}`)
+	if !isFinal {
+		t.Error("expected isFinal=true for empty delegations list")
 	}
 }

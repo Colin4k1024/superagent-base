@@ -1,0 +1,32 @@
+{{- if .Values.grpcIngress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "superagent.fullname" . }}-grpc
+  labels:
+    {{- include "superagent.labels" . | nindent 4 }}
+  annotations:
+    nginx.ingress.kubernetes.io/backend-protocol: "GRPC"
+    {{- with .Values.grpcIngress.annotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  {{- if .Values.grpcIngress.className }}
+  ingressClassName: {{ .Values.grpcIngress.className }}
+  {{- end }}
+  rules:
+    - host: {{ .Values.grpcIngress.host | quote }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "superagent.fullname" . }}
+                port:
+                  name: grpc
+  {{- if .Values.grpcIngress.tls }}
+  tls:
+    {{- toYaml .Values.grpcIngress.tls | nindent 4 }}
+  {{- end }}
+{{- end }}

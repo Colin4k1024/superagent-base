@@ -9,11 +9,17 @@ spec:
   selector:
     matchLabels:
       {{- include "superagent.selectorLabels" . | nindent 6 }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
   template:
     metadata:
       labels:
         {{- include "superagent.selectorLabels" . | nindent 8 }}
     spec:
+      terminationGracePeriodSeconds: 60
       containers:
         - name: superagent
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
@@ -33,7 +39,15 @@ spec:
           volumeMounts:
             - name: agent-configs
               mountPath: /app/configs/agents
+              {{- if .Values.gitSync.enabled }}
+              subPath: agents
+              {{- else }}
               readOnly: true
+              {{- end }}
+          lifecycle:
+            preStop:
+              exec:
+                command: ["sleep", "5"]
           livenessProbe:
             httpGet:
               path: /metrics
@@ -43,14 +57,29 @@ spec:
             failureThreshold: 3
           readinessProbe:
             httpGet:
-              path: /metrics
+              path: /ready
               port: http
             initialDelaySeconds: 10
             periodSeconds: 5
             failureThreshold: 3
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
+        {{- if .Values.gitSync.enabled }}
+        - name: git-sync
+          image: "{{ .Values.gitSync.image }}"
+          args:
+            - --repo={{ .Values.gitSync.repo }}
+            - --root=/git
+            - --period={{ .Values.gitSync.period }}
+          volumeMounts:
+            - name: agent-configs
+              mountPath: /git
+        {{- end }}
       volumes:
         - name: agent-configs
+          {{- if .Values.gitSync.enabled }}
+          emptyDir: {}
+          {{- else }}
           configMap:
             name: {{ include "superagent.fullname" . }}-agents
+          {{- end }}

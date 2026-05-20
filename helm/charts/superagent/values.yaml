@@ -19,6 +19,19 @@ ingress:
         - path: /
           pathType: Prefix
 
+# gRPC Ingress — requires nginx-ingress with GRPC backend-protocol support
+grpcIngress:
+  enabled: false
+  className: nginx
+  host: grpc.superagent.local
+  # Additional annotations merged with the required GRPC annotation
+  annotations: {}
+  # TLS configuration (optional)
+  # tls:
+  #   - secretName: grpc-tls-secret
+  #     hosts:
+  #       - grpc.superagent.local
+
 resources:
   limits:
     cpu: "2"
@@ -32,6 +45,18 @@ autoscaling:
   minReplicas: 1
   maxReplicas: 5
   targetCPUUtilization: 70
+  # Custom metrics for HPA — requires Prometheus Adapter deployed in the cluster.
+  # Each entry is a full HPA metrics spec (type: Pods/External/Object).
+  # Example:
+  # customMetrics:
+  #   - type: Pods
+  #     pods:
+  #       metric:
+  #         name: superagent_active_sessions
+  #       target:
+  #         type: AverageValue
+  #         averageValue: "50"
+  customMetrics: []
 
 model:
   baseURL: "http://model-service:8000/v1"
@@ -46,6 +71,8 @@ mysql:
   database: opencoze
   user: coze
   password: ""
+  # Reference an existing Secret instead of creating one.
+  # The Secret must contain MODEL_API_KEY_0, MYSQL_PASSWORD, REDIS_PASSWORD keys.
   existingSecret: ""
 
 redis:
@@ -59,3 +86,32 @@ observability:
   metrics:
     enabled: true
     serviceMonitor: false
+
+# Prometheus ServiceMonitor — requires prometheus-operator CRDs installed.
+metrics:
+  serviceMonitor:
+    # Set to true to create a ServiceMonitor resource for Prometheus Operator.
+    enabled: false
+    # Scrape interval (default 15s)
+    interval: "15s"
+    # Scrape timeout (optional, must be <= interval)
+    # scrapeTimeout: "10s"
+    # Additional labels to add to the ServiceMonitor (e.g. for Prometheus instance selector)
+    additionalLabels: {}
+    # Namespace selector (optional, defaults to same namespace)
+    # namespaceSelector:
+    #   matchNames:
+    #     - monitoring
+
+# Git-sync sidecar — syncs agent YAML definitions from a Git repository.
+# Requires the agent-configs volume to be writable (emptyDir replaces ConfigMap).
+# When enabled, the ConfigMap-based agent-configs volume is replaced by an emptyDir
+# shared between the superagent container and the git-sync sidecar.
+gitSync:
+  enabled: false
+  # Git repository URL to sync agent definitions from
+  repo: ""
+  # Sync period (e.g. 30s, 1m)
+  period: "30s"
+  # git-sync container image
+  image: "registry.k8s.io/git-sync/git-sync:v4.2.0"

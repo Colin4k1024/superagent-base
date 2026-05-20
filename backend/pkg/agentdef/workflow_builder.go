@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -50,54 +51,48 @@ func (w *WorkflowAgent) Name() string                    { return w.name }
 func (w *WorkflowAgent) Description() string             { return w.description }
 func (w *WorkflowAgent) GetDefinition() *AgentDefinition { return w.def }
 
-// Chat executes the workflow in topological order and streams the final
-// node's output back to the caller.
+// Chat executes the workflow level-by-level, running same-level nodes in
+// parallel up to maxParallelism.  The final level's last-written output is
+// streamed back to the caller.
 func (w *WorkflowAgent) Chat(ctx context.Context, sessionID string, message string) (<-chan string, error) {
 	ch := make(chan string, 100)
 	go func() {
 		defer close(ch)
 
 		// Seed the state with the incoming message.
-		state := map[string]string{"message": message}
+		state := newSafeState(map[string]string{"message": message})
 
-		order, err := w.topologicalSort()
+		levels, err := w.topologicalLevels()
 		if err != nil {
 			ch <- fmt.Sprintf("[workflow error] %v", err)
 			return
 		}
 
-		if len(order) == 0 {
+		if len(levels) == 0 {
 			ch <- "[workflow error] no executable nodes found"
 			return
 		}
 
-		for _, nodeID := range order {
-			node := w.getNode(nodeID)
-			if node == nil {
-				ch <- fmt.Sprintf("[workflow error] node %q not found", nodeID)
+		var lastNodeID string
+		for _, level := range levels {
+			if execErr := w.executeLevel(ctx, sessionID, level, state); execErr != nil {
+				ch <- fmt.Sprintf("[workflow error] %v", execErr)
 				return
 			}
-
-			result, execErr := w.executeNode(ctx, sessionID, node, state)
-			if execErr != nil {
-				ch <- fmt.Sprintf("[workflow error] node %q: %v", nodeID, execErr)
-				return
-			}
-
-			// Store raw output under <nodeID>.output.
-			state[nodeID+".output"] = result
-
-			// Apply any variable aliases that point to this node.
-			for _, v := range w.variables {
-				if strings.HasPrefix(v.From, nodeID+".") {
-					state[v.Name] = result
+			// Apply variable aliases for all nodes in this level (single-threaded).
+			for _, nodeID := range level {
+				result := state.get(nodeID + ".output")
+				for _, v := range w.variables {
+					if strings.HasPrefix(v.From, nodeID+".") {
+						state.set(v.Name, result)
+					}
 				}
 			}
+			lastNodeID = level[len(level)-1]
 		}
 
 		// Stream the final node's output.
-		lastNode := order[len(order)-1]
-		ch <- state[lastNode+".output"]
+		ch <- state.get(lastNodeID + ".output")
 	}()
 	return ch, nil
 }
@@ -382,6 +377,190 @@ func (w *WorkflowAgent) executeConditionNode(node *WorkflowNode, state map[strin
 		return "true", nil
 	}
 	return "false", nil
+}
+
+// maxParallelism returns the effective concurrency limit for node execution.
+// When the workflow spec declares Execution.MaxParallelism > 0 that value is
+// used; otherwise runtime.NumCPU() is used as a sensible default.
+func (w *WorkflowAgent) maxParallelism() int {
+	if w.def != nil && w.def.Spec.Workflow != nil &&
+		w.def.Spec.Workflow.Execution != nil &&
+		w.def.Spec.Workflow.Execution.MaxParallelism > 0 {
+		return w.def.Spec.Workflow.Execution.MaxParallelism
+	}
+	return runtime.NumCPU()
+}
+
+// errorStrategy returns the configured error strategy, defaulting to "fail_fast".
+func (w *WorkflowAgent) errorStrategy() string {
+	if w.def != nil && w.def.Spec.Workflow != nil &&
+		w.def.Spec.Workflow.Execution != nil &&
+		w.def.Spec.Workflow.Execution.ErrorStrategy != "" {
+		return w.def.Spec.Workflow.Execution.ErrorStrategy
+	}
+	return "fail_fast"
+}
+
+// executeLevel runs all nodeIDs in a single topological level concurrently.
+// Nodes read a snapshot of state taken before the level starts; each node
+// writes only its own nodeID.output key so there are no write conflicts.
+//
+// Error strategies:
+//   - fail_fast (default): cancel all sibling goroutines on first error.
+//   - best_effort: wait for all goroutines, collect all errors.
+func (w *WorkflowAgent) executeLevel(ctx context.Context, sessionID string, nodeIDs []string, state *safeState) error {
+	if len(nodeIDs) == 1 {
+		// Fast path: single node — no goroutine overhead, preserves serial semantics.
+		node := w.getNode(nodeIDs[0])
+		if node == nil {
+			return fmt.Errorf("node %q not found", nodeIDs[0])
+		}
+		snap := state.snapshot()
+		result, err := w.executeNode(ctx, sessionID, node, snap)
+		if err != nil {
+			return fmt.Errorf("node %q: %w", node.ID, err)
+		}
+		state.set(node.ID+".output", result)
+		return nil
+	}
+
+	strategy := w.errorStrategy()
+	parallelism := w.maxParallelism()
+
+	// Derive a cancellable child context for fail_fast support.
+	levelCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	sem := make(chan struct{}, parallelism)
+	errCh := make(chan error, len(nodeIDs))
+	var wg sync.WaitGroup
+
+	// Take a single snapshot before launching goroutines so all nodes see the
+	// same upstream state (core invariant: same-level nodes only read outputs
+	// from previous levels).
+	snap := state.snapshot()
+
+	for _, id := range nodeIDs {
+		node := w.getNode(id)
+		if node == nil {
+			cancel()
+			return fmt.Errorf("node %q not found", id)
+		}
+		wg.Add(1)
+		go func(n *WorkflowNode) {
+			defer wg.Done()
+			defer func() {
+				if r := recover(); r != nil {
+					err := fmt.Errorf("node %q panicked: %v", n.ID, r)
+					errCh <- err
+					if strategy == "fail_fast" {
+						cancel()
+					}
+				}
+			}()
+
+			// Acquire semaphore slot.
+			select {
+			case sem <- struct{}{}:
+			case <-levelCtx.Done():
+				return
+			}
+			defer func() { <-sem }()
+
+			// Bail early if context was already cancelled (fail_fast).
+			if levelCtx.Err() != nil {
+				return
+			}
+
+			result, err := w.executeNode(levelCtx, sessionID, n, snap)
+			if err != nil {
+				errCh <- fmt.Errorf("node %q: %w", n.ID, err)
+				if strategy == "fail_fast" {
+					cancel()
+				}
+				return
+			}
+			state.set(n.ID+".output", result)
+		}(node)
+	}
+
+	wg.Wait()
+	close(errCh)
+
+	// Collect errors.
+	var errs []string
+	for e := range errCh {
+		errs = append(errs, e.Error())
+	}
+	if len(errs) > 0 {
+		return fmt.Errorf("%s", strings.Join(errs, "; "))
+	}
+	return nil
+}
+
+// topologicalLevels returns nodes grouped by topological level using Kahn's
+// algorithm.  Nodes at the same level have no dependency on each other and
+// may be executed in parallel.  "START" and "END" sentinels are ignored.
+// Returns an error if the graph contains a cycle.
+func (w *WorkflowAgent) topologicalLevels() ([][]string, error) {
+	// Build a set of valid node IDs.
+	nodeSet := make(map[string]struct{}, len(w.nodes))
+	for _, n := range w.nodes {
+		nodeSet[n.ID] = struct{}{}
+	}
+
+	inDegree := make(map[string]int, len(w.nodes))
+	adj := make(map[string][]string, len(w.nodes))
+	for _, n := range w.nodes {
+		if _, exists := inDegree[n.ID]; !exists {
+			inDegree[n.ID] = 0
+		}
+	}
+
+	for _, e := range w.edges {
+		from, to := e.From, e.To
+		if from == "START" || to == "END" {
+			continue
+		}
+		if _, ok := nodeSet[from]; !ok {
+			continue
+		}
+		if _, ok := nodeSet[to]; !ok {
+			continue
+		}
+		adj[from] = append(adj[from], to)
+		inDegree[to]++
+	}
+
+	// Initialise queue with all zero-in-degree nodes.
+	queue := make([]string, 0, len(w.nodes))
+	for _, n := range w.nodes {
+		if inDegree[n.ID] == 0 {
+			queue = append(queue, n.ID)
+		}
+	}
+
+	var levels [][]string
+	visited := 0
+	for len(queue) > 0 {
+		level := queue
+		queue = nil
+		levels = append(levels, level)
+		visited += len(level)
+		for _, curr := range level {
+			for _, neighbor := range adj[curr] {
+				inDegree[neighbor]--
+				if inDegree[neighbor] == 0 {
+					queue = append(queue, neighbor)
+				}
+			}
+		}
+	}
+
+	if visited != len(w.nodes) {
+		return nil, fmt.Errorf("workflow graph contains a cycle")
+	}
+	return levels, nil
 }
 
 // topologicalSort returns node IDs in a valid execution order using Kahn's

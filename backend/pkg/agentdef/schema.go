@@ -117,6 +117,20 @@ type WorkflowSpec struct {
 	Edges     []WorkflowEdge     `yaml:"edges"               json:"edges"`
 	// Variables declare named references to node outputs for use in downstream nodes.
 	Variables []WorkflowVariable `yaml:"variables,omitempty" json:"variables,omitempty"`
+	// Execution controls parallel execution behaviour within the workflow.
+	Execution *WorkflowExecution `yaml:"execution,omitempty" json:"execution,omitempty"`
+}
+
+// WorkflowExecution controls how nodes within a workflow are executed.
+type WorkflowExecution struct {
+	// MaxParallelism is the maximum number of nodes that may run concurrently
+	// within a single topological level.  0 means "use runtime.NumCPU()".
+	MaxParallelism int `yaml:"max_parallelism,omitempty" json:"max_parallelism,omitempty"`
+	// ErrorStrategy controls how errors are handled during parallel execution.
+	// Valid values: "fail_fast" (default) or "best_effort".
+	//   fail_fast  — cancel all running nodes as soon as one fails.
+	//   best_effort — wait for all nodes to complete and collect all errors.
+	ErrorStrategy string `yaml:"error_strategy,omitempty" json:"error_strategy,omitempty"`
 }
 
 // WorkflowNode is a single processing step within a workflow.
@@ -171,12 +185,32 @@ type SubAgentRef struct {
 	Config map[string]any `yaml:"config,omitempty" json:"config,omitempty"`
 }
 
+// DelegationConfig controls how a SupervisorAgent delegates tasks to sub-agents.
+type DelegationConfig struct {
+	// Timeout is the per-delegation timeout (e.g. "30s", "1m").  Defaults to "30s".
+	Timeout string `yaml:"timeout,omitempty" json:"timeout,omitempty"`
+	// Retry is the number of times to retry a failed delegation.  Defaults to 0.
+	Retry int `yaml:"retry,omitempty" json:"retry,omitempty"`
+	// FallbackStrategy defines behaviour when a delegation fails.
+	// Supported: skip | abort | ask_supervisor (default: ask_supervisor).
+	FallbackStrategy string `yaml:"fallback_strategy,omitempty" json:"fallback_strategy,omitempty"`
+	// ParallelMax is the maximum number of concurrent delegations per round.
+	// Defaults to 3.
+	ParallelMax int `yaml:"parallel_max,omitempty" json:"parallel_max,omitempty"`
+}
+
 // OrchestrationSpec defines the coordination strategy for multi-agent types.
 type OrchestrationSpec struct {
 	// Mode is the orchestration strategy: supervisor, sequential, parallel, plan_execute.
-	Mode      string `yaml:"mode"                  json:"mode"`
+	Mode string `yaml:"mode" json:"mode"`
 	// MaxRounds limits the number of orchestration iterations.
-	MaxRounds int    `yaml:"max_rounds,omitempty"  json:"max_rounds,omitempty"`
+	MaxRounds int `yaml:"max_rounds,omitempty" json:"max_rounds,omitempty"`
+	// Delegation configures per-delegation timeout, retry, fallback and parallelism.
+	// Only used when Mode is "supervisor".
+	Delegation *DelegationConfig `yaml:"delegation,omitempty" json:"delegation,omitempty"`
+	// ResultAggregation controls how multiple delegation results are combined.
+	// Supported: concat (default) | summarize | structured.
+	ResultAggregation string `yaml:"result_aggregation,omitempty" json:"result_aggregation,omitempty"`
 }
 
 // ModelSpec configures model selection and routing for the agent.
