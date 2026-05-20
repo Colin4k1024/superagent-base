@@ -1,0 +1,39 @@
+name: text-transform
+version: "1.0.0"
+author: superagent-ai
+description: Transforms text with operations like uppercase, lowercase, title-case, reverse, truncate, and word-count.
+tags:
+  - utility
+  - text
+triggers:
+  - "transform text"
+  - "uppercase"
+  - "lowercase"
+  - "word count"
+  - "文本转换"
+input:
+  type: object
+  required:
+    - text
+    - operation
+  properties:
+    text:
+      type: string
+      description: Input text to transform
+    operation:
+      type: string
+      description: "One of: uppercase, lowercase, titlecase, reverse, trim, word_count, char_count, truncate"
+    max_length:
+      type: integer
+      description: Used when operation is truncate (default 100)
+output:
+  type: object
+  properties:
+    result:
+      type: string
+      description: Transformed text (for non-count operations)
+    count:
+      type: integer
+      description: Count value (for word_count and char_count operations)
+runtime:
+  type: embedded

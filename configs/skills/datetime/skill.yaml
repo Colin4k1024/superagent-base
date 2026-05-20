@@ -1,0 +1,36 @@
+name: datetime
+version: "1.0.0"
+author: superagent-ai
+description: Returns the current date/time in the specified format and timezone.
+tags:
+  - utility
+  - datetime
+triggers:
+  - "current time"
+  - "what time is it"
+  - "today's date"
+  - "现在几点"
+  - "当前时间"
+input:
+  type: object
+  properties:
+    format:
+      type: string
+      description: Go time format string (default "2006-01-02 15:04:05")
+    timezone:
+      type: string
+      description: IANA timezone name, e.g. "Asia/Shanghai" (default "Local")
+output:
+  type: object
+  properties:
+    datetime:
+      type: string
+      description: Formatted date/time string
+    timestamp:
+      type: integer
+      description: Unix timestamp (seconds)
+    timezone:
+      type: string
+      description: Resolved timezone name
+runtime:
+  type: embedded
