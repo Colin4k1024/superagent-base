@@ -18,8 +18,9 @@ package modelrouter
 
 // RouterConfig is the top-level routing configuration loaded from YAML.
 type RouterConfig struct {
-	Strategies []StrategyConfig            `yaml:"strategies"`
-	Providers  map[string]ProviderConfig   `yaml:"providers"`
+	Strategies []StrategyConfig          `yaml:"strategies"`
+	Providers  map[string]ProviderConfig `yaml:"providers"`
+	Feedback   *FeedbackConfig           `yaml:"feedback,omitempty"`
 }
 
 // StrategyConfig defines a named routing strategy with ordered rules.
@@ -41,6 +42,24 @@ type RuleConfig struct {
 
 // ProviderConfig holds provider-level metadata for a model ID.
 type ProviderConfig struct {
-	Type     string `yaml:"type"`
-	Endpoint string `yaml:"endpoint,omitempty"`
+	Type     string      `yaml:"type"`
+	Endpoint string      `yaml:"endpoint,omitempty"`
+	Pricing  PricingInfo `yaml:"pricing,omitempty"`
+}
+
+// PricingInfo holds the per-1k-token cost for a provider (USD).
+type PricingInfo struct {
+	InputPer1K  float64 `yaml:"input_per_1k"`
+	OutputPer1K float64 `yaml:"output_per_1k"`
+}
+
+// FeedbackConfig controls the real-time feedback subsystem.
+// When Enabled is false (default), AdaptiveStrategy is not registered and the
+// feedback path is entirely bypassed with zero overhead.
+type FeedbackConfig struct {
+	Enabled       bool                 `yaml:"enabled"`
+	EMAAlpha      float64              `yaml:"ema_alpha,omitempty"`
+	MinSamples    int                  `yaml:"min_samples,omitempty"`
+	StaleDuration string               `yaml:"stale_duration,omitempty"`
+	CircuitBreaker CircuitBreakerConfig `yaml:"circuit_breaker,omitempty"`
 }

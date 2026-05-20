@@ -18,6 +18,7 @@ package agentdef
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"sync"
@@ -25,17 +26,22 @@ import (
 
 // ─── SupervisorAgent ─────────────────────────────────────────────────────────
 
-// SupervisorAgent coordinates sub-agents via a main LLM.
-// In v1 the supervisor augments its system prompt with the list of available
-// sub-agents and their descriptions, then delegates the conversation to its
-// own LLM.  Future versions will parse structured delegation directives from
-// the LLM output and fan-out to the appropriate sub-agent.
+// SupervisorAgent coordinates sub-agents via a multi-round ReAct loop.
+//
+// V2 behaviour:
+//  1. The supervisor LLM decides which sub-agents to invoke (via the
+//     built-in delegate_to_agent tool).
+//  2. Delegations are executed (potentially in parallel, bounded by parallelMax).
+//  3. Results are aggregated and fed back to the LLM as the next input.
+//  4. The loop terminates when the LLM produces a direct answer (no tool
+//     calls) or when maxRounds is exhausted.
 type SupervisorAgent struct {
 	name        string
 	description string
 	mainAgent   Agent
 	subAgents   map[string]Agent
 	maxRounds   int
+	delegate    *delegateTool
 	def         *AgentDefinition
 }
 
@@ -43,33 +49,147 @@ func (s *SupervisorAgent) Name() string                    { return s.name }
 func (s *SupervisorAgent) Description() string             { return s.description }
 func (s *SupervisorAgent) GetDefinition() *AgentDefinition { return s.def }
 
-// Chat runs the supervisor: it enriches the system prompt with sub-agent
-// metadata and then streams the main agent's response.
+// Chat runs the multi-round supervisor loop.
+//
+// Each round the LLM can either:
+//   - Emit a JSON object with "delegations": [...] to fan-out to sub-agents, or
+//   - Emit any other text, which is treated as the final answer.
+//
+// The loop exits as soon as a final answer is produced or maxRounds is reached.
 func (s *SupervisorAgent) Chat(ctx context.Context, sessionID string, message string) (<-chan string, error) {
-	enrichedPrompt := buildSupervisorPrompt(s.def.Spec.SystemPrompt, s.subAgents)
-
-	// Temporarily override the definition's system prompt so the underlying
-	// mainAgent uses the enriched version.  We create a synthetic message that
-	// prepends the enriched system context to the user message.
-	fullMessage := enrichedPrompt + "\n\nUser: " + message
-
-	subCh, err := s.mainAgent.Chat(ctx, sessionID, fullMessage)
-	if err != nil {
-		return nil, fmt.Errorf("supervisor %q: main agent chat: %w", s.name, err)
+	if s.delegate == nil {
+		// Fallback for tests that construct SupervisorAgent without a delegate.
+		return s.mainAgent.Chat(ctx, sessionID, message)
 	}
+	s.delegate.sessionID = sessionID
 
+	enrichedPrompt := buildSupervisorPrompt(s.def.Spec.SystemPrompt, s.subAgents)
 	ch := make(chan string, 100)
+
 	go func() {
 		defer close(ch)
-		for token := range subCh {
-			ch <- token
+
+		aggregationMode := ""
+		if s.def.Spec.Orchestration != nil {
+			aggregationMode = s.def.Spec.Orchestration.ResultAggregation
+		}
+
+		input := message
+		for round := 0; round < s.maxRounds; round++ {
+			if ctx.Err() != nil {
+				return
+			}
+
+			// Build the current round's prompt.
+			roundPrompt := enrichedPrompt + "\n\nUser: " + input
+
+			// Ask the LLM for its decision.
+			subCh, err := s.mainAgent.Chat(ctx, sessionID, roundPrompt)
+			if err != nil {
+				select {
+				case ch <- fmt.Sprintf("[supervisor error round %d]: %v", round+1, err):
+				case <-ctx.Done():
+				}
+				return
+			}
+
+			var decisionBuf strings.Builder
+			for token := range subCh {
+				decisionBuf.WriteString(token)
+			}
+			decision := strings.TrimSpace(decisionBuf.String())
+
+			// Try to parse structured delegations from the LLM output.
+			delegations, isFinal := parseDelegationDecision(decision)
+			if isFinal || len(delegations) == 0 {
+				// Final answer — stream tokens and exit.
+				for _, tok := range strings.SplitAfter(decision, "") {
+					select {
+					case ch <- tok:
+					case <-ctx.Done():
+						return
+					}
+				}
+				return
+			}
+
+			// Emit a progress event so callers can observe the round.
+			progressEvent := formatProgressEvent(round+1, delegations)
+			select {
+			case ch <- progressEvent:
+			case <-ctx.Done():
+				return
+			}
+
+			// Execute delegations (parallel, bounded by parallelMax).
+			results := s.delegate.executeDelegations(ctx, delegations)
+
+			// Check abort on any failure.
+			if s.delegate.fallback == "abort" {
+				for _, r := range results {
+					if r.err != nil {
+						select {
+						case ch <- fmt.Sprintf("[supervisor abort]: %v", r.err):
+						case <-ctx.Done():
+						}
+						return
+					}
+				}
+			}
+
+			// Aggregate results as the next round's input.
+			input = aggregateResults(results, aggregationMode)
+		}
+
+		// maxRounds exhausted — emit a final error token.
+		select {
+		case ch <- fmt.Sprintf("[supervisor: max rounds (%d) exceeded]", s.maxRounds):
+		case <-ctx.Done():
 		}
 	}()
+
 	return ch, nil
 }
 
-// buildSupervisorPrompt appends a list of available sub-agents to the base
-// system prompt so the supervisor LLM is aware of its delegation options.
+// parseDelegationDecision attempts to decode the LLM's response as a
+// delegation directive.  It returns the list of inputs and a "isFinal" flag.
+//
+// Expected format when the LLM wants to delegate:
+//
+//	{"delegations":[{"agent_name":"x","task":"..."},...]}
+//
+// Any other text is treated as a final answer (isFinal=true).
+func parseDelegationDecision(text string) ([]DelegateToolInput, bool) {
+	// Quick check before attempting JSON parse.
+	trimmed := strings.TrimSpace(text)
+	if !strings.HasPrefix(trimmed, "{") {
+		return nil, true
+	}
+
+	var envelope struct {
+		Delegations []DelegateToolInput `json:"delegations"`
+	}
+	if err := json.Unmarshal([]byte(trimmed), &envelope); err != nil {
+		return nil, true
+	}
+	if len(envelope.Delegations) == 0 {
+		return nil, true
+	}
+	return envelope.Delegations, false
+}
+
+// formatProgressEvent formats a lightweight progress notification.
+func formatProgressEvent(round int, delegations []DelegateToolInput) string {
+	names := make([]string, 0, len(delegations))
+	for _, d := range delegations {
+		names = append(names, d.AgentName)
+	}
+	return fmt.Sprintf("\n[supervisor round %d: delegating to %s]\n",
+		round, strings.Join(names, ", "))
+}
+
+// buildSupervisorPrompt appends a list of available sub-agents and delegation
+// instructions to the base system prompt.
 func buildSupervisorPrompt(basePrompt string, subAgents map[string]Agent) string {
 	if len(subAgents) == 0 {
 		return basePrompt
@@ -80,6 +200,12 @@ func buildSupervisorPrompt(basePrompt string, subAgents map[string]Agent) string
 	for name, agent := range subAgents {
 		sb.WriteString(fmt.Sprintf("- %s: %s\n", name, agent.Description()))
 	}
+	sb.WriteString(`
+To delegate tasks, respond ONLY with valid JSON in this format:
+{"delegations":[{"agent_name":"<name>","task":"<task>","context":"<optional>"}]}
+
+To provide a final answer, respond with plain text (not JSON).
+`)
 	return sb.String()
 }
 

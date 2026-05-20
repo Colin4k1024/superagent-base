@@ -857,16 +857,16 @@ func (b *AgentBuilder) resolveSubAgentList(def *AgentDefinition) ([]Agent, error
 	return agents, nil
 }
 
-// buildSupervisor constructs a SupervisorAgent.  It builds the main LLM agent
-// for the supervisor definition itself, then resolves sub-agent references.
+// buildSupervisor constructs a SupervisorAgent with V2 multi-round delegation.
+// It builds the main LLM agent for the supervisor definition itself, resolves
+// sub-agent references, and wires up the delegateTool.
 func (b *AgentBuilder) buildSupervisor(ctx context.Context, def *AgentDefinition) (Agent, error) {
 	subAgents, err := b.resolveSubAgents(def)
 	if err != nil {
 		return nil, err
 	}
 
-	// Build the supervisor's own LLM as a chat_model_agent so it has an
-	// underlying model to generate responses.
+	// Build the supervisor's own LLM as a chat_model_agent.
 	syntheticDef := &AgentDefinition{
 		APIVersion: def.APIVersion,
 		Kind:       def.Kind,
@@ -888,12 +888,39 @@ func (b *AgentBuilder) buildSupervisor(ctx context.Context, def *AgentDefinition
 		maxRounds = def.Spec.Orchestration.MaxRounds
 	}
 
+	// Configure delegation settings from the YAML spec.
+	delegationTimeout := 30 * time.Second
+	delegationFallback := "ask_supervisor"
+	delegationParallelMax := 3
+	if def.Spec.Orchestration != nil && def.Spec.Orchestration.Delegation != nil {
+		dcfg := def.Spec.Orchestration.Delegation
+		if dcfg.Timeout != "" {
+			if d, parseErr := time.ParseDuration(dcfg.Timeout); parseErr == nil {
+				delegationTimeout = d
+			}
+		}
+		if dcfg.FallbackStrategy != "" {
+			delegationFallback = dcfg.FallbackStrategy
+		}
+		if dcfg.ParallelMax > 0 {
+			delegationParallelMax = dcfg.ParallelMax
+		}
+	}
+
+	dt := &delegateTool{
+		subAgents:   subAgents,
+		timeout:     delegationTimeout,
+		fallback:    delegationFallback,
+		parallelMax: delegationParallelMax,
+	}
+
 	return &SupervisorAgent{
 		name:        def.Metadata.Name,
 		description: def.Spec.SystemPrompt,
 		mainAgent:   mainAgent,
 		subAgents:   subAgents,
 		maxRounds:   maxRounds,
+		delegate:    dt,
 		def:         def,
 	}, nil
 }
@@ -1235,8 +1262,39 @@ func (a *einoReactAgent) Name() string                    { return a.def.Metadat
 func (a *einoReactAgent) Description() string             { return a.systemPrompt }
 func (a *einoReactAgent) GetDefinition() *AgentDefinition { return a.def }
 
-func (a *einoReactAgent) Chat(ctx context.Context, _ string, message string) (<-chan string, error) {
-	msgs := buildMessages(a.systemPrompt, message)
+func (a *einoReactAgent) Chat(ctx context.Context, sessionID string, message string) (<-chan string, error) {
+	// Build message list: system prompt + history + new user message
+	msgs := make([]*schema.Message, 0, 8)
+	if a.systemPrompt != "" {
+		msgs = append(msgs, schema.SystemMessage(a.systemPrompt))
+	}
+
+	// Load conversation history from memory if available
+	if a.memBackend != nil && sessionID != "" {
+		history, err := a.memBackend.GetMessages(ctx, sessionID, memory.GetMessagesOpts{Limit: 20})
+		if err == nil {
+			for _, m := range history {
+				switch m.Role {
+				case "user":
+					msgs = append(msgs, schema.UserMessage(m.Content))
+				case "assistant":
+					msgs = append(msgs, schema.AssistantMessage(m.Content, nil))
+				}
+			}
+		}
+	}
+
+	// Append current user message
+	msgs = append(msgs, schema.UserMessage(message))
+
+	// Save user message to memory
+	if a.memBackend != nil && sessionID != "" {
+		_ = a.memBackend.AddMessage(ctx, sessionID, memory.Message{
+			Role:      "user",
+			Content:   message,
+			Timestamp: time.Now().Unix(),
+		})
+	}
 
 	reader, err := a.agent.Stream(ctx, msgs)
 	if err != nil {
@@ -1249,6 +1307,7 @@ func (a *einoReactAgent) Chat(ctx context.Context, _ string, message string) (<-
 		defer reader.Close()
 		streamStart := time.Now()
 		firstToken := true
+		var fullResponse strings.Builder
 		for {
 			chunk, err := reader.Recv()
 			if err != nil {
@@ -1258,6 +1317,14 @@ func (a *einoReactAgent) Chat(ctx context.Context, _ string, message string) (<-
 					case <-ctx.Done():
 					}
 				}
+				// Save assistant response to memory
+				if a.memBackend != nil && sessionID != "" && fullResponse.Len() > 0 {
+					_ = a.memBackend.AddMessage(ctx, sessionID, memory.Message{
+						Role:      "assistant",
+						Content:   fullResponse.String(),
+						Timestamp: time.Now().Unix(),
+					})
+				}
 				return
 			}
 			if chunk != nil && chunk.Content != "" {
@@ -1265,6 +1332,7 @@ func (a *einoReactAgent) Chat(ctx context.Context, _ string, message string) (<-
 					modelrouter.RecordModelLatency(a.modelID, a.provider, time.Since(streamStart))
 					firstToken = false
 				}
+				fullResponse.WriteString(chunk.Content)
 				select {
 				case ch <- chunk.Content:
 				case <-ctx.Done():
