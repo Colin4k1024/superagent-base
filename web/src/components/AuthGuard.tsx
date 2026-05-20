@@ -1,9 +1,11 @@
-import { Navigate, Outlet } from 'react-router-dom'
+import { Outlet } from 'react-router-dom'
 import { isAuthenticated } from '@/lib/auth'
+import { login } from '@/lib/iam'
 
 export function AuthGuard() {
   if (!isAuthenticated()) {
-    return <Navigate to="/login" replace />
+    login({ invalidateToken: true })
+    return null
   }
   return <Outlet />
 }

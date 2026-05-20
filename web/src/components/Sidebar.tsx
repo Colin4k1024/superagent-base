@@ -1,16 +1,14 @@
 import { useState } from 'react'
-import { NavLink, useNavigate } from 'react-router-dom'
+import { NavLink } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { clearApiKey } from '@/lib/auth'
+import { logout } from '@/lib/iam'
 
 export default function Sidebar() {
-  const navigate = useNavigate()
   const { t, i18n } = useTranslation()
   const [mobileOpen, setMobileOpen] = useState(false)
 
   function handleLogout() {
-    clearApiKey()
-    navigate('/login', { replace: true })
+    logout()
   }
 
   function toggleLanguage() {

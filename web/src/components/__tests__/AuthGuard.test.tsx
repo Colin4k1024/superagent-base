@@ -3,20 +3,25 @@ import { render, screen } from '@testing-library/react'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
 import { AuthGuard } from '../AuthGuard'
 
-// Mock the auth module so we control isAuthenticated without touching localStorage
 vi.mock('@/lib/auth', () => ({
   isAuthenticated: vi.fn(),
 }))
 
+vi.mock('@/lib/iam', () => ({
+  login: vi.fn(),
+}))
+
 import { isAuthenticated } from '@/lib/auth'
+import { login } from '@/lib/iam'
 const mockIsAuthenticated = vi.mocked(isAuthenticated)
+const mockLogin = vi.mocked(login)
 
 describe('AuthGuard', () => {
   beforeEach(() => {
     vi.clearAllMocks()
   })
 
-  it('redirects to /login when not authenticated', () => {
+  it('calls login with invalidateToken when not authenticated', () => {
     mockIsAuthenticated.mockReturnValue(false)
 
     render(
@@ -25,12 +30,11 @@ describe('AuthGuard', () => {
           <Route element={<AuthGuard />}>
             <Route path="/dashboard" element={<div>Dashboard</div>} />
           </Route>
-          <Route path="/login" element={<div>Login Page</div>} />
         </Routes>
       </MemoryRouter>,
     )
 
-    expect(screen.getByText('Login Page')).toBeInTheDocument()
+    expect(mockLogin).toHaveBeenCalledWith({ invalidateToken: true })
     expect(screen.queryByText('Dashboard')).not.toBeInTheDocument()
   })
 
@@ -43,12 +47,11 @@ describe('AuthGuard', () => {
           <Route element={<AuthGuard />}>
             <Route path="/dashboard" element={<div>Dashboard</div>} />
           </Route>
-          <Route path="/login" element={<div>Login Page</div>} />
         </Routes>
       </MemoryRouter>,
     )
 
     expect(screen.getByText('Dashboard')).toBeInTheDocument()
-    expect(screen.queryByText('Login Page')).not.toBeInTheDocument()
+    expect(mockLogin).not.toHaveBeenCalled()
   })
 })

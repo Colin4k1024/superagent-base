@@ -1,7 +1,6 @@
 import { createBrowserRouter, Navigate } from 'react-router-dom'
 import Layout from './components/Layout'
 import { AuthGuard } from './components/AuthGuard'
-import LoginPage from './pages/LoginPage'
 import AgentsPage from './pages/AgentsPage'
 import AgentEditPage from './pages/AgentEditPage'
 import WorkflowEditorPage from './pages/WorkflowEditorPage'
@@ -13,7 +12,6 @@ import EvolutionPage from './pages/EvolutionPage'
 import XiaohaiDebugPage from './pages/XiaohaiDebugPage'
 
 export const router = createBrowserRouter([
-  { path: '/login', element: <LoginPage /> },
   {
     element: <AuthGuard />,
     children: [

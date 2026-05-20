@@ -15,6 +15,7 @@
   "dependencies": {
     "@aiui/card-settlement-process": "file:../../../../card-settlement-process",
     "@ant-design/icons": "^5.0.0",
+    "@haier/iam": "^1.9.4",
     "@hookform/resolvers": "^5.2.2",
     "@monaco-editor/react": "^4.7.0",
     "@tanstack/react-query": "^5.100.10",

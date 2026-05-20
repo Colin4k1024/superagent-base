@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { getApiKey, setApiKey, clearApiKey, isAuthenticated } from '../auth'
+import { getToken, isAuthenticated } from '../auth'
 
 describe('auth', () => {
   const localStorageMock = {
@@ -14,52 +14,33 @@ describe('auth', () => {
     vi.clearAllMocks()
   })
 
-  describe('getApiKey', () => {
+  describe('getToken', () => {
     it('returns null when not set', () => {
       localStorageMock.getItem.mockReturnValue(null)
-      expect(getApiKey()).toBeNull()
-      expect(localStorageMock.getItem).toHaveBeenCalledWith('admin_api_key')
+      expect(getToken()).toBeNull()
+      expect(localStorageMock.getItem).toHaveBeenCalledWith('haier-user-center-access-token')
     })
 
     it('returns stored value', () => {
-      localStorageMock.getItem.mockReturnValue('my-secret-key')
-      expect(getApiKey()).toBe('my-secret-key')
-    })
-  })
-
-  describe('setApiKey', () => {
-    it('stores value in localStorage', () => {
-      setApiKey('test-key')
-      expect(localStorageMock.setItem).toHaveBeenCalledWith('admin_api_key', 'test-key')
-    })
-
-    it('stores empty string for dev mode', () => {
-      setApiKey('')
-      expect(localStorageMock.setItem).toHaveBeenCalledWith('admin_api_key', '')
-    })
-  })
-
-  describe('clearApiKey', () => {
-    it('removes key from localStorage', () => {
-      clearApiKey()
-      expect(localStorageMock.removeItem).toHaveBeenCalledWith('admin_api_key')
+      localStorageMock.getItem.mockReturnValue('jwt-token-value')
+      expect(getToken()).toBe('jwt-token-value')
     })
   })
 
   describe('isAuthenticated', () => {
-    it('returns false when key is null', () => {
+    it('returns false when token is null', () => {
       localStorageMock.getItem.mockReturnValue(null)
       expect(isAuthenticated()).toBe(false)
     })
 
-    it('returns true when key is set', () => {
-      localStorageMock.getItem.mockReturnValue('some-key')
+    it('returns true when token is set', () => {
+      localStorageMock.getItem.mockReturnValue('some-token')
       expect(isAuthenticated()).toBe(true)
     })
 
-    it('returns true for empty string key (dev mode)', () => {
+    it('returns false for empty string', () => {
       localStorageMock.getItem.mockReturnValue('')
-      expect(isAuthenticated()).toBe(true)
+      expect(isAuthenticated()).toBe(false)
     })
   })
 })
