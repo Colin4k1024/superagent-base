@@ -76,7 +76,7 @@ export class SuperagentClient {
     message: string,
     options?: ChatOptions,
   ): A2UIStream {
-    return this.streamRequest("POST", "/api/v1/chat/stream", {
+    return this.streamRequest("POST", "/api/v2/chat/stream", {
       agent_id: agentId,
       session_id: options?.sessionId ?? "default",
       message,
@@ -100,7 +100,7 @@ export class SuperagentClient {
     sessionId: string,
     input: Record<string, unknown>,
   ): A2UIStream {
-    return this.streamRequest("POST", "/api/v1/chat/resume", {
+    return this.streamRequest("POST", "/api/v2/chat/resume", {
       agent_id: agentId,
       session_id: sessionId,
       input,
@@ -113,12 +113,12 @@ export class SuperagentClient {
 
   /**
    * List all agents currently loaded by the runtime.
-   * GET /api/v1/agents
+   * GET /api/v2/agents
    */
   async listAgents(): Promise<AgentInfo[]> {
     const resp = await this.request<{
       agents: Array<{ name: string; description: string }>;
-    }>("GET", "/api/v1/agents");
+    }>("GET", "/api/v2/agents");
     return (resp.agents ?? []).map((a) => ({
       name: a.name,
       type: "",

@@ -16,51 +16,51 @@ export class AdminClient {
 
   /**
    * Returns runtime status including uptime, agent count, and health checks.
-   * GET /api/v1/admin/status
+   * GET /api/v2/admin/status
    */
   async status(): Promise<Record<string, unknown>> {
-    return this._request<Record<string, unknown>>("GET", "/api/v1/admin/status");
+    return this._request<Record<string, unknown>>("GET", "/api/v2/admin/status");
   }
 
   /**
    * Triggers a hot-reload of all agent YAML definitions.
-   * POST /api/v1/admin/reload
+   * POST /api/v2/admin/reload
    */
   async reload(): Promise<{ message: string }> {
-    return this._request<{ message: string }>("POST", "/api/v1/admin/reload");
+    return this._request<{ message: string }>("POST", "/api/v2/admin/reload");
   }
 
   /**
    * Returns all agents known to the runtime with their status.
-   * GET /api/v1/admin/agents
+   * GET /api/v2/admin/agents
    */
   async listAgents(): Promise<AgentInfo[]> {
     const resp = await this._request<{ agents: AgentInfo[] }>(
       "GET",
-      "/api/v1/admin/agents",
+      "/api/v2/admin/agents",
     );
     return resp.agents ?? [];
   }
 
   /**
    * Returns the definition and raw YAML for a specific agent.
-   * GET /api/v1/admin/agents/:name
+   * GET /api/v2/admin/agents/:name
    */
   async getAgent(name: string): Promise<Record<string, unknown>> {
     return this._request<Record<string, unknown>>(
       "GET",
-      `/api/v1/admin/agents/${encodeURIComponent(name)}`,
+      `/api/v2/admin/agents/${encodeURIComponent(name)}`,
     );
   }
 
   /**
    * Creates a new agent from YAML content.
-   * POST /api/v1/admin/agents
+   * POST /api/v2/admin/agents
    */
   async createAgent(yamlContent: string): Promise<ApplyResult> {
     const raw = await this._request<{ name: string; message: string }>(
       "POST",
-      "/api/v1/admin/agents",
+      "/api/v2/admin/agents",
       { yaml: yamlContent },
     );
     return {
@@ -72,12 +72,12 @@ export class AdminClient {
 
   /**
    * Overwrites an existing agent YAML definition.
-   * PUT /api/v1/admin/agents/:name
+   * PUT /api/v2/admin/agents/:name
    */
   async updateAgent(name: string, yamlContent: string): Promise<ApplyResult> {
     const raw = await this._request<{ name: string; message: string }>(
       "PUT",
-      `/api/v1/admin/agents/${encodeURIComponent(name)}`,
+      `/api/v2/admin/agents/${encodeURIComponent(name)}`,
       { yaml: yamlContent },
     );
     return {
@@ -89,25 +89,25 @@ export class AdminClient {
 
   /**
    * Deletes an agent YAML file and unloads it from the runtime.
-   * DELETE /api/v1/admin/agents/:name
+   * DELETE /api/v2/admin/agents/:name
    */
   async deleteAgent(name: string): Promise<void> {
     await this._request<unknown>(
       "DELETE",
-      `/api/v1/admin/agents/${encodeURIComponent(name)}`,
+      `/api/v2/admin/agents/${encodeURIComponent(name)}`,
     );
   }
 
   /**
    * Validates agent YAML without writing it to disk.
-   * POST /api/v1/admin/agents/validate
+   * POST /api/v2/admin/agents/validate
    */
   async validateAgent(yamlContent: string): Promise<ValidateResult> {
     const raw = await this._request<{
       valid: boolean;
       error?: string;
       errors?: string[];
-    }>("POST", "/api/v1/admin/agents/validate", { yaml: yamlContent });
+    }>("POST", "/api/v2/admin/agents/validate", { yaml: yamlContent });
 
     const errors: string[] = [];
     if (!raw.valid) {
