@@ -23,6 +23,7 @@ import (
 	"crypto/tls"
 	"fmt"
 	"os"
+	"path/filepath"
 	"runtime/debug"
 	"strings"
 	"time"
@@ -149,6 +150,18 @@ func main() {
 			Version:     "1.0.0",
 			Description: "Built-in " + name + " skill",
 		})
+	}
+
+	// Scan .claude/skills/ for SKILL.md files and register them in inline mode.
+	// Dir precedence: CLAUDE_SKILLS_DIR env → <cwd>/.claude/skills → <exe-dir>/../.claude/skills.
+	claudeSkillsDir := resolveClaudeSkillsDir()
+	if claudeSkillsDir != "" {
+		n, scanErr := skill.RegisterClaudeSkills(skillMgr, localInvoker, claudeSkillsDir)
+		if scanErr != nil {
+			logs.Warnf("claude skills: scan failed: %v", scanErr)
+		} else {
+			logs.Infof("claude skills: registered %d skills from %s", n, claudeSkillsDir)
+		}
 	}
 
 	// Build the ToolManager and register all built-in tools.
@@ -427,6 +440,32 @@ func loadEnv() (err error) {
 	}
 
 	return err
+}
+
+// resolveClaudeSkillsDir returns the directory that contains Claude Code SKILL.md files.
+// Resolution order:
+//  1. CLAUDE_SKILLS_DIR env var (explicit override)
+//  2. <cwd>/.claude/skills (typical development layout)
+//  3. <exe-dir>/../.claude/skills (deployment layout where binary is in bin/)
+func resolveClaudeSkillsDir() string {
+	if dir := os.Getenv("CLAUDE_SKILLS_DIR"); dir != "" {
+		return dir
+	}
+	// Try cwd/.claude/skills
+	if cwd, err := os.Getwd(); err == nil {
+		candidate := filepath.Join(cwd, ".claude", "skills")
+		if info, err := os.Stat(candidate); err == nil && info.IsDir() {
+			return candidate
+		}
+	}
+	// Try exe-dir/../.claude/skills (when running from bin/)
+	if exe, err := os.Executable(); err == nil {
+		candidate := filepath.Join(filepath.Dir(exe), "..", ".claude", "skills")
+		if info, err := os.Stat(candidate); err == nil && info.IsDir() {
+			return candidate
+		}
+	}
+	return ""
 }
 
 func getEnv(key string, defaultValue string) string {
