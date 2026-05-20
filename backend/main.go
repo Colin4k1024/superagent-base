@@ -56,6 +56,7 @@ import (
 	"github.com/superagent-ai/superagent-base/backend/pkg/skill"
 	skillbuiltin "github.com/superagent-ai/superagent-base/backend/pkg/skill/builtin"
 	"github.com/superagent-ai/superagent-base/backend/pkg/tool"
+	"github.com/superagent-ai/superagent-base/backend/pkg/webhook"
 	"github.com/superagent-ai/superagent-base/backend/types/consts"
 )
 
@@ -235,6 +236,14 @@ func main() {
 		})
 	}
 
+	// WHK-001: Initialise webhook dispatcher and register global accessor.
+	webhookWorkers := int(conv.StrToInt64D(getEnv("WEBHOOK_WORKERS", "4"), 4))
+	webhookStore := webhook.NewMemoryStore()
+	webhookDispatcher := webhook.NewDispatcher(webhookStore, webhookWorkers)
+	webhookDispatcher.Start(ctx)
+	webhook.InitGlobalDispatcher(webhookDispatcher)
+	logs.Infof("webhook dispatcher started (workers=%d)", webhookWorkers)
+
 	startHttpServer(agentRT, skillMgr, mcpRegistry, userStore, evoEngine)
 }
 
@@ -342,6 +351,16 @@ func startHttpServer(agentRT *agentdef.AgentRuntime, skillMgr *skill.Manager, mc
 	adminGroup.GET("/evolution/stats", evoAdmin.HandleStats)
 	adminGroup.GET("/evolution/genes", evoAdmin.HandleListGenes)
 	adminGroup.GET("/evolution/federated", evoAdmin.HandleFederatedSearch)
+
+	// Webhook subscription management endpoints — protected by admin auth middleware.
+	webhookH := cozehandler.NewWebhookHandler(webhook.GetWebhookDispatcher())
+	adminGroup.POST("/webhooks", webhookH.HandleCreate)
+	adminGroup.GET("/webhooks", webhookH.HandleList)
+	adminGroup.GET("/webhooks/:id", webhookH.HandleGet)
+	adminGroup.PUT("/webhooks/:id", webhookH.HandleUpdate)
+	adminGroup.DELETE("/webhooks/:id", webhookH.HandleDelete)
+	adminGroup.POST("/webhooks/:id/test", webhookH.HandleTest)
+	adminGroup.GET("/webhooks/:id/logs", webhookH.HandleLogs)
 
 	// 集团小海对接接口 (集团IT智能体输出规范 v1.0.0) — Api-Key 鉴权.
 	xiaohaiH := cozehandler.NewXiaohaiHandler(agentRT)
