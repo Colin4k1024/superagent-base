@@ -1,0 +1,61 @@
+pages:
+  stage: deploy
+  image: node:18-alpine
+  script:
+    - npm install -g docsify-cli
+    - mkdir -p public
+    - |
+      cat > public/index.html << 'HTMLEOF'
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <title>Superagent Base</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/docsify-themeable@0/dist/css/theme-simple.css">
+      </head>
+      <body>
+        <div id="app"></div>
+        <script>
+          window.$docsify = {
+            name: 'Superagent Base',
+            repo: '',
+            loadSidebar: true,
+            subMaxLevel: 3,
+            search: {
+              placeholder: '搜索文档',
+              noData: '没有找到结果',
+            },
+          }
+        </script>
+        <script src="https://cdn.jsdelivr.net/npm/docsify@4/lib/docsify.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/docsify@4/lib/plugins/search.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/prismjs@1/components/prism-yaml.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/prismjs@1/components/prism-bash.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/prismjs@1/components/prism-go.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/prismjs@1/components/prism-json.min.js"></script>
+      </body>
+      </html>
+      HTMLEOF
+    - cp -r docs/wiki/* public/ 2>/dev/null || true
+    - |
+      if [ ! -f public/_sidebar.md ]; then
+        cat > public/README.md << 'MDEOF'
+      # Superagent Base
+
+      开源 AI Agent 开发平台，基于声明式 YAML 定义构建、部署和管理 AI Agent。
+
+      ## 快速导航
+
+      - [快速上手](guide/quickstart.md)
+      - [架构总览](guide/architecture.md)
+      - [Agent YAML 规范](guide/agent-yaml-spec.md)
+      - [工具系统](guide/tools.md)
+      - [HiAgent RAG 集成](advanced/hiagent-rag.md)
+      MDEOF
+      fi
+  artifacts:
+    paths:
+      - public
+  only:
+    - main
