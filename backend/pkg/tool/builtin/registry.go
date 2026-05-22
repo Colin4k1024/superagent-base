@@ -20,10 +20,15 @@ import "github.com/cloudwego/eino/components/tool"
 
 // GetAllBuiltinTools returns one instance of every built-in tool.
 // Each call produces fresh instances so callers can configure them independently.
+// Tools that depend on optional env vars return nil when unconfigured and are skipped.
 func GetAllBuiltinTools() []tool.InvokableTool {
-	return []tool.InvokableTool{
+	tools := []tool.InvokableTool{
 		newWebSearchTool(),
 		newHTTPRequestTool(),
 		newCodeExecTool(),
 	}
+	if t := newHiAgentRAGTool(); t != nil {
+		tools = append(tools, t)
+	}
+	return tools
 }

@@ -1,0 +1,22 @@
+apiVersion: superagent/v1
+kind: Agent
+metadata:
+  name: rag-assistant
+  version: "1.0.0"
+  tags: [rag, hiagent]
+  description: "基于 HiAgent 知识库的 RAG 问答助手"
+
+spec:
+  type: chat_model_agent
+  model:
+    primary: qwen-plus
+
+  system_prompt: |
+    你是一个知识助手。用户提问时，使用 hiagent_rag 工具检索知识库获取相关信息，
+    然后综合检索结果给出准确的回答。如果知识库中没有相关信息，如实告知用户。
+
+  tools:
+    - ref: builtin/hiagent_rag
+
+  memory:
+    backend: builtin
