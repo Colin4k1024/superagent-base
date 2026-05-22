@@ -17,7 +17,7 @@ require (
 	github.com/bytedance/gopkg v0.1.3
 	github.com/bytedance/mockey v1.2.14
 	github.com/bytedance/sonic v1.15.0
-	github.com/cloudwego/eino v0.7.13
+	github.com/cloudwego/eino v0.9.0-beta.1
 	github.com/cloudwego/eino-ext/components/embedding/ark v0.1.0
 	github.com/cloudwego/eino-ext/components/embedding/gemini v0.0.0-20250814083140-54b99ff82f8e
 	github.com/cloudwego/eino-ext/components/embedding/ollama v0.0.0-20250728060543-79ec300857b8
@@ -300,6 +300,7 @@ require (
 	github.com/ardielle/ardielle-go v1.5.2 // indirect
 	github.com/bahlo/generic-list-go v0.2.0 // indirect
 	github.com/bits-and-blooms/bitset v1.4.0 // indirect
+	github.com/bmatcuk/doublestar/v4 v4.10.0 // indirect
 	github.com/buger/jsonparser v1.1.1 // indirect
 	github.com/danieljoos/wincred v1.1.2 // indirect
 	github.com/dvsekhvalnov/jose2go v1.6.0 // indirect

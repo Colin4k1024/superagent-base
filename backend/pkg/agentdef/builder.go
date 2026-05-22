@@ -18,25 +18,16 @@ package agentdef
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
 	"os"
 	"strings"
-	"sync"
 	"time"
 
-	einoark "github.com/cloudwego/eino-ext/components/model/ark"
-	einoclaude "github.com/cloudwego/eino-ext/components/model/claude"
-	einodeepseek "github.com/cloudwego/eino-ext/components/model/deepseek"
-	einoollama "github.com/cloudwego/eino-ext/components/model/ollama"
-	einoopenai "github.com/cloudwego/eino-ext/components/model/openai"
-	"github.com/cloudwego/eino/components/model"
+	"github.com/cloudwego/eino/adk"
 	einotool "github.com/cloudwego/eino/components/tool"
 	"github.com/cloudwego/eino/compose"
-	"github.com/cloudwego/eino/flow/agent/react"
 	"github.com/cloudwego/eino/schema"
 
 	"github.com/superagent-ai/superagent-base/backend/infra/cache"
@@ -46,7 +37,6 @@ import (
 	"github.com/superagent-ai/superagent-base/backend/pkg/mcp"
 	"github.com/superagent-ai/superagent-base/backend/pkg/memory"
 	"github.com/superagent-ai/superagent-base/backend/pkg/modelrouter"
-	"github.com/superagent-ai/superagent-base/backend/pkg/observe"
 	"github.com/superagent-ai/superagent-base/backend/pkg/skill"
 	"github.com/superagent-ai/superagent-base/backend/pkg/tool"
 )
@@ -165,6 +155,8 @@ func (b *AgentBuilder) Build(ctx context.Context, def *AgentDefinition) (Agent, 
 	switch def.Spec.Type {
 	case "supervisor":
 		return b.buildSupervisor(ctx, def)
+	case "adk_supervisor":
+		return b.buildADKSupervisor(ctx, def)
 	case "sequential":
 		return b.buildSequential(ctx, def)
 	case "parallel":
@@ -239,7 +231,7 @@ func (b *AgentBuilder) Build(ctx context.Context, def *AgentDefinition) (Agent, 
 			tools:      toolRefs,
 			memBackend: memBackend,
 		}
-		return b.maybeWrapInterruptable(built, def), nil
+		return b.maybeWrapInterruptable(ctx, built, def), nil
 	}
 
 	// Build a real Eino ChatModel dispatched by provider protocol.
@@ -274,23 +266,37 @@ func (b *AgentBuilder) Build(ctx context.Context, def *AgentDefinition) (Agent, 
 	einoTools := b.resolveEinoTools(ctx, toolRefs)
 
 	if len(einoTools) > 0 {
-		// ReAct agent with tool calling.
-		reactAgent, err := react.NewAgent(ctx, &react.AgentConfig{
-			ToolCallingModel: chatModel,
-			ToolsConfig: compose.ToolsNodeConfig{
-				Tools: einoTools,
+		// ADK ChatModelAgent with tool calling (replaces legacy react.NewAgent).
+		maxStep := 10
+		if def.Spec.MaxTurns > 0 {
+			maxStep = def.Spec.MaxTurns
+		}
+		adkHandlers, err := resolveADKHandlers(ctx, def.Spec.Middleware)
+		if err != nil {
+			return nil, fmt.Errorf("agentdef: Build %q: resolve adk handlers: %w", def.Metadata.Name, err)
+		}
+		adkAgent, err := adk.NewChatModelAgent(ctx, &adk.ChatModelAgentConfig{
+			Name:        def.Metadata.Name,
+			Description: def.Spec.SystemPrompt,
+			Instruction: def.Spec.SystemPrompt,
+			Model:       chatModel,
+			ToolsConfig: adk.ToolsConfig{
+				ToolsNodeConfig: compose.ToolsNodeConfig{
+					Tools: einoTools,
+				},
 			},
-			MaxStep: 10,
+			MaxIterations: maxStep,
+			Handlers:      adkHandlers,
 		})
 		if err != nil {
-			return nil, fmt.Errorf("agentdef: Build: create react agent: %w", err)
+			return nil, fmt.Errorf("agentdef: Build: create adk agent: %w", err)
 		}
-		built = &einoReactAgent{
+		built = &adkChatModelAgent{
 			def:          def,
 			modelID:      effectiveModelID,
 			provider:     protocol,
 			memBackend:   memBackend,
-			agent:        reactAgent,
+			agent:        adkAgent,
 			systemPrompt: def.Spec.SystemPrompt,
 		}
 	} else {
@@ -317,22 +323,31 @@ func (b *AgentBuilder) Build(ctx context.Context, def *AgentDefinition) (Agent, 
 		}
 		var fbAgent Agent
 		if len(einoTools) > 0 {
-			fbReactAgent, fbReactErr := react.NewAgent(ctx, &react.AgentConfig{
-				ToolCallingModel: fallbackModel,
-				ToolsConfig: compose.ToolsNodeConfig{
-					Tools: einoTools,
-				},
-				MaxStep: 10,
-			})
-			if fbReactErr != nil {
-				return nil, fmt.Errorf("agentdef: Build: create fallback react agent: %w", fbReactErr)
+			maxStep := 10
+			if def.Spec.MaxTurns > 0 {
+				maxStep = def.Spec.MaxTurns
 			}
-			fbAgent = &einoReactAgent{
+			fbADKAgent, fbADKErr := adk.NewChatModelAgent(ctx, &adk.ChatModelAgentConfig{
+				Name:        def.Metadata.Name + "_fallback",
+				Description: def.Spec.SystemPrompt,
+				Instruction: def.Spec.SystemPrompt,
+				Model:       fallbackModel,
+				ToolsConfig: adk.ToolsConfig{
+					ToolsNodeConfig: compose.ToolsNodeConfig{
+						Tools: einoTools,
+					},
+				},
+				MaxIterations: maxStep,
+			})
+			if fbADKErr != nil {
+				return nil, fmt.Errorf("agentdef: Build: create fallback adk agent: %w", fbADKErr)
+			}
+			fbAgent = &adkChatModelAgent{
 				def:          def,
 				modelID:      fallbackModelID,
 				provider:     protocol,
 				memBackend:   memBackend,
-				agent:        fbReactAgent,
+				agent:        fbADKAgent,
 				systemPrompt: def.Spec.SystemPrompt,
 			}
 		} else {
@@ -350,12 +365,15 @@ func (b *AgentBuilder) Build(ctx context.Context, def *AgentDefinition) (Agent, 
 		built = &fallbackAgent{primary: built, fallback: fbAgent}
 	}
 
-	return b.maybeWrapInterruptable(built, def), nil
+	return b.maybeWrapInterruptable(ctx, built, def), nil
 }
 
-// maybeWrapInterruptable wraps agent with InterruptableAgent when the
+// maybeWrapInterruptable wraps agent with interrupt/resume support when the
 // definition's interrupt config is present and enabled.
-func (b *AgentBuilder) maybeWrapInterruptable(agent Agent, def *AgentDefinition) Agent {
+// For ADK-based agents it uses ADKRunnerAgent with native checkpoint support;
+// for legacy agents it falls back to InterruptableAgent with pattern-based detection.
+// The function unwraps through middleware layers to find the underlying ADK agent.
+func (b *AgentBuilder) maybeWrapInterruptable(ctx context.Context, agent Agent, def *AgentDefinition) Agent {
 	ic := def.Spec.Interrupt
 	if ic == nil || !ic.Enabled {
 		return agent
@@ -371,6 +389,20 @@ func (b *AgentBuilder) maybeWrapInterruptable(agent Agent, def *AgentDefinition)
 		}
 	default:
 		store = checkpoint.NewInMemoryStore()
+	}
+
+	// Unwrap through middleware layers to find the underlying ADK agent.
+	if adkAgent := unwrapToADKChatModel(agent); adkAgent != nil {
+		return NewADKRunnerAgent(
+			ctx,
+			adkAgent.agent,
+			store,
+			def,
+			adkAgent.modelID,
+			adkAgent.provider,
+			adkAgent.systemPrompt,
+			adkAgent.memBackend,
+		)
 	}
 
 	timeout := time.Duration(ic.TimeoutSeconds) * time.Second
@@ -452,294 +484,6 @@ func (b *AgentBuilder) applyMiddleware(agent Agent, def *AgentDefinition) Agent 
 	return result
 }
 
-// observedAgent wraps an Agent with Prometheus metrics recording.
-type observedAgent struct {
-	inner         Agent
-	enableMetrics bool
-}
-
-func (a *observedAgent) Name() string                    { return a.inner.Name() }
-func (a *observedAgent) Description() string             { return a.inner.Description() }
-func (a *observedAgent) GetDefinition() *AgentDefinition { return a.inner.GetDefinition() }
-
-func (a *observedAgent) Chat(ctx context.Context, sessionID string, message string) (<-chan string, error) {
-	start := time.Now()
-	ch, err := a.inner.Chat(ctx, sessionID, message)
-	if err != nil {
-		if a.enableMetrics {
-			observe.AgentRequestsTotal.WithLabelValues(a.inner.Name(), "error").Inc()
-			observe.AgentRequestDuration.WithLabelValues(a.inner.Name()).Observe(time.Since(start).Seconds())
-		}
-		return nil, err
-	}
-
-	// Wrap channel to record completion metrics.
-	out := make(chan string, 64)
-	go func() {
-		defer close(out)
-		hadError := false
-		for token := range ch {
-			if strings.HasPrefix(token, "[error]") {
-				hadError = true
-			}
-			select {
-			case out <- token:
-			case <-ctx.Done():
-				if a.enableMetrics {
-					observe.AgentRequestsTotal.WithLabelValues(a.inner.Name(), "cancelled").Inc()
-					observe.AgentRequestDuration.WithLabelValues(a.inner.Name()).Observe(time.Since(start).Seconds())
-				}
-				return
-			}
-		}
-		if a.enableMetrics {
-			status := "success"
-			if hadError {
-				status = "error"
-			}
-			observe.AgentRequestsTotal.WithLabelValues(a.inner.Name(), status).Inc()
-			observe.AgentRequestDuration.WithLabelValues(a.inner.Name()).Observe(time.Since(start).Seconds())
-		}
-	}()
-	return out, nil
-}
-
-// timeoutAgent wraps an Agent with a per-request timeout.
-type timeoutAgent struct {
-	inner   Agent
-	timeout time.Duration
-}
-
-func (a *timeoutAgent) Name() string                    { return a.inner.Name() }
-func (a *timeoutAgent) Description() string             { return a.inner.Description() }
-func (a *timeoutAgent) GetDefinition() *AgentDefinition { return a.inner.GetDefinition() }
-
-func (a *timeoutAgent) Chat(ctx context.Context, sessionID string, message string) (<-chan string, error) {
-	ctx, cancel := context.WithTimeout(ctx, a.timeout)
-	ch, err := a.inner.Chat(ctx, sessionID, message)
-	if err != nil {
-		cancel()
-		return nil, err
-	}
-	// Wrap channel to cancel context after draining.
-	out := make(chan string, 64)
-	go func() {
-		defer close(out)
-		defer cancel()
-		for token := range ch {
-			select {
-			case out <- token:
-			case <-ctx.Done():
-				return
-			}
-		}
-	}()
-	return out, nil
-}
-
-// retryAgent wraps an Agent with retry-on-failure logic.
-type retryAgent struct {
-	inner       Agent
-	maxAttempts int
-}
-
-func (a *retryAgent) Name() string                    { return a.inner.Name() }
-func (a *retryAgent) Description() string             { return a.inner.Description() }
-func (a *retryAgent) GetDefinition() *AgentDefinition { return a.inner.GetDefinition() }
-
-func (a *retryAgent) Chat(ctx context.Context, sessionID string, message string) (<-chan string, error) {
-	var lastErr error
-	for attempt := 0; attempt < a.maxAttempts; attempt++ {
-		ch, err := a.inner.Chat(ctx, sessionID, message)
-		if err == nil {
-			return ch, nil
-		}
-		lastErr = err
-		// Exponential backoff: 100ms, 200ms, 400ms... — cancellable via ctx.
-		backoff := time.Duration(100<<uint(attempt)) * time.Millisecond
-		select {
-		case <-ctx.Done():
-			return nil, ctx.Err()
-		case <-time.After(backoff):
-		}
-	}
-	return nil, fmt.Errorf("agentdef: retry exhausted after %d attempts: %w", a.maxAttempts, lastErr)
-}
-
-// ─── fallback agent ─────────────────────────────────────────────────────────
-
-// fallbackAgent wraps a primary Agent with a fallback Agent. If primary.Chat()
-// returns an error, the fallback agent is tried instead.
-type fallbackAgent struct {
-	primary  Agent
-	fallback Agent
-}
-
-func (a *fallbackAgent) Name() string                    { return a.primary.Name() }
-func (a *fallbackAgent) Description() string             { return a.primary.Description() }
-func (a *fallbackAgent) GetDefinition() *AgentDefinition { return a.primary.GetDefinition() }
-
-func (a *fallbackAgent) Chat(ctx context.Context, sessionID string, message string) (<-chan string, error) {
-	ch, err := a.primary.Chat(ctx, sessionID, message)
-	if err != nil {
-		// Primary failed; try fallback.
-		return a.fallback.Chat(ctx, sessionID, message)
-	}
-	return ch, nil
-}
-
-// ─── rate limit agent ───────────────────────────────────────────────────────
-
-// rateLimitAgent wraps an Agent with a simple token-bucket rate limiter based
-// on request timestamps within a sliding window.
-type rateLimitAgent struct {
-	inner Agent
-	rpm   int
-	mu    sync.Mutex
-	times []time.Time
-}
-
-func (a *rateLimitAgent) Name() string                    { return a.inner.Name() }
-func (a *rateLimitAgent) Description() string             { return a.inner.Description() }
-func (a *rateLimitAgent) GetDefinition() *AgentDefinition { return a.inner.GetDefinition() }
-
-func (a *rateLimitAgent) Chat(ctx context.Context, sessionID string, message string) (<-chan string, error) {
-	a.mu.Lock()
-	now := time.Now()
-	windowStart := now.Add(-time.Minute)
-
-	// Evict timestamps outside the sliding window.
-	valid := a.times[:0]
-	for _, t := range a.times {
-		if t.After(windowStart) {
-			valid = append(valid, t)
-		}
-	}
-	a.times = valid
-
-	if len(a.times) >= a.rpm {
-		a.mu.Unlock()
-		return nil, fmt.Errorf("agentdef: rate limit exceeded (%d requests/minute)", a.rpm)
-	}
-	a.times = append(a.times, now)
-	a.mu.Unlock()
-
-	return a.inner.Chat(ctx, sessionID, message)
-}
-
-// ─── cache agent ────────────────────────────────────────────────────────────
-
-// cacheEntry holds a cached response with its expiration time.
-type cacheEntry struct {
-	tokens    []string
-	expiresAt time.Time
-}
-
-// maxCacheEntries is the maximum number of cached responses retained in memory.
-const maxCacheEntries = 1000
-
-// cacheAgent wraps an Agent with an in-memory response cache keyed by
-// SHA256(agentName + sessionID + message).
-type cacheAgent struct {
-	inner Agent
-	ttl   time.Duration
-	mu    sync.RWMutex
-	cache map[string]cacheEntry
-}
-
-func (a *cacheAgent) Name() string                    { return a.inner.Name() }
-func (a *cacheAgent) Description() string             { return a.inner.Description() }
-func (a *cacheAgent) GetDefinition() *AgentDefinition { return a.inner.GetDefinition() }
-
-func (a *cacheAgent) Chat(ctx context.Context, sessionID string, message string) (<-chan string, error) {
-	key := cacheKey(a.inner.Name(), sessionID, message)
-
-	// Check cache (read lock).
-	a.mu.RLock()
-	if entry, ok := a.cache[key]; ok && time.Now().Before(entry.expiresAt) {
-		a.mu.RUnlock()
-		ch := make(chan string, len(entry.tokens))
-		for _, tok := range entry.tokens {
-			ch <- tok
-		}
-		close(ch)
-		return ch, nil
-	}
-	a.mu.RUnlock()
-
-	// Cache miss: call inner agent.
-	innerCh, err := a.inner.Chat(ctx, sessionID, message)
-	if err != nil {
-		return nil, err
-	}
-
-	// Wrap channel to collect tokens for caching.
-	out := make(chan string, 64)
-	go func() {
-		defer close(out)
-		var tokens []string
-		for tok := range innerCh {
-			select {
-			case out <- tok:
-				tokens = append(tokens, tok)
-			case <-ctx.Done():
-				return
-			}
-		}
-		// Only cache successful responses (no error tokens).
-		hasError := false
-		for _, tok := range tokens {
-			if strings.HasPrefix(tok, "[error]") {
-				hasError = true
-				break
-			}
-		}
-		if !hasError {
-			// Store in cache with eviction of expired/oldest entries.
-			a.mu.Lock()
-			now := time.Now()
-			// Evict expired entries first.
-			for k, e := range a.cache {
-				if now.After(e.expiresAt) {
-					delete(a.cache, k)
-				}
-			}
-			// If still at capacity, evict the oldest entry.
-			if len(a.cache) >= maxCacheEntries {
-				var oldestKey string
-				var oldestTime time.Time
-				for k, e := range a.cache {
-					if oldestKey == "" || e.expiresAt.Before(oldestTime) {
-						oldestKey = k
-						oldestTime = e.expiresAt
-					}
-				}
-				if oldestKey != "" {
-					delete(a.cache, oldestKey)
-				}
-			}
-			a.cache[key] = cacheEntry{
-				tokens:    tokens,
-				expiresAt: time.Now().Add(a.ttl),
-			}
-			a.mu.Unlock()
-		}
-	}()
-	return out, nil
-}
-
-// cacheKey produces a SHA256 hex digest from the agent name, session ID, and message.
-// Fields are separated by a null byte to prevent collisions where field boundaries
-// shift (e.g. ("a","bc","d") vs ("ab","c","d")).
-func cacheKey(agentName, sessionID, message string) string {
-	h := sha256.New()
-	h.Write([]byte(agentName))
-	h.Write([]byte{0})
-	h.Write([]byte(sessionID))
-	h.Write([]byte{0})
-	h.Write([]byte(message))
-	return hex.EncodeToString(h.Sum(nil))
-}
 
 // resolveEinoTools converts resolved tool refs to Eino einotool.BaseTool instances.
 // Supports builtin (via tool.Manager), skill:// (via skill.Manager), and
@@ -925,6 +669,114 @@ func (b *AgentBuilder) buildSupervisor(ctx context.Context, def *AgentDefinition
 	}, nil
 }
 
+// adkAgentFrom returns the underlying adk.Agent if the agent was built with ADK.
+// It unwraps through middleware layers to find the ADK agent. Returns nil if not
+// ADK-based.
+func adkAgentFrom(a Agent) adk.Agent {
+	return unwrapToEinoAgent(a)
+}
+
+// buildADKSupervisor constructs a supervisor using ADK's AgentTool pattern.
+// Each sub-agent is wrapped as an AgentTool and exposed to the main ChatModelAgent,
+// which autonomously decides which sub-agent to call based on the task.
+func (b *AgentBuilder) buildADKSupervisor(ctx context.Context, def *AgentDefinition) (Agent, error) {
+	agents, err := b.resolveSubAgentList(def)
+	if err != nil {
+		return nil, err
+	}
+
+	// Resolve regular tools from the supervisor definition.
+	var toolRefs []resolvedTool
+	for _, ref := range def.Spec.Tools {
+		resolved, resolveErr := b.resolveToolRef(ref)
+		if resolveErr != nil {
+			continue
+		}
+		toolRefs = append(toolRefs, resolved)
+	}
+	einoTools := b.resolveEinoTools(ctx, toolRefs)
+
+	// Wrap each sub-agent as an AgentTool.
+	for _, subAgent := range agents {
+		underlying := adkAgentFrom(subAgent)
+		if underlying == nil {
+			continue
+		}
+		agentTool := adk.NewAgentTool(ctx, underlying)
+		einoTools = append(einoTools, agentTool)
+	}
+
+	// Build the supervisor's model.
+	effectiveModelID := def.Spec.Model.Primary
+	if effectiveModelID == "" {
+		effectiveModelID = b.modelConfig.ModelID
+	}
+	baseURL := b.modelConfig.BaseURL
+	apiKey := b.modelConfig.APIKey
+	protocol := b.modelConfig.Type
+	if def.Spec.Model.BaseURL != "" {
+		baseURL = def.Spec.Model.BaseURL
+	}
+	if def.Spec.Model.APIKeyEnv != "" {
+		if v := os.Getenv(def.Spec.Model.APIKeyEnv); v != "" {
+			apiKey = v
+		}
+	}
+	if def.Spec.Model.Protocol != "" {
+		protocol = def.Spec.Model.Protocol
+	}
+	chatModel, err := b.createChatModel(ctx, protocol, baseURL, apiKey, effectiveModelID)
+	if err != nil {
+		return nil, fmt.Errorf("agentdef: buildADKSupervisor %q: create model: %w", def.Metadata.Name, err)
+	}
+
+	maxStep := 20
+	if def.Spec.Orchestration != nil && def.Spec.Orchestration.MaxRounds > 0 {
+		maxStep = def.Spec.Orchestration.MaxRounds
+	}
+
+	adkHandlers, err := resolveADKHandlers(ctx, def.Spec.Middleware)
+	if err != nil {
+		return nil, fmt.Errorf("agentdef: buildADKSupervisor %q: resolve handlers: %w", def.Metadata.Name, err)
+	}
+
+	adkAgent, err := adk.NewChatModelAgent(ctx, &adk.ChatModelAgentConfig{
+		Name:        def.Metadata.Name,
+		Description: def.Spec.SystemPrompt,
+		Instruction: def.Spec.SystemPrompt,
+		Model:       chatModel,
+		ToolsConfig: adk.ToolsConfig{
+			ToolsNodeConfig: compose.ToolsNodeConfig{
+				Tools: einoTools,
+			},
+			EmitInternalEvents: true,
+		},
+		MaxIterations: maxStep,
+		Handlers:      adkHandlers,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("agentdef: buildADKSupervisor %q: create agent: %w", def.Metadata.Name, err)
+	}
+
+	var memBackend memory.Backend
+	if b.memoryFactory != nil && def.Spec.Memory.Backend != "" {
+		cfg := memory.BackendConfig{
+			Type:    def.Spec.Memory.Backend,
+			Options: def.Spec.Memory.Config,
+		}
+		memBackend, _ = b.memoryFactory(cfg)
+	}
+	built := &adkChatModelAgent{
+		def:          def,
+		modelID:      effectiveModelID,
+		provider:     protocol,
+		memBackend:   memBackend,
+		agent:        adkAgent,
+		systemPrompt: def.Spec.SystemPrompt,
+	}
+	return b.maybeWrapInterruptable(ctx, built, def), nil
+}
+
 // buildSequential constructs a SequentialAgent from ordered sub-agent refs.
 func (b *AgentBuilder) buildSequential(_ context.Context, def *AgentDefinition) (Agent, error) {
 	agents, err := b.resolveSubAgentList(def)
@@ -1026,7 +878,7 @@ func (b *AgentBuilder) buildAgentLoop(ctx context.Context, def *AgentDefinition)
 		def:         def,
 		maxTurns:    maxTurns,
 	}
-	return b.maybeWrapInterruptable(agent, def), nil
+	return b.maybeWrapInterruptable(ctx, agent, def), nil
 }
 
 // buildWorkflow constructs a WorkflowAgent from a workflow spec.
@@ -1126,305 +978,9 @@ func (a *einoGraphAgent) Chat(ctx context.Context, _ string, message string) (<-
 	return ch, nil
 }
 
-// ─── stub agent (no model config) ────────────────────────────────────────────
 
-// chatAgent is the stub implementation used when no real model endpoint is
-// configured.  It satisfies the Agent interface for testing purposes.
-type chatAgent struct {
-	def        *AgentDefinition
-	modelID    string
-	tools      []resolvedTool
-	memBackend memory.Backend
-}
-
-func (a *chatAgent) Name() string                    { return a.def.Metadata.Name }
-func (a *chatAgent) Description() string             { return a.def.Spec.SystemPrompt }
-func (a *chatAgent) GetDefinition() *AgentDefinition { return a.def }
-
-func (a *chatAgent) Chat(_ context.Context, _ string, message string) (<-chan string, error) {
-	ch := make(chan string, 1)
-	ch <- fmt.Sprintf("[%s] placeholder response for: %s", a.modelID, message)
-	close(ch)
-	return ch, nil
-}
-
-// ─── Eino simple chat agent (no tools) ───────────────────────────────────────
-
-// einoChatAgent calls an Eino ChatModel directly (no tool loop).
-type einoChatAgent struct {
-	def          *AgentDefinition
-	modelID      string
-	provider     string // protocol / provider type for metrics labeling
-	memBackend   memory.Backend
-	chatModel    model.ToolCallingChatModel
-	systemPrompt string
-}
-
-func (a *einoChatAgent) Name() string                    { return a.def.Metadata.Name }
-func (a *einoChatAgent) Description() string             { return a.systemPrompt }
-func (a *einoChatAgent) GetDefinition() *AgentDefinition { return a.def }
-
-func (a *einoChatAgent) Chat(ctx context.Context, sessionID string, message string) (<-chan string, error) {
-	// Build message list: system prompt + history + new user message
-	msgs := make([]*schema.Message, 0, 8)
-	if a.systemPrompt != "" {
-		msgs = append(msgs, schema.SystemMessage(a.systemPrompt))
-	}
-
-	// Load conversation history from memory if available
-	if a.memBackend != nil && sessionID != "" {
-		history, err := a.memBackend.GetMessages(ctx, sessionID, memory.GetMessagesOpts{Limit: 20})
-		if err == nil {
-			for _, m := range history {
-				switch m.Role {
-				case "user":
-					msgs = append(msgs, schema.UserMessage(m.Content))
-				case "assistant":
-					msgs = append(msgs, schema.AssistantMessage(m.Content, nil))
-				}
-			}
-		}
-	}
-
-	// Append current user message
-	msgs = append(msgs, schema.UserMessage(message))
-
-	// Save user message to memory
-	if a.memBackend != nil && sessionID != "" {
-		_ = a.memBackend.AddMessage(ctx, sessionID, memory.Message{
-			Role:      "user",
-			Content:   message,
-			Timestamp: time.Now().Unix(),
-		})
-	}
-
-	reader, err := a.chatModel.Stream(ctx, msgs)
-	if err != nil {
-		return nil, fmt.Errorf("agentdef: chat: stream: %w", err)
-	}
-
-	ch := make(chan string, 64)
-	go func() {
-		defer close(ch)
-		defer reader.Close()
-		var fullResponse strings.Builder
-		streamStart := time.Now()
-		firstToken := true
-		for {
-			chunk, err := reader.Recv()
-			if err != nil {
-				if !errors.Is(err, io.EOF) {
-					select {
-					case ch <- fmt.Sprintf("[error] %v", err):
-					case <-ctx.Done():
-					}
-				}
-				// Save assistant response to memory
-				if a.memBackend != nil && sessionID != "" && fullResponse.Len() > 0 {
-					_ = a.memBackend.AddMessage(ctx, sessionID, memory.Message{
-						Role:      "assistant",
-						Content:   fullResponse.String(),
-						Timestamp: time.Now().Unix(),
-					})
-				}
-				return
-			}
-			if chunk != nil && chunk.Content != "" {
-				if firstToken {
-					modelrouter.RecordModelLatency(a.modelID, a.provider, time.Since(streamStart))
-					firstToken = false
-				}
-				fullResponse.WriteString(chunk.Content)
-				select {
-				case ch <- chunk.Content:
-				case <-ctx.Done():
-					return
-				}
-			}
-		}
-	}()
-	return ch, nil
-}
-
-// ─── Eino ReAct agent (with tools) ───────────────────────────────────────────
-
-// einoReactAgent wraps an Eino react.Agent for tool-using interactions.
-type einoReactAgent struct {
-	def          *AgentDefinition
-	modelID      string
-	provider     string // protocol / provider type for metrics labeling
-	memBackend   memory.Backend
-	agent        *react.Agent
-	systemPrompt string
-}
-
-func (a *einoReactAgent) Name() string                    { return a.def.Metadata.Name }
-func (a *einoReactAgent) Description() string             { return a.systemPrompt }
-func (a *einoReactAgent) GetDefinition() *AgentDefinition { return a.def }
-
-func (a *einoReactAgent) Chat(ctx context.Context, sessionID string, message string) (<-chan string, error) {
-	// Build message list: system prompt + history + new user message
-	msgs := make([]*schema.Message, 0, 8)
-	if a.systemPrompt != "" {
-		msgs = append(msgs, schema.SystemMessage(a.systemPrompt))
-	}
-
-	// Load conversation history from memory if available
-	if a.memBackend != nil && sessionID != "" {
-		history, err := a.memBackend.GetMessages(ctx, sessionID, memory.GetMessagesOpts{Limit: 20})
-		if err == nil {
-			for _, m := range history {
-				switch m.Role {
-				case "user":
-					msgs = append(msgs, schema.UserMessage(m.Content))
-				case "assistant":
-					msgs = append(msgs, schema.AssistantMessage(m.Content, nil))
-				}
-			}
-		}
-	}
-
-	// Append current user message
-	msgs = append(msgs, schema.UserMessage(message))
-
-	// Save user message to memory
-	if a.memBackend != nil && sessionID != "" {
-		_ = a.memBackend.AddMessage(ctx, sessionID, memory.Message{
-			Role:      "user",
-			Content:   message,
-			Timestamp: time.Now().Unix(),
-		})
-	}
-
-	reader, err := a.agent.Stream(ctx, msgs)
-	if err != nil {
-		return nil, fmt.Errorf("agentdef: react chat: stream: %w", err)
-	}
-
-	ch := make(chan string, 64)
-	go func() {
-		defer close(ch)
-		defer reader.Close()
-		streamStart := time.Now()
-		firstToken := true
-		var fullResponse strings.Builder
-		for {
-			chunk, err := reader.Recv()
-			if err != nil {
-				if !errors.Is(err, io.EOF) {
-					select {
-					case ch <- fmt.Sprintf("[error] %v", err):
-					case <-ctx.Done():
-					}
-				}
-				// Save assistant response to memory
-				if a.memBackend != nil && sessionID != "" && fullResponse.Len() > 0 {
-					_ = a.memBackend.AddMessage(ctx, sessionID, memory.Message{
-						Role:      "assistant",
-						Content:   fullResponse.String(),
-						Timestamp: time.Now().Unix(),
-					})
-				}
-				return
-			}
-			if chunk != nil && chunk.Content != "" {
-				if firstToken {
-					modelrouter.RecordModelLatency(a.modelID, a.provider, time.Since(streamStart))
-					firstToken = false
-				}
-				fullResponse.WriteString(chunk.Content)
-				select {
-				case ch <- chunk.Content:
-				case <-ctx.Done():
-					return
-				}
-			}
-		}
-	}()
-	return ch, nil
-}
-
-// ─── provider dispatch ───────────────────────────────────────────────────────
-
-// createChatModel creates an Eino ChatModel for the given protocol.
-// Protocols deepseek, ollama, qwen are OpenAI-compatible (just different BaseURL).
-// Claude, Gemini, and ARK have dedicated SDK adapters.
-func (b *AgentBuilder) createChatModel(ctx context.Context, protocol, baseURL, apiKey, modelID string) (model.ToolCallingChatModel, error) {
-	switch strings.ToLower(protocol) {
-	case "claude":
-		return einoclaude.NewChatModel(ctx, &einoclaude.Config{
-			BaseURL: &baseURL,
-			APIKey:  apiKey,
-			Model:   modelID,
-		})
-
-	case "gemini":
-		// Gemini requires google.golang.org/genai client. For simplicity, use
-		// OpenAI-compatible endpoint (e.g. via LiteLLM proxy) when base_url is set.
-		if baseURL != "" {
-			return einoopenai.NewChatModel(ctx, &einoopenai.ChatModelConfig{
-				BaseURL: baseURL,
-				APIKey:  apiKey,
-				Model:   modelID,
-			})
-		}
-		return nil, fmt.Errorf("gemini protocol requires base_url pointing to an OpenAI-compatible proxy (e.g. LiteLLM)")
-
-	case "ark":
-		return einoark.NewChatModel(ctx, &einoark.ChatModelConfig{
-			BaseURL: baseURL,
-			APIKey:  apiKey,
-			Model:   modelID,
-		})
-
-	case "deepseek":
-		// DeepSeek uses OpenAI-compatible protocol with its own endpoint.
-		if baseURL == "" || baseURL == b.modelConfig.BaseURL {
-			baseURL = "https://api.deepseek.com/v1"
-		}
-		return einodeepseek.NewChatModel(ctx, &einodeepseek.ChatModelConfig{
-			BaseURL: baseURL,
-			APIKey:  apiKey,
-			Model:   modelID,
-		})
-
-	case "ollama":
-		// Ollama uses its own SDK at localhost:11434 (no /v1 suffix).
-		ollamaURL := baseURL
-		if ollamaURL == "" || ollamaURL == b.modelConfig.BaseURL {
-			ollamaURL = "http://localhost:11434"
-		}
-		// Strip /v1 suffix if present (Ollama SDK adds its own paths).
-		ollamaURL = strings.TrimSuffix(ollamaURL, "/v1")
-		return einoollama.NewChatModel(ctx, &einoollama.ChatModelConfig{
-			BaseURL: ollamaURL,
-			Model:   modelID,
-		})
-
-	case "openai", "qwen", "":
-		// OpenAI protocol (also used by Qwen DashScope compatible endpoint).
-		return einoopenai.NewChatModel(ctx, &einoopenai.ChatModelConfig{
-			BaseURL: baseURL,
-			APIKey:  apiKey,
-			Model:   modelID,
-		})
-
-	default:
-		return nil, fmt.Errorf("unsupported model protocol %q (supported: openai, claude, deepseek, gemini, ark, ollama, qwen)", protocol)
-	}
-}
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
-
-// buildMessages assembles the message slice sent to the model.
-func buildMessages(systemPrompt, userMessage string) []*schema.Message {
-	msgs := make([]*schema.Message, 0, 2)
-	if systemPrompt != "" {
-		msgs = append(msgs, schema.SystemMessage(systemPrompt))
-	}
-	msgs = append(msgs, schema.UserMessage(userMessage))
-	return msgs
-}
 
 // shallowCopyDefWithSystemPrompt returns a copy of def with an overridden system prompt.
 // The original def is not mutated.
