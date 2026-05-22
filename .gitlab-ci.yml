@@ -1,11 +1,12 @@
+image: alpine:latest
+
 pages:
   stage: deploy
-  image: node:18-alpine
   script:
-    - npm install -g docsify-cli
     - mkdir -p public
+    - cp -r docs/wiki/* public/
     - |
-      cat > public/index.html << 'HTMLEOF'
+      cat > public/index.html << 'EOF'
       <!DOCTYPE html>
       <html>
       <head>
@@ -36,26 +37,10 @@ pages:
         <script src="https://cdn.jsdelivr.net/npm/prismjs@1/components/prism-json.min.js"></script>
       </body>
       </html>
-      HTMLEOF
-    - cp -r docs/wiki/* public/ 2>/dev/null || true
-    - |
-      if [ ! -f public/_sidebar.md ]; then
-        cat > public/README.md << 'MDEOF'
-      # Superagent Base
-
-      开源 AI Agent 开发平台，基于声明式 YAML 定义构建、部署和管理 AI Agent。
-
-      ## 快速导航
-
-      - [快速上手](guide/quickstart.md)
-      - [架构总览](guide/architecture.md)
-      - [Agent YAML 规范](guide/agent-yaml-spec.md)
-      - [工具系统](guide/tools.md)
-      - [HiAgent RAG 集成](advanced/hiagent-rag.md)
-      MDEOF
-      fi
+      EOF
+    - cp public/Home.md public/README.md 2>/dev/null || true
   artifacts:
     paths:
       - public
-  only:
-    - main
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
