@@ -421,7 +421,7 @@ services:
   coze-web:
     build:
       context: ../
-      dockerfile: frontend/Dockerfile
+      dockerfile: web/Dockerfile
     # image: cozedev/coze-studio-web:latest
     container_name: coze-web
     restart: always
