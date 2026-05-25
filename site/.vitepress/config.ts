@@ -33,6 +33,7 @@ export default defineConfig({
             { text: 'YAML 规范', link: '/guide/agent-yaml-spec' },
             { text: '模型配置', link: '/guide/model-config' },
             { text: '工具使用', link: '/guide/tools' },
+            { text: '海尔知识问答工具', link: '/guide/haier-knowledge-qa' },
             { text: '记忆系统', link: '/guide/memory' }
           ]
         }
