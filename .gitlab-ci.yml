@@ -1,4 +1,4 @@
-image: alpine:latest
+image: harbor-test.haier.net/paas/alpine:3.22.0
 
 pages:
   stage: deploy
