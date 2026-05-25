@@ -23,9 +23,9 @@
 | **OpenTelemetry + Prometheus** | 分布式追踪 + 指标（Agent 请求数/延迟/错误率、Model Token、Tool 调用、活跃会话数、Evolution 信号），Eino callback 自动上报 |
 | **Monitor Dashboard** | 4 Tab 实时面板（Status / Metrics / Logs / Admin），纯 SVG 图表，SSE 日志流，热重载管理 |
 | **监控栈一键部署** | Prometheus + Grafana + OTel Collector，`docker compose -f docker/docker-compose-monitoring.yml up -d` |
-| **Admin API** | `GET /api/v1/admin/status`（运行状态）、`POST /api/v1/admin/reload`（热重载）、`GET /api/v1/admin/logs`（实时日志 SSE）、Evolution 管理 API |
+| **Platform API（v2）** | 对话流式、会话 CRUD、文件管理、长期记忆、Agent 状态、Workflow 执行、Skills/Tools、Admin 管理——统一 `/api/v2/` 命名空间 |
 | **gRPC API** | AgentService / ConversationService / ModelService / ToolService |
-| **HTTP SSE 流式 API** | POST /api/v1/chat/stream，GET /api/v1/agents，POST /api/v1/chat/resume |
+| **HTTP SSE 流式 API** | POST /api/v2/chat/stream，GET /api/v2/agents，POST /api/v2/chat/resume |
 | **前端认证** | API Key 认证门禁，localStorage 持久化，未授权自动跳转登录页 |
 | **Agent 编辑器** | Monaco YAML 编辑器 + 表单双向同步，创建 / 编辑 / 复制 / 删除 / 校验 / 测试对话 |
 | **Workflow 图编辑器** | React Flow DAG 画布，5 种节点拖放，属性面板，自动布局，YAML ↔ Graph 双向序列化 |
@@ -77,33 +77,96 @@ make dev-down
 
 ## API 快速参考
 
-### HTTP SSE 流式 API
+所有 API 统一在 `/api/v2/` 命名空间下。管理类端点需 `Authorization: Bearer <API_KEY>` 认证。
+
+### 对话与 Agent
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
-| `POST` | `/api/v1/chat/stream` | 流式对话，支持 Legacy 和 A2UI 两种模式 |
-| `GET` | `/api/v1/agents` | 列出所有已加载 Agent |
-| `POST` | `/api/v1/chat/resume` | 恢复中断的对话 |
-| `GET` | `/api/v1/chat/interrupt_state` | 查询会话中断状态 |
+| `POST` | `/api/v2/chat/stream` | 流式对话（SSE），支持 Legacy / A2UI 两种模式 |
+| `POST` | `/api/v2/chat/resume` | 恢复中断的对话 |
+| `GET` | `/api/v2/chat/interrupt_state` | 查询会话中断状态 |
+| `GET` | `/api/v2/agents` | 列出所有已加载 Agent |
 
-### 监控与管理 API
+### 会话与消息
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
-| `GET` | `/api/v1/admin/status` | 系统运行状态（uptime、agents、health、ready） |
-| `POST` | `/api/v1/admin/reload` | 触发 Agent 热重载 |
-| `GET` | `/api/v1/admin/logs` | SSE 实时日志流（结构化 JSON） |
-| `GET` | `/api/v1/admin/evolution/stats` | Evolution 引擎状态（基因数、置信度、成功率） |
-| `GET` | `/api/v1/admin/evolution/genes` | 基因列表（支持 `?q=&min_confidence=&limit=`） |
-| `GET` | `/api/v1/admin/evolution/federated` | 预留（本地模式返回空） |
-| `GET` | `/metrics` | Prometheus 指标端点 |
+| `GET` | `/api/v2/conversations` | 列出会话 |
+| `POST` | `/api/v2/conversations` | 创建会话 |
+| `GET` | `/api/v2/conversations/:id` | 获取会话详情 |
+| `PUT` | `/api/v2/conversations/:id` | 更新会话 |
+| `DELETE` | `/api/v2/conversations/:id` | 删除会话 |
+| `GET` | `/api/v2/conversations/:id/messages` | 获取消息列表 |
+| `DELETE` | `/api/v2/conversations/:id/messages/:msg_id` | 删除消息 |
+| `GET` | `/api/v2/sessions/:session_id/messages` | 获取 session 消息历史 |
+| `DELETE` | `/api/v2/sessions/:session_id` | 清空 session |
+
+### 文件管理
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| `POST` | `/api/v2/files` | 上传文件（multipart/form-data） |
+| `GET` | `/api/v2/files` | 列出所有文件 |
+| `GET` | `/api/v2/files/:id` | 获取文件元信息 |
+| `GET` | `/api/v2/files/:id/content` | 下载文件内容 |
+| `DELETE` | `/api/v2/files/:id` | 删除文件 |
+
+### 长期记忆与 Agent 状态
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| `GET` | `/api/v2/memory/long-term?user_id=&limit=&offset=` | 列出用户的长期记忆 |
+| `POST` | `/api/v2/memory/long-term` | 添加记忆条目 |
+| `GET` | `/api/v2/memory/long-term/search?user_id=&q=` | 语义搜索记忆 |
+| `PUT` | `/api/v2/memory/long-term/:id` | 更新记忆 |
+| `DELETE` | `/api/v2/memory/long-term/:id` | 删除记忆 |
+| `GET` | `/api/v2/agents/:agent_id/state` | 获取 Agent 全部状态 |
+| `GET` | `/api/v2/agents/:agent_id/state/:key` | 获取单个状态值 |
+| `POST` | `/api/v2/agents/:agent_id/state` | 设置状态 `{key, value}` |
+| `DELETE` | `/api/v2/agents/:agent_id/state/:key` | 删除状态键 |
+
+### Workflow 执行
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| `POST` | `/api/v2/workflows/run` | 同步执行 Workflow |
+| `POST` | `/api/v2/workflows/stream_run` | 流式执行 Workflow（SSE） |
+| `POST` | `/api/v2/workflows/stream_resume` | 恢复流式 Workflow |
+| `POST` | `/api/v2/workflows/chat` | Chat 模式执行 Workflow |
+| `GET` | `/api/v2/workflows/:workflow_id` | 获取 Workflow 信息 |
+
+### Skills 与 Tools
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| `GET` | `/api/v2/skills` | 列出已安装技能 |
+| `GET` | `/api/v2/skills/search?q=` | 搜索可用技能 |
+| `GET` | `/api/v2/tools` | 列出所有注册工具及其 schema |
+
+### 管理 API（需 API Key 认证）
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| `GET` | `/api/v2/admin/status` | 系统运行状态 |
+| `POST` | `/api/v2/admin/reload` | 触发 Agent 热重载 |
+| `GET` | `/api/v2/admin/logs` | SSE 实时日志流 |
+| `GET/POST/PUT/DELETE` | `/api/v2/admin/agents[/:name]` | Agent YAML CRUD + 校验 |
+| `GET/POST/PUT/DELETE` | `/api/v2/admin/users[/:id]` | 用户管理 |
+| `GET/POST/DELETE` | `/api/v2/admin/mcp/servers[/:name]` | MCP Server 管理 |
+| `GET` | `/api/v2/admin/evolution/stats` | Evolution 引擎统计 |
+| `GET` | `/api/v2/admin/evolution/genes` | 基因列表 |
+| `POST` | `/api/v2/admin/evolution/recommend` | 策略推荐 |
+| `GET/POST/PUT/DELETE` | `/api/v2/admin/webhooks[/:id]` | Webhook CRUD + 测试 + 日志 |
+| `GET` | `/api/v2/me` | 当前用户信息 |
+| `GET` | `/metrics` | Prometheus 指标 |
 | `GET` | `/health` | 健康检查 |
-| `GET` | `/ready` | 就绪检查（含 Agent Runtime 状态） |
+| `GET` | `/ready` | 就绪检查 |
 
 **流式对话示例（Legacy 模式）：**
 
 ```bash
-curl -X POST http://localhost:8888/api/v1/chat/stream \
+curl -X POST http://localhost:8888/api/v2/chat/stream \
   -H "Content-Type: application/json" \
   -d '{"agent_id":"research-agent","session_id":"s1","message":"研究一下量子计算"}' \
   --no-buffer
@@ -112,7 +175,7 @@ curl -X POST http://localhost:8888/api/v1/chat/stream \
 **A2UI 模式（结构化事件）：**
 
 ```bash
-curl -X POST http://localhost:8888/api/v1/chat/stream \
+curl -X POST http://localhost:8888/api/v2/chat/stream \
   -H "Content-Type: application/json" \
   -H "X-A2UI: true" \
   -d '{"agent_id":"research-agent","session_id":"s1","message":"研究一下量子计算"}' \
