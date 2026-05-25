@@ -1,11 +1,11 @@
-image: python:3.12-alpine
+image: alpine:latest
 
 pages:
   stage: deploy
-  before_script:
-    - pip install mkdocs-material pymdown-extensions
   script:
-    - mkdocs build --strict --site-dir public
+    - mkdir -p public
+    - cp -r docs/* public/
+    - cp docs/index.html public/index.html
   artifacts:
     paths:
       - public
