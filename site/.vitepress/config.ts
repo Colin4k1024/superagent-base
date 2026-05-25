@@ -13,7 +13,7 @@ export default defineConfig({
       { text: '指南', link: '/guide/getting-started' },
       { text: 'API', link: '/api/http-sse' },
       { text: '高级', link: '/advanced/a2ui-protocol' },
-      { text: 'GitHub', link: 'https://github.com/Colin4k1024/superagent-base' }
+      { text: 'GitLab', link: 'https://hgit.haier.net/s04795/superagent-base' }
     ],
 
     sidebar: {
@@ -65,7 +65,7 @@ export default defineConfig({
     },
 
     socialLinks: [
-      { icon: 'github', link: 'https://github.com/Colin4k1024/superagent-base' }
+      { icon: 'gitlab', link: 'https://hgit.haier.net/s04795/superagent-base' }
     ],
 
     footer: {
