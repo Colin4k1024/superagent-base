@@ -1,0 +1,64 @@
+site_name: Superagent Base
+site_description: AI Agent 开发平台文档
+site_url: https://s04795.hgit.haier.net/superagent-base
+
+theme:
+  name: material
+  language: zh
+  palette:
+    - scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: 切换到深色模式
+    - scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: 切换到浅色模式
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - search.highlight
+    - content.code.copy
+
+markdown_extensions:
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+  - admonition
+  - pymdownx.details
+  - attr_list
+  - md_in_html
+  - toc:
+      permalink: true
+
+nav:
+  - 首页: index.md
+  - 架构:
+      - 系统架构: architecture.md
+      - 路线图: ROADMAP.md
+  - 开发指南:
+      - Agent YAML 规范: agent-yaml-spec.md
+      - A2UI 协议: a2ui-protocol.md
+      - 模型配置: model-config.md
+      - Workflow 指南: workflow-guide.md
+      - 中断恢复: interrupt-resume.md
+      - Skill 开发: skill-development.md
+      - SkillHub 对接: skillhub对接文档.md
+  - 部署运维:
+      - 部署指南: deployment.md
+      - 可观测性: observability-issues-2026-05-13.md
+  - 集成:
+      - ORIS 集成方案: oris-integration-plan.md
+
+docs_dir: docs
