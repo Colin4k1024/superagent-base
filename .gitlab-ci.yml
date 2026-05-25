@@ -1,11 +1,13 @@
-image: harbor-test.enterprise.net/paas/alpine:3.22.0
+image: harbor-test.enterprise.net/paas/node:20-alpine
 
 pages:
   stage: deploy
   script:
-    - mkdir -p public
-    - cp -r docs/* public/
-    - cp docs/index.html public/index.html
+    - npm config set registry https://npm.enterprise.net
+    - cd site
+    - npm ci
+    - npm run build
+    - mv .vitepress/dist ../public
   artifacts:
     paths:
       - public
