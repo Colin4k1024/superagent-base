@@ -1,0 +1,17 @@
+- [首页](/)
+- **架构**
+  - [系统架构](architecture.md)
+  - [路线图](ROADMAP.md)
+- **开发指南**
+  - [Agent YAML 规范](agent-yaml-spec.md)
+  - [A2UI 协议](a2ui-protocol.md)
+  - [模型配置](model-config.md)
+  - [Workflow 指南](workflow-guide.md)
+  - [中断恢复](interrupt-resume.md)
+  - [Skill 开发](skill-development.md)
+  - [SkillHub 对接](skillhub对接文档.md)
+- **部署运维**
+  - [部署指南](deployment.md)
+  - [可观测性问题](observability-issues-2026-05-13.md)
+- **集成**
+  - [ORIS 集成方案](oris-integration-plan.md)
