@@ -183,6 +183,12 @@ func main() {
 	redisPwd := getEnv("REDIS_PASSWORD", "")
 	redisClient := redis.NewWithAddrAndPassword(redisAddr, redisPwd)
 
+	// Shared short-term memory backend — used by SessionHandler for conversation history API.
+	// Lives outside individual agent scope so any session_id can be queried directly.
+	sharedMemBackend := builtin.NewWithCache(redisClient)
+	_ = sharedMemBackend.Init(ctx, memory.BackendConfig{Type: "builtin"})
+	var sharedMemory memory.Backend = sharedMemBackend
+
 	// Build the AgentRuntime that powers YAML-defined agents.
 	// Single builder construction — SkillManager and MCPRegistry conditionally added.
 	builderOpts := []agentdef.BuilderOption{
@@ -259,10 +265,10 @@ func main() {
 	webhook.InitGlobalDispatcher(webhookDispatcher)
 	logs.Infof("webhook dispatcher started (workers=%d)", webhookWorkers)
 
-	startHttpServer(agentRT, skillMgr, mcpRegistry, userStore, evoEngine)
+	startHttpServer(agentRT, skillMgr, toolMgr, mcpRegistry, userStore, evoEngine, sharedMemory)
 }
 
-func startHttpServer(agentRT *agentdef.AgentRuntime, skillMgr *skill.Manager, mcpRegistry *mcp.Registry, userStore *rbac.UserStore, evoEngine *evolution.Engine) {
+func startHttpServer(agentRT *agentdef.AgentRuntime, skillMgr *skill.Manager, toolMgr *tool.Manager, mcpRegistry *mcp.Registry, userStore *rbac.UserStore, evoEngine *evolution.Engine, sharedMem memory.Backend) {
 	maxRequestBodySize := os.Getenv("MAX_REQUEST_BODY_SIZE")
 	maxSize := conv.StrToInt64D(maxRequestBodySize, 1024*1024*200)
 	addr := getEnv("LISTEN_ADDR", ":8888")
@@ -383,11 +389,32 @@ func startHttpServer(agentRT *agentdef.AgentRuntime, skillMgr *skill.Manager, mc
 	xiaohaiGroup.POST("/stream/:agent_id", xiaohaiH.HandleStream)
 	xiaohaiGroup.POST("/chat/:agent_id", xiaohaiH.HandleNonStream)
 
+	// Session history — conversation message read/clear (backed by shared Redis memory).
+	sessionH := cozehandler.NewSessionHandler(sharedMem)
+	s.GET("/api/v1/sessions/:session_id/messages", middleware.DeprecationMW("/api/v2"), sessionH.HandleGetMessages)
+	s.DELETE("/api/v1/sessions/:session_id", middleware.APIKeyAdminAuthMW(userStore), middleware.DeprecationMW("/api/v2"), sessionH.HandleClearSession)
+
+	// File management — multipart upload, list, download, delete (local filesystem).
+	uploadDir := getEnv("UPLOAD_DIR", filepath.Join("bin", "uploads"))
+	fileH := cozehandler.NewFileHandler(uploadDir)
+	s.POST("/api/v1/files", middleware.DeprecationMW("/api/v2"), fileH.HandleUpload)
+	s.GET("/api/v1/files", middleware.DeprecationMW("/api/v2"), fileH.HandleList)
+	s.GET("/api/v1/files/:id", middleware.DeprecationMW("/api/v2"), fileH.HandleGet)
+	s.GET("/api/v1/files/:id/content", middleware.DeprecationMW("/api/v2"), fileH.HandleDownload)
+	s.DELETE("/api/v1/files/:id", middleware.APIKeyAdminAuthMW(userStore), middleware.DeprecationMW("/api/v2"), fileH.HandleDelete)
+
 	// Skill management API endpoints (v1, deprecated).
 	registerSkillRoutes(s, skillMgr, userStore)
 
+	// Memory handler — backed by the shared Redis memory store.
+	memH := cozehandler.NewMemoryHandler(sharedMem)
+
+	// V1 interrupt/resume — same handlers as v2 (deprecated).
+	s.POST("/api/v1/chat/resume", middleware.DeprecationMW("/api/v2"), chatSSE.HandleChatResume)
+	s.GET("/api/v1/chat/interrupt_state", middleware.DeprecationMW("/api/v2"), chatSSE.HandleGetInterruptState)
+
 	// V2 canonical API — same handlers, no deprecation headers.
-	registerV2Routes(s, chatSSE, adminH, agentAdmin, userAdmin, mcpAdmin, evoAdmin, webhookH, xiaohaiH, skillMgr, userStore)
+	registerV2Routes(s, chatSSE, adminH, agentAdmin, userAdmin, mcpAdmin, evoAdmin, webhookH, xiaohaiH, sessionH, fileH, skillMgr, toolMgr, memH, userStore)
 
 	s.Spin()
 }
@@ -404,12 +431,39 @@ func registerV2Routes(
 	evoAdmin *cozehandler.EvolutionAdminHandler,
 	webhookH *cozehandler.WebhookHandler,
 	xiaohaiH *cozehandler.XiaohaiHandler,
+	sessionH *cozehandler.SessionHandler,
+	fileH *cozehandler.FileHandler,
 	skillMgr *skill.Manager,
+	toolMgr *tool.Manager,
+	memH *cozehandler.MemoryHandler,
 	userStore *rbac.UserStore,
 ) {
 	// Chat endpoints.
 	s.POST("/api/v2/chat/stream", chatSSE.HandleChatStream)
+	s.POST("/api/v2/chat/resume", chatSSE.HandleChatResume)
+	s.GET("/api/v2/chat/interrupt_state", chatSSE.HandleGetInterruptState)
 	s.GET("/api/v2/agents", chatSSE.HandleListAgents)
+
+	// Session history — read is public, clear requires admin auth.
+	s.GET("/api/v2/sessions/:session_id/messages", sessionH.HandleGetMessages)
+	s.DELETE("/api/v2/sessions/:session_id", middleware.APIKeyAdminAuthMW(userStore), sessionH.HandleClearSession)
+
+	// File management — upload/list/get are public; delete requires admin auth.
+	s.POST("/api/v2/files", fileH.HandleUpload)
+	s.GET("/api/v2/files", fileH.HandleList)
+	s.GET("/api/v2/files/:id", fileH.HandleGet)
+	s.GET("/api/v2/files/:id/content", fileH.HandleDownload)
+	s.DELETE("/api/v2/files/:id", middleware.APIKeyAdminAuthMW(userStore), fileH.HandleDelete)
+
+	// User profile — returns the authenticated caller's identity.
+	s.GET("/api/v2/me", middleware.APIKeyAdminAuthMW(userStore), func(ctx context.Context, c *app.RequestContext) {
+		user := rbac.GetUser(ctx)
+		if user == nil {
+			c.JSON(401, map[string]any{"error": "unauthorized"})
+			return
+		}
+		c.JSON(200, map[string]any{"user": user})
+	})
 
 	// Admin/monitoring endpoints — same auth as v1.
 	adminGroup := s.Group("/api/v2/admin", middleware.APIKeyAdminAuthMW(userStore))
@@ -441,6 +495,7 @@ func registerV2Routes(
 	adminGroup.GET("/evolution/stats", evoAdmin.HandleStats)
 	adminGroup.GET("/evolution/genes", evoAdmin.HandleListGenes)
 	adminGroup.GET("/evolution/federated", evoAdmin.HandleFederatedSearch)
+	adminGroup.POST("/evolution/recommend", evoAdmin.HandleRecommend)
 
 	// Webhook management.
 	adminGroup.POST("/webhooks", webhookH.HandleCreate)
@@ -456,8 +511,42 @@ func registerV2Routes(
 	xiaohaiGroup.POST("/stream/:agent_id", xiaohaiH.HandleStream)
 	xiaohaiGroup.POST("/chat/:agent_id", xiaohaiH.HandleNonStream)
 
+	// Long-term memory — user_id scoped; read is public, mutations are public.
+	s.GET("/api/v2/memory/long-term", memH.HandleLTMList)
+	s.POST("/api/v2/memory/long-term", memH.HandleLTMAdd)
+	s.GET("/api/v2/memory/long-term/search", memH.HandleLTMSearch)
+	s.PUT("/api/v2/memory/long-term/:id", memH.HandleLTMUpdate)
+	s.DELETE("/api/v2/memory/long-term/:id", middleware.APIKeyAdminAuthMW(userStore), memH.HandleLTMDelete)
+
+	// Agent state — per-agent key-value store.
+	s.GET("/api/v2/agents/:agent_id/state", memH.HandleAgentStateGetAll)
+	s.GET("/api/v2/agents/:agent_id/state/:key", memH.HandleAgentStateGet)
+	s.POST("/api/v2/agents/:agent_id/state", memH.HandleAgentStateSet)
+	s.DELETE("/api/v2/agents/:agent_id/state/:key", middleware.APIKeyAdminAuthMW(userStore), memH.HandleAgentStateDelete)
+
+	// Tool registry — list all tools registered in the runtime.
+	registerToolV2Routes(s, toolMgr)
+
 	// Skill management (v2).
 	registerSkillV2Routes(s, skillMgr, userStore)
+
+	// Conversation CRUD v2 — wraps conversation_service.go OpenAPI functions.
+	s.GET("/api/v2/conversations", cozehandler.ListConversationsApi)
+	s.POST("/api/v2/conversations", cozehandler.CreateConversation)
+	s.GET("/api/v2/conversations/:id", cozehandler.RetrieveConversationApi)
+	s.PUT("/api/v2/conversations/:id", cozehandler.UpdateConversationApi)
+	s.DELETE("/api/v2/conversations/:id", middleware.APIKeyAdminAuthMW(userStore), cozehandler.DeleteConversationApi)
+
+	// Message access v2 — wraps message_service.go functions.
+	s.GET("/api/v2/conversations/:conversation_id/messages", cozehandler.GetApiMessageList)
+	s.DELETE("/api/v2/conversations/:conversation_id/messages/:message_id", middleware.APIKeyAdminAuthMW(userStore), cozehandler.DeleteMessage)
+
+	// Workflow execution v2 (runtime only) — wraps workflow_service.go OpenAPI* functions.
+	s.POST("/api/v2/workflows/run", cozehandler.OpenAPIRunFlow)
+	s.POST("/api/v2/workflows/stream_run", cozehandler.OpenAPIStreamRunFlow)
+	s.POST("/api/v2/workflows/stream_resume", cozehandler.OpenAPIStreamResumeFlow)
+	s.POST("/api/v2/workflows/chat", cozehandler.OpenAPIChatFlowRun)
+	s.GET("/api/v2/workflows/:workflow_id", cozehandler.OpenAPIGetWorkflowInfo)
 }
 
 func registerSkillV2Routes(s *server.Hertz, mgr *skill.Manager, userStore *rbac.UserStore) {
@@ -601,6 +690,33 @@ func registerSkillRoutes(s *server.Hertz, mgr *skill.Manager, userStore *rbac.Us
 		name := ctx.Param("name")
 		mgr.Uninstall(name)
 		ctx.JSON(200, map[string]any{"status": "uninstalled", "name": name})
+	})
+}
+
+func registerToolV2Routes(s *server.Hertz, mgr *tool.Manager) {
+	if mgr == nil {
+		return
+	}
+
+	// GET /api/v2/tools — list all registered tools with their schemas.
+	s.GET("/api/v2/tools", func(ctx context.Context, c *app.RequestContext) {
+		tools := mgr.List()
+		items := make([]map[string]any, 0, len(tools))
+		for _, t := range tools {
+			info, err := t.Info(ctx)
+			if err != nil {
+				continue
+			}
+			item := map[string]any{
+				"name":        info.Name,
+				"description": info.Desc,
+			}
+			if info.Extra != nil {
+				item["extra"] = info.Extra
+			}
+			items = append(items, item)
+		}
+		c.JSON(200, map[string]any{"tools": items, "count": len(items)})
 	})
 }
 

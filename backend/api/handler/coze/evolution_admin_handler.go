@@ -111,6 +111,50 @@ func (h *EvolutionAdminHandler) HandleStats(ctx context.Context, c *app.RequestC
 	})
 }
 
+// HandleRecommend returns strategy recommendations for a given query context.
+//
+// POST /api/v2/admin/evolution/recommend
+// Body: {"query": "...", "min_confidence": 0.5, "limit": 5}
+func (h *EvolutionAdminHandler) HandleRecommend(ctx context.Context, c *app.RequestContext) {
+	if h.engine == nil {
+		c.JSON(200, map[string]any{"enabled": false, "recommendations": []any{}})
+		return
+	}
+
+	var req struct {
+		Query         string  `json:"query"`
+		MinConfidence float64 `json:"min_confidence"`
+		Limit         int     `json:"limit"`
+	}
+	if err := c.BindJSON(&req); err != nil {
+		c.JSON(400, map[string]any{"error": "invalid request body: " + err.Error()})
+		return
+	}
+	if req.Query == "" {
+		c.JSON(400, map[string]any{"error": "query is required"})
+		return
+	}
+	if req.MinConfidence == 0 {
+		req.MinConfidence = h.engine.Config().MinConfidence
+	}
+	if req.Limit <= 0 || req.Limit > 50 {
+		req.Limit = h.engine.Config().MaxSuggestions
+	}
+
+	recs := h.engine.Advisor().RecommendWithOpts(ctx, req.Query, req.MinConfidence, req.Limit)
+	items := make([]geneItem, 0, len(recs))
+	for _, r := range recs {
+		items = append(items, geneItem{
+			ID:          r.GeneID,
+			Strategy:    r.Strategy,
+			Confidence:  r.Confidence,
+			UseCount:    r.UseCount,
+			SuccessRate: r.SuccessRate,
+		})
+	}
+	c.JSON(200, map[string]any{"enabled": true, "recommendations": items, "count": len(items)})
+}
+
 // HandleFederatedSearch is a no-op in local-only mode.
 // GET /api/v1/admin/evolution/federated?q=<query>
 func (h *EvolutionAdminHandler) HandleFederatedSearch(_ context.Context, c *app.RequestContext) {
