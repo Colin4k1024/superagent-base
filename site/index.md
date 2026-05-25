@@ -86,6 +86,11 @@ features:
     details: OpenTelemetry 分布式追踪 + Prometheus 指标 + Grafana 看板 + 实时 SSE 日志流，Eino Callback 自动上报
     link: /guide/architecture
     linkText: 查看架构
+  - icon: "\U0001F4E1"
+    title: 完整 Platform API（v2）
+    details: 统一 /api/v2/ 命名空间，覆盖对话流式、会话 CRUD、消息历史、文件管理、长期记忆、Agent 状态 KV、Workflow 执行、Skills/Tools、Admin 全量管理
+    link: /api/http-sse
+    linkText: 查看 API
   - icon: "\U0001F510"
     title: RBAC 权限控制
     details: 三级角色（viewer / editor / admin）+ API Key 认证门禁，前端未授权自动跳转登录页
