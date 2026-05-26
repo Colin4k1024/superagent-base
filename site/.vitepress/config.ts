@@ -23,6 +23,7 @@ export default defineConfig({
           items: [
             { text: '5 分钟快速上手', link: '/guide/quickstart' },
             { text: '完整安装指南', link: '/guide/getting-started' },
+            { text: 'Windows 本地开发', link: '/guide/windows-dev' },
             { text: '架构概览', link: '/guide/architecture' },
             { text: '部署指南', link: '/guide/deployment' }
           ]
