@@ -26,7 +26,16 @@ export function clearAuth(): void {
   localStorage.removeItem(USER_INFO_KEY)
 }
 
-export async function handleLogin(options?: { invalidateToken?: boolean }): Promise<boolean> {
+export type LoginResult = { status: 'success' } | { status: 'redirecting' } | { status: 'error'; message: string }
+
+export async function handleLogin(options?: { invalidateToken?: boolean }): Promise<LoginResult> {
   const res = await iamLogin(options)
-  return res.success
+  if (res.success) {
+    return { status: 'success' }
+  }
+  // code 999 means SDK is redirecting to SSO — not an error
+  if ('code' in res && res.code === 999) {
+    return { status: 'redirecting' }
+  }
+  return { status: 'error', message: ('errorMessage' in res && res.errorMessage) || 'Login failed' }
 }

@@ -1,32 +1,34 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { isAuthenticated, handleLogin } from '@/lib/auth'
+import type { LoginResult } from '@/lib/auth'
 
 export default function LoginPage() {
   const { t } = useTranslation()
   const [error, setError] = useState('')
+
+  function doLogin() {
+    setError('')
+    handleLogin()
+      .then((result: LoginResult) => {
+        if (result.status === 'success') {
+          window.location.replace('/agents')
+        } else if (result.status === 'error') {
+          setError(result.message)
+        }
+        // status === 'redirecting': SDK is navigating to SSO, do nothing
+      })
+      .catch((err: unknown) => {
+        setError(err instanceof Error ? err.message : String(err))
+      })
+  }
 
   useEffect(() => {
     if (isAuthenticated()) {
       window.location.replace('/agents')
       return
     }
-
-    let cancelled = false
-    handleLogin()
-      .then((success) => {
-        if (cancelled) return
-        if (success) {
-          window.location.replace('/agents')
-        }
-      })
-      .catch((err: unknown) => {
-        if (cancelled) return
-        const msg = err instanceof Error ? err.message : String(err)
-        setError(msg)
-      })
-
-    return () => { cancelled = true }
+    doLogin()
   }, [])
 
   return (
@@ -41,14 +43,7 @@ export default function LoginPage() {
               {error}
             </p>
             <button
-              onClick={() => {
-                setError('')
-                handleLogin()
-                  .then((success) => { if (success) window.location.replace('/agents') })
-                  .catch((err: unknown) =>
-                    setError(err instanceof Error ? err.message : String(err)),
-                  )
-              }}
+              onClick={doLogin}
               className="w-full inline-flex items-center justify-center rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 transition-colors"
             >
               {t('login.retry')}
