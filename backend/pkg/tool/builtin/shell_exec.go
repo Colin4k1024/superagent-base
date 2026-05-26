@@ -88,6 +88,13 @@ func (t *ShellExecuteTool) InvokableRun(_ context.Context, args string, _ ...too
 
 	cmd := exec.CommandContext(ctx, "sh", "-c", p.Command)
 
+	// WaitDelay ensures that after the context deadline fires and the process is
+	// killed, any goroutines still blocked reading from stdout/stderr pipes are
+	// forcibly unblocked after this duration. Without this, child processes
+	// spawned by sh (e.g. "sleep 60") can keep the pipes open long after sh
+	// itself is killed, causing cmd.Wait() to hang indefinitely.
+	cmd.WaitDelay = 3 * time.Second
+
 	if p.Cwd != "" {
 		cmd.Dir = p.Cwd
 	}

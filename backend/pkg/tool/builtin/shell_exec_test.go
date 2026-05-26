@@ -63,7 +63,10 @@ func TestShellExecuteTool_ExitCode(t *testing.T) {
 
 func TestShellExecuteTool_Timeout(t *testing.T) {
 	tool := newShellExecuteTool()
-	args, _ := json.Marshal(shellExecuteParams{Command: "sleep 60", TimeoutSeconds: 1})
+	// Use "sleep 2" (not 60) so the test finishes well within CI limits.
+	// TimeoutSeconds=1 fires the context cancel after 1s; WaitDelay in the
+	// implementation then force-closes the pipes within 3s.
+	args, _ := json.Marshal(shellExecuteParams{Command: "sleep 2", TimeoutSeconds: 1})
 	out, err := tool.InvokableRun(context.Background(), string(args))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
