@@ -68,7 +68,7 @@ func SessionAuthMW() app.HandlerFunc {
 		// IMPORTANT: /api/v1/admin/ routes are protected by APIKeyAdminAuthMW at
 		// the route group level (main.go). Do NOT register admin routes outside
 		// the adminGroup — they would bypass both session auth and admin key auth.
-		if strings.HasPrefix(path, "/api/v1/skills/") || strings.HasPrefix(path, "/api/v1/admin/") || strings.HasPrefix(path, "/api/v1/xiaohai/") || strings.HasPrefix(path, "/api/v1/chat/") || strings.HasPrefix(path, "/api/v1/agents") {
+		if strings.HasPrefix(path, "/api/v1/skills/") || strings.HasPrefix(path, "/api/v1/admin/") || strings.HasPrefix(path, "/api/admin/") || strings.HasPrefix(path, "/api/v1/xiaohai/") || strings.HasPrefix(path, "/api/v1/chat/") || strings.HasPrefix(path, "/api/v1/agents") {
 			ctx.Next(c)
 			return
 		}
