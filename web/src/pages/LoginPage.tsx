@@ -1,87 +1,67 @@
-import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { setApiKey, isAuthenticated } from '@/lib/auth'
-
-const API_BASE = '/api/v1'
+import { isAuthenticated, handleLogin } from '@/lib/auth'
 
 export default function LoginPage() {
-  const navigate = useNavigate()
   const { t } = useTranslation()
-  const [apiKey, setApiKeyInput] = useState('')
   const [error, setError] = useState('')
-  const [loading, setLoading] = useState(false)
 
-  // Already authenticated — skip login
   useEffect(() => {
     if (isAuthenticated()) {
-      navigate('/agents', { replace: true })
+      window.location.replace('/agents')
+      return
     }
-  }, [navigate])
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    setError('')
-    setLoading(true)
+    let cancelled = false
+    handleLogin()
+      .then((success) => {
+        if (cancelled) return
+        if (success) {
+          window.location.replace('/agents')
+        }
+      })
+      .catch((err: unknown) => {
+        if (cancelled) return
+        const msg = err instanceof Error ? err.message : String(err)
+        setError(msg)
+      })
 
-    try {
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' }
-      if (apiKey) {
-        headers['X-Admin-Key'] = apiKey
-      }
-
-      const res = await fetch(`${API_BASE}/admin/status`, { headers })
-
-      if (res.ok) {
-        setApiKey(apiKey)
-        navigate('/agents', { replace: true })
-      } else if (res.status === 401 || res.status === 403) {
-        setError(t('login.error'))
-      } else {
-        setError(`Server error: HTTP ${res.status}`)
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Network error')
-    } finally {
-      setLoading(false)
-    }
-  }
+    return () => { cancelled = true }
+  }, [])
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-      <div className="w-full max-w-sm bg-white rounded-xl shadow-sm border border-gray-200 p-8">
-        <div className="mb-8 text-center">
-          <h1 className="text-2xl font-bold text-gray-900">{t('login.title')}</h1>
-          <p className="mt-1 text-sm text-gray-500">AI Agent Development Platform</p>
-        </div>
+      <div className="w-full max-w-sm bg-white rounded-xl shadow-sm border border-gray-200 p-8 text-center">
+        <h1 className="text-2xl font-bold text-gray-900 mb-2">{t('login.title')}</h1>
+        <p className="text-sm text-gray-500 mb-6">AI Agent Development Platform</p>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <Input
-            label="API Key"
-            type="password"
-            placeholder={t('login.placeholder')}
-            value={apiKey}
-            onChange={(e) => setApiKeyInput(e.target.value)}
-            autoComplete="current-password"
-            autoFocus
-          />
-
-          {error && (
+        {error ? (
+          <div className="space-y-4">
             <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-md px-3 py-2">
               {error}
             </p>
-          )}
-
-          <Button type="submit" className="w-full" loading={loading}>
-            {t('login.button')}
-          </Button>
-        </form>
-
-        <p className="mt-6 text-center text-xs text-gray-400">
-          {t('login.devNote')}
-        </p>
+            <button
+              onClick={() => {
+                setError('')
+                handleLogin()
+                  .then((success) => { if (success) window.location.replace('/agents') })
+                  .catch((err: unknown) =>
+                    setError(err instanceof Error ? err.message : String(err)),
+                  )
+              }}
+              className="w-full inline-flex items-center justify-center rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 transition-colors"
+            >
+              {t('login.retry')}
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <div className="animate-pulse">
+              <div className="mx-auto h-8 w-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+            </div>
+            <p className="text-sm text-gray-500">{t('login.redirecting')}</p>
+          </div>
+        )}
       </div>
     </div>
   )
