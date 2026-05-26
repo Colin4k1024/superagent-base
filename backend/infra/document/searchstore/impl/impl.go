@@ -21,12 +21,9 @@ import (
 	"os"
 	"time"
 
-	"github.com/milvus-io/milvus/client/v2/milvusclient"
-
 	"github.com/superagent-ai/superagent-base/backend/api/model/admin/config"
 	"github.com/superagent-ai/superagent-base/backend/infra/document/searchstore"
 	"github.com/superagent-ai/superagent-base/backend/infra/document/searchstore/impl/elasticsearch"
-	"github.com/superagent-ai/superagent-base/backend/infra/document/searchstore/impl/milvus"
 	searchstoreOceanbase "github.com/superagent-ai/superagent-base/backend/infra/document/searchstore/impl/oceanbase"
 	"github.com/superagent-ai/superagent-base/backend/infra/document/searchstore/impl/vikingdb"
 	"github.com/superagent-ai/superagent-base/backend/infra/embedding"
@@ -62,41 +59,6 @@ func getVectorStore(ctx context.Context, conf *config.KnowledgeConfig) (searchst
 	switch vsType {
 	case "", "none":
 		return nil, nil
-	case "milvus":
-		ctx, cancel := context.WithTimeout(ctx, time.Second*5)
-		defer cancel()
-
-		var (
-			milvusAddr  = os.Getenv("MILVUS_ADDR")
-			user        = os.Getenv("MILVUS_USER")
-			password    = os.Getenv("MILVUS_PASSWORD")
-			milvusToken = os.Getenv("MILVUS_TOKEN")
-		)
-		mc, err := milvusclient.New(ctx, &milvusclient.ClientConfig{
-			Address:  milvusAddr,
-			Username: user,
-			Password: password,
-			APIKey:   milvusToken,
-		})
-		if err != nil {
-			return nil, fmt.Errorf("init milvus client failed, err=%w", err)
-		}
-
-		emb, err := impl.GetEmbedding(ctx, conf.EmbeddingConfig)
-		if err != nil {
-			return nil, fmt.Errorf("init milvus embedding failed, err=%w", err)
-		}
-
-		mgr, err := milvus.NewManager(&milvus.ManagerConfig{
-			Client:       mc,
-			Embedding:    emb,
-			EnableHybrid: ptr.Of(true),
-		})
-		if err != nil {
-			return nil, fmt.Errorf("init milvus vector store failed, err=%w", err)
-		}
-
-		return mgr, nil
 	case "vikingdb":
 		var (
 			host      = os.Getenv("VIKING_DB_HOST")
