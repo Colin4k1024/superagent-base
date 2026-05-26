@@ -9,7 +9,7 @@ RUN npm install --frozen-lockfile
 
 # Copy source and build
 COPY . .
-RUN npm run build
+RUN npm run build -- --mode development
 
 # Stage 2: Serve with Nginx
 FROM harbor-test.haier.net/paas/nginx:1.25-alpine
