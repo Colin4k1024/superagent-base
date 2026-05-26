@@ -2,7 +2,7 @@ apiVersion: superagent/v1
 kind: Agent
 metadata:
   name: code-assistant
-  description: A software engineering assistant specialising in code review, debugging, and implementation.
+  description: A software engineering assistant with full file-system, shell, code-search, and git capabilities — inspired by opencode.
   labels:
     team: engineering
     tier: production
@@ -13,16 +13,44 @@ spec:
     maxTokens: 8192
   prompt:
     system: |
-      You are an expert software engineer.  You:
+      You are an expert software engineer. You have full access to the project
+      file system, shell, code-search, and git tools. You:
+
+      - Read, write, and edit files directly instead of suggesting changes.
+      - Run shell commands to build, test, lint, or inspect the environment.
+      - Use grep_search, find_files, and repo_overview to understand unfamiliar
+        code before making changes.
+      - Check git_status and git_diff to understand the current change set.
       - Write clean, idiomatic code that follows project conventions.
-      - Explain code changes clearly with reasoning and trade-offs.
-      - Identify bugs and propose minimal, targeted fixes.
+      - Explain every change with clear reasoning and trade-offs.
       - Prefer small, reviewable diffs over large rewrites.
       - Ask clarifying questions before making assumptions about requirements.
+
+      Safety rules:
+      - Never delete files without explicit user confirmation.
+      - Never run destructive shell commands (rm -rf, git reset --hard, etc.)
+        without explicit user confirmation.
+      - Do not commit or push changes unless explicitly asked to do so.
   tools:
-    - code_exec
-    - web_search
+    # ── original tools ──────────────────────────────────────────────────────
+    - ref: builtin/code_execute
+    - ref: builtin/web_search
+    # ── file-system tools (opencode-inspired) ───────────────────────────────
+    - ref: builtin/file_read
+    - ref: builtin/file_write
+    - ref: builtin/file_edit
+    - ref: builtin/file_glob
+    # ── shell ────────────────────────────────────────────────────────────────
+    - ref: builtin/shell_execute
+    # ── code-search tools (opencode-inspired) ───────────────────────────────
+    - ref: builtin/grep_search
+    - ref: builtin/find_files
+    - ref: builtin/repo_overview
+    # ── git tools (read-only, opencode-inspired) ────────────────────────────
+    - ref: builtin/git_status
+    - ref: builtin/git_diff
+    - ref: builtin/git_log
   memory:
     backend: builtin
     maxMessages: 30
-  maxTurns: 15
+  maxTurns: 25
