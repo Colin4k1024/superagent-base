@@ -13,9 +13,11 @@
     "test:e2e:headed": "playwright test --headed"
   },
   "dependencies": {
+    "@haier/iam": "1.9.4",
     "@hookform/resolvers": "^5.2.2",
     "@monaco-editor/react": "^4.7.0",
     "@tanstack/react-query": "^5.100.10",
+    "@testing-library/dom": "^10.4.1",
     "@types/react-syntax-highlighter": "^15.5.13",
     "@xyflow/react": "^12.10.2",
     "clsx": "^2.1.1",

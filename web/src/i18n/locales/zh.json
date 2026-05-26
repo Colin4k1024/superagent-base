@@ -10,14 +10,15 @@
     "skills": "技能",
     "settings": "设置",
     "logout": "退出登录",
+    "logoutConfirmTitle": "确认退出",
+    "logoutConfirmMessage": "确定要退出当前账号吗？退出后需要重新登录。",
     "evolution": "进化"
   },
   "login": {
     "title": "Superagent",
-    "placeholder": "输入 API Key",
-    "button": "登录",
-    "devNote": "开发模式下可留空直接登录",
-    "error": "API Key 无效"
+    "redirecting": "正在跳转海尔账号中心登录...",
+    "retry": "重新登录",
+    "ssoFailed": "SSO 登录失败，请确认已配置正确的应用信息"
   },
   "agents": {
     "title": "Agents",

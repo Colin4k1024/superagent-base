@@ -7,7 +7,7 @@ test.describe('Agent Editor', () => {
   test.beforeEach(async ({ page }) => {
     await page.addInitScript(() => {
       localStorage.setItem('language', 'en')
-      localStorage.setItem('admin_api_key', '')
+      localStorage.setItem('haier-user-center-access-token', 'test-iam-token')
     })
   })
 

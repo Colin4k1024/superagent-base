@@ -1,24 +1,22 @@
 // REST API client for the Superagent backend.
 // All requests go to /api which the Vite dev proxy forwards to localhost:8888.
 
-import { getApiKey, clearApiKey } from './auth'
+import { getToken, handleLogin } from './auth'
 
 const API_BASE = '/api/v1'
 
 function authHeaders(): Record<string, string> {
-  const key = getApiKey()
+  const token = getToken()
   const headers: Record<string, string> = { 'Content-Type': 'application/json' }
-  if (key !== null) {
-    // Send header even for empty string — dev mode backend matches empty ADMIN_API_KEY
-    headers['X-Admin-Key'] = key
+  if (token) {
+    headers['Access-Token'] = token
   }
   return headers
 }
 
 function handleAuthError(res: Response): void {
   if (res.status === 401 || res.status === 403) {
-    clearApiKey()
-    window.location.href = '/login'
+    handleLogin({ invalidateToken: true })
     throw new Error('Session expired')
   }
 }

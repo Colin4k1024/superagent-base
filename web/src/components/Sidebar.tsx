@@ -1,16 +1,17 @@
 import { useState } from 'react'
-import { NavLink, useNavigate } from 'react-router-dom'
+import { NavLink } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { clearApiKey } from '@/lib/auth'
+import { logout } from '@haier/iam'
+import { clearAuth } from '@/lib/auth'
 
 export default function Sidebar() {
-  const navigate = useNavigate()
   const { t, i18n } = useTranslation()
   const [mobileOpen, setMobileOpen] = useState(false)
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
 
   function handleLogout() {
-    clearApiKey()
-    navigate('/login', { replace: true })
+    clearAuth()
+    logout()
   }
 
   function toggleLanguage() {
@@ -96,7 +97,7 @@ export default function Sidebar() {
         </button>
 
         <button
-          onClick={handleLogout}
+          onClick={() => setShowLogoutConfirm(true)}
           className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium text-gray-400 hover:bg-gray-800 hover:text-white transition-colors"
         >
           <span className="shrink-0">🚪</span>
@@ -108,6 +109,29 @@ export default function Sidebar() {
           {t('app.version')}
         </p>
       </div>
+
+      {showLogoutConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-white rounded-lg shadow-xl p-6 w-80 mx-4">
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">{t('nav.logoutConfirmTitle')}</h3>
+            <p className="text-sm text-gray-600 mb-6">{t('nav.logoutConfirmMessage')}</p>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setShowLogoutConfirm(false)}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors"
+              >
+                {t('common.cancel')}
+              </button>
+              <button
+                onClick={handleLogout}
+                className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700 transition-colors"
+              >
+                {t('common.confirm')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </nav>
   )
 }

@@ -15,6 +15,7 @@ export default function XiaohaiDebugPage() {
   const [sessionId, setSessionId] = useState(() => `debug-${Date.now()}`)
   const [terminalType, setTerminalType] = useState('PC')
   const [apiKey, setApiKey] = useState('')
+  const [accessToken, setAccessToken] = useState('')
   const [mode, setMode] = useState<'stream' | 'chat'>('stream')
   const [isLoading, setIsLoading] = useState(false)
   const [logs, setLogs] = useState<LogEntry[]>([])
@@ -52,7 +53,7 @@ export default function XiaohaiDebugPage() {
     const url = `/api/v1/xiaohai/${mode}/${selectedAgent}`
     const body = {
       userQuery: userQuery.trim(),
-      userToken: 'debug-user',
+      userToken: accessToken || 'debug-user',
       terminalType,
       sessionId,
       hisMsg: [],
@@ -62,6 +63,7 @@ export default function XiaohaiDebugPage() {
 
     const headers: Record<string, string> = { 'Content-Type': 'application/json' }
     if (apiKey) headers['Api-Key'] = apiKey
+    if (accessToken) headers['Access-Token'] = accessToken
 
     addLog('info', `--- ${mode === 'stream' ? '流式' : '非流式'}请求 → ${url} ---`)
     addLog('sent', JSON.stringify(body, null, 2))
@@ -180,6 +182,16 @@ export default function XiaohaiDebugPage() {
               placeholder="留空则不发送"
               value={apiKey}
               onChange={(e) => setApiKey(e.target.value)}
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Access-Token(userToken)</label>
+            <input
+              className="w-full text-sm border border-gray-300 rounded-lg px-3 py-1.5"
+              placeholder="填写后 userToken 字段留空，后端从 header 取"
+              value={accessToken}
+              onChange={(e) => setAccessToken(e.target.value)}
             />
           </div>
 

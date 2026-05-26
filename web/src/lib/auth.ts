@@ -1,21 +1,41 @@
-// Auth state management — stores the admin API key in localStorage.
-// The backend accepts an empty key in dev mode (no ADMIN_API_KEY configured).
+import { login as iamLogin } from '@haier/iam'
 
-const AUTH_KEY = 'admin_api_key'
+const TOKEN_KEY = 'haier-user-center-access-token'
+const USER_INFO_KEY = 'haier-user-center-user-info'
 
-export function getApiKey(): string | null {
-  return localStorage.getItem(AUTH_KEY)
+export function getToken(): string | null {
+  return localStorage.getItem(TOKEN_KEY) || null
 }
 
-export function setApiKey(key: string): void {
-  localStorage.setItem(AUTH_KEY, key)
+export function getAccount(): Record<string, unknown> | null {
+  const raw = localStorage.getItem(USER_INFO_KEY)
+  if (!raw) return null
+  try {
+    return JSON.parse(raw)
+  } catch {
+    return null
+  }
 }
 
-export function clearApiKey(): void {
-  localStorage.removeItem(AUTH_KEY)
-}
-
-// Returns true if a key has been stored (including empty string for dev mode).
 export function isAuthenticated(): boolean {
-  return localStorage.getItem(AUTH_KEY) !== null
+  return getToken() !== null
+}
+
+export function clearAuth(): void {
+  localStorage.removeItem(TOKEN_KEY)
+  localStorage.removeItem(USER_INFO_KEY)
+}
+
+export type LoginResult = { status: 'success' } | { status: 'redirecting' } | { status: 'error'; message: string }
+
+export async function handleLogin(options?: { invalidateToken?: boolean }): Promise<LoginResult> {
+  const res = await iamLogin(options)
+  if (res.success) {
+    return { status: 'success' }
+  }
+  // code 999 means SDK is redirecting to SSO — not an error
+  if ('code' in res && res.code === 999) {
+    return { status: 'redirecting' }
+  }
+  return { status: 'error', message: ('errorMessage' in res && res.errorMessage) || 'Login failed' }
 }

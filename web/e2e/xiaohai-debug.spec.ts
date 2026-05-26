@@ -3,7 +3,7 @@ import { test, expect } from '@playwright/test'
 // Helper: set auth and language before navigation
 function setupAuth(page: any) {
   return page.addInitScript(() => {
-    localStorage.setItem('admin_api_key', '')
+    localStorage.setItem('haier-user-center-access-token', 'test-iam-token')
     localStorage.setItem('language', 'en')
   })
 }
