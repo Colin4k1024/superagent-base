@@ -52,7 +52,7 @@
 - Docker + Docker Compose
 - 本地 LLM：[LM Studio](https://lmstudio.ai/) 监听 `http://127.0.0.1:8000/v1`（或 Ollama / 任意 OpenAI 兼容端点）
 
-### 3 步启动
+### Linux / macOS
 
 ```bash
 # 1. 克隆
@@ -69,9 +69,28 @@ make dev
 访问 `http://localhost:8888`，gRPC 在 `localhost:50051`。
 
 ```bash
-# 停止
-make dev-down
+make dev-down   # 停止
 ```
+
+### Windows（PowerShell）
+
+```powershell
+# 1. 克隆
+git clone <repo-url>
+cd superagent-base
+
+# 2. 复制 env 文件
+copy docker\.env.dev backend\.env.dev
+
+# 3. 启动（MySQL + Redis + backend）
+.\scripts\dev-windows.ps1
+```
+
+```powershell
+.\scripts\dev-windows.ps1 -Action down   # 停止
+```
+
+> 详细说明见 [docs/windows-dev.md](docs/windows-dev.md)。
 
 ---
 

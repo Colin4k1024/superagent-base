@@ -162,16 +162,8 @@ dev: dev-middleware dev-server
 dev-middleware:
 	@echo "Starting dev middleware (MySQL + Redis)..."
 	@if ! docker info > /dev/null 2>&1; then \
-		echo "Docker daemon not running, starting Docker Desktop..."; \
-		open -a Docker; \
-		printf "Waiting for Docker"; \
-		for i in $$(seq 1 30); do \
-			if docker info > /dev/null 2>&1; then echo " ready."; break; fi; \
-			printf "."; sleep 2; \
-		done; \
-		if ! docker info > /dev/null 2>&1; then \
-			echo ""; echo "ERROR: Docker Desktop failed to start. Please start it manually."; exit 1; \
-		fi; \
+		echo "Docker daemon not running, please start Docker Desktop manually and retry."; \
+		exit 1; \
 	fi
 	@docker compose -f docker/docker-compose-dev.yml up -d --wait
 
