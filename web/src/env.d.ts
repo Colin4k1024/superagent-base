@@ -11,18 +11,33 @@ interface ImportMeta {
 }
 
 declare module '@haier/iam' {
-  interface ConfigOptions {
+  interface UserCenterConfig {
     clientId: string
     ssoUrl: string
     tokenUrl: string
     appId?: string
   }
 
-  interface LoginOptions {
+  interface LoginParams {
+    force?: boolean
     invalidateToken?: boolean
   }
 
-  export function configUserCenter(options: ConfigOptions): void
-  export function login(options?: LoginOptions): Promise<void>
-  export function logout(): Promise<void>
+  interface LoginSuccessRes {
+    success: true
+    token?: string
+    userInfo?: Record<string, unknown>
+  }
+
+  interface LoginFailRes {
+    success: false
+    errorMessage?: string
+    code?: number
+  }
+
+  type LoginResponse = LoginSuccessRes | LoginFailRes
+
+  export function configUserCenter(config: UserCenterConfig): void
+  export function login(params?: LoginParams): Promise<LoginResponse>
+  export function logout(): Promise<boolean>
 }

@@ -10,14 +10,15 @@
     "skills": "Skills",
     "settings": "Settings",
     "logout": "Logout",
+    "logoutConfirmTitle": "Confirm Logout",
+    "logoutConfirmMessage": "Are you sure you want to log out? You will need to sign in again.",
     "evolution": "Evolution"
   },
   "login": {
     "title": "Superagent",
-    "placeholder": "Enter API Key",
-    "button": "Login",
-    "devNote": "In dev mode, leave empty and click Login",
-    "error": "Invalid API Key"
+    "redirecting": "Redirecting to Haier Account Center...",
+    "retry": "Retry Login",
+    "ssoFailed": "SSO login failed. Please verify the application configuration."
   },
   "agents": {
     "title": "Agents",
