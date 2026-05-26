@@ -14,6 +14,7 @@ configUserCenter({
   clientId: import.meta.env.VITE_IAM_CLIENT_ID,
   ssoUrl: import.meta.env.VITE_IAM_SSO_URL,
   tokenUrl: import.meta.env.VITE_IAM_TOKEN_URL,
+  redirectUri: `${window.location.origin}/login`,
 })
 
 ReactDOM.createRoot(document.getElementById('root')!).render(

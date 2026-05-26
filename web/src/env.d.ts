@@ -15,6 +15,8 @@ declare module '@haier/iam' {
     clientId: string
     ssoUrl: string
     tokenUrl: string
+    redirectUri?: string
+    exitUrl?: string
     appId?: string
   }
 
