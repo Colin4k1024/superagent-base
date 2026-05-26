@@ -26,7 +26,6 @@ import (
 
 	"github.com/apache/rocketmq-client-go/v2/primitive"
 	"github.com/cloudwego/eino/schema"
-	"github.com/milvus-io/milvus/client/v2/milvusclient"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 	"gorm.io/gorm"
@@ -43,8 +42,6 @@ import (
 	"github.com/superagent-ai/superagent-base/backend/infra/document/rerank/impl/rrf"
 	"github.com/superagent-ai/superagent-base/backend/infra/document/searchstore"
 	sses "github.com/superagent-ai/superagent-base/backend/infra/document/searchstore/impl/elasticsearch"
-	ssmilvus "github.com/superagent-ai/superagent-base/backend/infra/document/searchstore/impl/milvus"
-	hembed "github.com/superagent-ai/superagent-base/backend/infra/embedding/impl/http"
 	"github.com/superagent-ai/superagent-base/backend/infra/es/impl/es"
 	eventbus "github.com/superagent-ai/superagent-base/backend/infra/eventbus/impl"
 	"github.com/superagent-ai/superagent-base/backend/infra/idgen/impl/idgen"
@@ -85,13 +82,11 @@ func (suite *KnowledgeTestSuite) SetupSuite() {
 	ctx := context.Background()
 	var (
 		rmqEndpoint = "127.0.0.1:9876"
-		embEndpoint = "http://127.0.0.1:6543"
 		// esCertPath    = os.Getenv("ES_CA_CERT_PATH")
 		// esAddr = os.Getenv("ES_ADDR")
 		// esUsername    = os.Getenv("ES_USERNAME")
 		// esPassword    = os.Getenv("ES_PASSWORD")
-		milvusAddr    = os.Getenv("MILVUS_ADDR")
-		_             = os.Getenv("MYSQL_DSN")
+		_ = os.Getenv("MYSQL_DSN")
 		_             = os.Getenv("REDIS_ADDR")
 		minioEndpoint = os.Getenv(consts.MinIOEndpoint)
 		minioAK       = os.Getenv(consts.MinIOAK)
@@ -139,28 +134,6 @@ func (suite *KnowledgeTestSuite) SetupSuite() {
 	}
 
 	mgrs = append(mgrs, sses.NewManager(&sses.ManagerConfig{Client: knowledgeES}))
-
-	mc, err := milvusclient.New(ctx, &milvusclient.ClientConfig{
-		Address: milvusAddr,
-	})
-	if err != nil {
-		panic(err)
-	}
-
-	emb, err := hembed.NewEmbedding(embEndpoint, 1024, 1)
-	if err != nil {
-		panic(err)
-	}
-
-	mvs, err := ssmilvus.NewManager(&ssmilvus.ManagerConfig{
-		Client:       mc,
-		Embedding:    emb,
-		EnableHybrid: ptr.Of(true),
-	})
-	if err != nil {
-		panic(err)
-	}
-	mgrs = append(mgrs, mvs)
 
 	// ctrl := gomock.NewController(suite.T())
 
