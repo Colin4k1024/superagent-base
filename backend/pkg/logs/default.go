@@ -138,26 +138,31 @@ func CtxFatalf(ctx context.Context, format string, v ...interface{}) {
 // CtxErrorf calls the default logs's CtxErrorf method.
 func CtxErrorf(ctx context.Context, format string, v ...interface{}) {
 	logger.CtxErrorf(ctx, format, v...)
+	BroadcastLog("error", fmt.Sprintf(format, v...), nil)
 }
 
 // CtxWarnf calls the default logs's CtxWarnf method.
 func CtxWarnf(ctx context.Context, format string, v ...interface{}) {
 	logger.CtxWarnf(ctx, format, v...)
+	BroadcastLog("warn", fmt.Sprintf(format, v...), nil)
 }
 
 // CtxNoticef calls the default logs's CtxNoticef method.
 func CtxNoticef(ctx context.Context, format string, v ...interface{}) {
 	logger.CtxNoticef(ctx, format, v...)
+	BroadcastLog("info", fmt.Sprintf(format, v...), nil)
 }
 
 // CtxInfof calls the default logs's CtxInfof method.
 func CtxInfof(ctx context.Context, format string, v ...interface{}) {
 	logger.CtxInfof(ctx, format, v...)
+	BroadcastLog("info", fmt.Sprintf(format, v...), nil)
 }
 
 // CtxDebugf calls the default logs's CtxDebugf method.
 func CtxDebugf(ctx context.Context, format string, v ...interface{}) {
 	logger.CtxDebugf(ctx, format, v...)
+	BroadcastLog("debug", fmt.Sprintf(format, v...), nil)
 }
 
 // CtxTracef calls the default logs's CtxTracef method.
