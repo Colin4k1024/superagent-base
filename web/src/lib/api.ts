@@ -233,26 +233,87 @@ export const skillsApi = {
   },
 }
 
+// ModelClass integer values from backend developer_api.ModelClass enum
+export const MODEL_CLASS_MAP: Record<string, number> = {
+  OpenAI:   1,   // ModelClass_GPT
+  Claude:   3,   // ModelClass_Claude
+  DeepSeek: 19,  // ModelClass_DeekSeek
+  Gemini:   11,  // ModelClass_Gemini
+  Ollama:   20,  // ModelClass_Llama
+  Qwen:     15,  // ModelClass_QWen
+  Ark:      2,   // ModelClass_SEED
+}
+
+export const MODEL_CLASS_LABELS: Record<number, string> = {
+  1:  'OpenAI',
+  2:  'Ark',
+  3:  'Claude',
+  11: 'Gemini',
+  15: 'Qwen',
+  19: 'DeepSeek',
+  20: 'Ollama',
+}
+
 export interface CreateModelRequest {
-  model_class: string  // e.g., "GPT", "Claude", "DeepSeek"
+  model_class: string  // display name key e.g., "OpenAI", "Claude"
   name: string         // display name
-  base_url: string     // API endpoint
-  api_key: string      // API key
-  model: string        // model ID (e.g., "gpt-4o")
+  base_url: string
+  api_key: string
+  model: string        // model ID e.g., "gpt-4o"
+}
+
+export interface ModelRecord {
+  id: number
+  name: string
+  model: string
+  model_class_id: number
+  model_class: string
+  base_url: string
+  api_key?: string
 }
 
 export const modelConfigApi = {
-  list: async (): Promise<any> => {
+  list: async (): Promise<ModelRecord[]> => {
     const res = await fetch('/api/admin/config/model/list', { headers: authHeaders() })
     handleAuthError(res)
     if (!res.ok) throw new Error('Failed to fetch models')
-    return res.json()
+    const data = await res.json()
+    // Backend returns {provider_model_list: [{provider, model_list: [Model]}]}
+    const providerList: any[] = data?.provider_model_list ?? []
+    const models: ModelRecord[] = []
+    for (const pl of providerList) {
+      for (const m of (pl.model_list ?? [])) {
+        const classId: number = m.provider?.model_class ?? 0
+        models.push({
+          id: m.id,
+          name: m.display_info?.name ?? '',
+          model: m.connection?.base_conn_info?.model ?? '',
+          model_class_id: classId,
+          model_class: MODEL_CLASS_LABELS[classId] ?? String(classId),
+          base_url: m.connection?.base_conn_info?.base_url ?? '',
+          api_key: m.connection?.base_conn_info?.api_key,
+        })
+      }
+    }
+    return models
   },
   create: async (data: CreateModelRequest): Promise<any> => {
+    const classId = MODEL_CLASS_MAP[data.model_class] ?? 1
+    const payload = {
+      model_class: classId,
+      model_name: data.name,
+      connection: {
+        base_conn_info: {
+          base_url: data.base_url,
+          api_key: data.api_key,
+          model: data.model,
+        },
+      },
+    }
     const res = await fetch('/api/admin/config/model/create', {
       method: 'POST',
       headers: authHeaders(),
-      body: JSON.stringify(data),
+      body: JSON.stringify(payload),
     })
     handleAuthError(res)
     if (!res.ok) throw new Error(await res.text())
@@ -267,6 +328,59 @@ export const modelConfigApi = {
     handleAuthError(res)
     if (!res.ok) throw new Error(await res.text())
     return res.json()
+  },
+}
+
+// MCP server management API  (/api/v1/admin/mcp/servers)
+export interface McpServerItem {
+  name: string
+  transport: string
+  status: string
+  tools_count: number
+}
+
+export interface McpConnectRequest {
+  name: string
+  transport: 'stdio' | 'sse'
+  command?: string
+  args?: string[]
+  url?: string
+  env?: Record<string, string>
+}
+
+export const mcpAdminApi = {
+  list: async (): Promise<McpServerItem[]> => {
+    const res = await fetch(`${API_BASE}/admin/mcp/servers`, { headers: authHeaders() })
+    handleAuthError(res)
+    if (!res.ok) throw new Error('Failed to fetch MCP servers')
+    const data = await res.json()
+    return data.servers ?? []
+  },
+  connect: async (req: McpConnectRequest): Promise<any> => {
+    const res = await fetch(`${API_BASE}/admin/mcp/servers`, {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify(req),
+    })
+    handleAuthError(res)
+    if (!res.ok) throw new Error(await res.text())
+    return res.json()
+  },
+  disconnect: async (name: string): Promise<any> => {
+    const res = await fetch(`${API_BASE}/admin/mcp/servers/${encodeURIComponent(name)}`, {
+      method: 'DELETE',
+      headers: authHeaders(),
+    })
+    handleAuthError(res)
+    if (!res.ok) throw new Error(await res.text())
+    return res.json()
+  },
+  listTools: async (name: string): Promise<any[]> => {
+    const res = await fetch(`${API_BASE}/admin/mcp/servers/${encodeURIComponent(name)}/tools`, { headers: authHeaders() })
+    handleAuthError(res)
+    if (!res.ok) throw new Error(await res.text())
+    const data = await res.json()
+    return data.tools ?? []
   },
 }
 
