@@ -21,6 +21,8 @@ export default function ChatPage() {
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const abortRef = useRef<AbortController | null>(null)
   const userScrollingRef = useRef(false)
+  // Incremented on each new send; guards stale callbacks from updating the wrong message.
+  const requestIdRef = useRef(0)
 
   // Load agents
   useEffect(() => {
@@ -67,10 +69,31 @@ export default function ChatPage() {
     setIsLoading(false)
   }, [])
 
-  // Send message
+  // Send message (also supports preempting an in-flight request).
   const handleSend = useCallback(() => {
     const text = input.trim()
-    if (!text || !selectedAgent || isLoading) return
+    if (!text || !selectedAgent) return
+
+    // Preempt: if a turn is active, cancel it before starting the new one.
+    if (isLoading) {
+      // Mark the current assistant message as preempted.
+      setMessages((prev) => {
+        const updated = [...prev]
+        const last = updated[updated.length - 1]
+        if (last.role === 'assistant') {
+          updated[updated.length - 1] = { ...last, preempted: true }
+        }
+        return updated
+      })
+      // Tell the backend to abort, then abort the SSE connection locally.
+      chatApi.abort(selectedAgent, sessionId).catch(() => {})
+      const oldCtrl = abortRef.current
+      abortRef.current = null
+      oldCtrl?.abort()
+    }
+
+    requestIdRef.current++
+    const myRequestId = requestIdRef.current
 
     const userMsg: ChatMessage = { role: 'user', content: text }
     setMessages((prev) => [...prev, userMsg])
@@ -84,6 +107,7 @@ export default function ChatPage() {
 
     const callbacks: ChatStreamCallbacks = {
       onToken: (token) => {
+        if (requestIdRef.current !== myRequestId) return
         setMessages((prev) => {
           const updated = [...prev]
           const last = updated[updated.length - 1]
@@ -94,6 +118,7 @@ export default function ChatPage() {
         })
       },
       onThinking: (text) => {
+        if (requestIdRef.current !== myRequestId) return
         setMessages((prev) => {
           const updated = [...prev]
           const last = updated[updated.length - 1]
@@ -107,6 +132,7 @@ export default function ChatPage() {
         })
       },
       onToolCall: (name, args) => {
+        if (requestIdRef.current !== myRequestId) return
         setMessages((prev) => {
           const updated = [...prev]
           const last = updated[updated.length - 1]
@@ -119,12 +145,12 @@ export default function ChatPage() {
         })
       },
       onToolResult: (name: string, result: string) => {
+        if (requestIdRef.current !== myRequestId) return
         setMessages((prev) => {
           const updated = [...prev]
           const last = updated[updated.length - 1]
           if (last.role === 'assistant' && last.toolCalls) {
             const toolCalls = [...last.toolCalls]
-            // Find last calling tool with this name
             let idx = -1
             for (let i = toolCalls.length - 1; i >= 0; i--) {
               if (toolCalls[i].name === name && toolCalls[i].status === 'calling') {
@@ -141,10 +167,19 @@ export default function ChatPage() {
         })
       },
       onDone: () => {
+        if (requestIdRef.current !== myRequestId) return
+        setIsLoading(false)
+        abortRef.current = null
+      },
+      onPreempted: () => {
+        // Backend confirmed preemption — the stream for this turn ended early.
+        // The UI already marked the message preempted; nothing extra needed.
+        if (requestIdRef.current !== myRequestId) return
         setIsLoading(false)
         abortRef.current = null
       },
       onError: (err) => {
+        if (requestIdRef.current !== myRequestId) return
         setMessages((prev) => {
           const updated = [...prev]
           const last = updated[updated.length - 1]
@@ -213,12 +248,18 @@ export default function ChatPage() {
           )}
 
           {messages.map((msg, i) => (
-            <MessageBubble
-              key={i}
-              message={msg}
-              isStreaming={isLoading}
-              isLast={i === messages.length - 1}
-            />
+            <div key={i}>
+              <MessageBubble
+                message={msg}
+                isStreaming={isLoading && i === messages.length - 1}
+                isLast={i === messages.length - 1}
+              />
+              {msg.preempted && (
+                <div className="flex justify-start mt-1 ml-1">
+                  <span className="text-xs text-gray-400 italic">已中断</span>
+                </div>
+              )}
+            </div>
           ))}
 
           <div ref={messagesEndRef} />

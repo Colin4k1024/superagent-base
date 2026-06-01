@@ -409,9 +409,10 @@ func startHttpServer(agentRT *agentdef.AgentRuntime, skillMgr *skill.Manager, to
 	// Memory handler — backed by the shared Redis memory store.
 	memH := cozehandler.NewMemoryHandler(sharedMem)
 
-	// V1 interrupt/resume — same handlers as v2 (deprecated).
+	// V1 interrupt/resume/abort — same handlers as v2 (deprecated).
 	s.POST("/api/v1/chat/resume", middleware.DeprecationMW("/api/v2"), chatSSE.HandleChatResume)
 	s.GET("/api/v1/chat/interrupt_state", middleware.DeprecationMW("/api/v2"), chatSSE.HandleGetInterruptState)
+	s.POST("/api/v1/chat/abort", middleware.DeprecationMW("/api/v2"), chatSSE.HandleChatAbort)
 
 	// V2 canonical API — same handlers, no deprecation headers.
 	registerV2Routes(s, chatSSE, adminH, agentAdmin, userAdmin, mcpAdmin, evoAdmin, webhookH, xiaohaiH, sessionH, fileH, skillMgr, toolMgr, memH, userStore)
@@ -442,6 +443,7 @@ func registerV2Routes(
 	s.POST("/api/v2/chat/stream", chatSSE.HandleChatStream)
 	s.POST("/api/v2/chat/resume", chatSSE.HandleChatResume)
 	s.GET("/api/v2/chat/interrupt_state", chatSSE.HandleGetInterruptState)
+	s.POST("/api/v2/chat/abort", chatSSE.HandleChatAbort)
 	s.GET("/api/v2/agents", chatSSE.HandleListAgents)
 
 	// Session history — read is public, clear requires admin auth.
