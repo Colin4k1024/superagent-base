@@ -54,6 +54,7 @@ export interface ToolCallInfo {
 }
 
 export interface ChatMessage {
+  id?: string
   role: 'user' | 'assistant'
   content: string
   type?: 'text' | 'card' | 'file' | 'thinking'
@@ -282,6 +283,17 @@ export interface ChatStreamCallbacks {
 }
 
 export const chatApi = {
+  async abort(agentId: string, sessionId: string): Promise<{ status: string }> {
+    const res = await fetch(`${API_BASE}/chat/abort`, {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({ agent_id: agentId, session_id: sessionId }),
+    })
+    handleAuthError(res)
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    return res.json()
+  },
+
   /**
    * Send a message and receive streaming response.
    * Supports both A2UI JSON events and legacy raw text format.

@@ -335,6 +335,7 @@ func startHttpServer(agentRT *agentdef.AgentRuntime, skillMgr *skill.Manager, to
 	// Agent SSE endpoints — direct streaming without the Coze conversation pipeline.
 	chatSSE := cozehandler.NewChatSSEHandler(agentRT)
 	s.POST("/api/v1/chat/stream", middleware.DeprecationMW("/api/v2"), chatSSE.HandleChatStream)
+	s.POST("/api/v1/chat/abort", middleware.DeprecationMW("/api/v2"), chatSSE.HandleChatAbort)
 	s.GET("/api/v1/agents", middleware.DeprecationMW("/api/v2"), chatSSE.HandleListAgents)
 
 	// Admin/monitoring endpoints — protected by AdminAuthMW (key validation + rate limiting).
@@ -440,6 +441,7 @@ func registerV2Routes(
 ) {
 	// Chat endpoints.
 	s.POST("/api/v2/chat/stream", chatSSE.HandleChatStream)
+	s.POST("/api/v2/chat/abort", chatSSE.HandleChatAbort)
 	s.POST("/api/v2/chat/resume", chatSSE.HandleChatResume)
 	s.GET("/api/v2/chat/interrupt_state", chatSSE.HandleGetInterruptState)
 	s.GET("/api/v2/agents", chatSSE.HandleListAgents)

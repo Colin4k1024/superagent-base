@@ -24,6 +24,7 @@ import (
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/protocol/sse"
 
+	"github.com/superagent-ai/superagent-base/backend/pkg/a2ui"
 	"github.com/superagent-ai/superagent-base/backend/pkg/agentdef"
 	"github.com/superagent-ai/superagent-base/backend/pkg/observe"
 )
@@ -31,12 +32,16 @@ import (
 // ChatSSEHandler provides HTTP endpoints for direct agent interaction
 // without going through the full Coze conversation pipeline.
 type ChatSSEHandler struct {
-	runtime *agentdef.AgentRuntime
+	runtime   *agentdef.AgentRuntime
+	turnLoops *agentdef.TurnLoopManager
 }
 
 // NewChatSSEHandler creates a ChatSSEHandler.
 func NewChatSSEHandler(rt *agentdef.AgentRuntime) *ChatSSEHandler {
-	return &ChatSSEHandler{runtime: rt}
+	return &ChatSSEHandler{
+		runtime:   rt,
+		turnLoops: agentdef.NewTurnLoopManager(),
+	}
 }
 
 // chatStreamRequest is the JSON body for POST /api/v1/chat/stream.
@@ -123,8 +128,13 @@ func (h *ChatSSEHandler) HandleChatStream(ctx context.Context, c *app.RequestCon
 	defer func() { _ = w.Close() }()
 
 	if useA2UI {
-		eventAgent := agentdef.NewEventAgent(agent)
-		stream, _ := eventAgent.ChatWithEvents(ctx, req.SessionID, req.Message)
+		stream := a2ui.NewEventStream(200)
+		eventCtx := agentdef.ContextWithA2UIStream(ctx, stream)
+		ch, handled, err := h.turnLoops.Chat(eventCtx, req.AgentID, agent, req.SessionID, req.Message)
+		if !handled {
+			ch, err = agent.Chat(eventCtx, req.SessionID, req.Message)
+		}
+		stream = agentdef.TokenStreamToEventStream(eventCtx, ch, err, stream)
 		for evt := range stream.Chan() {
 			data, _ := json.Marshal(evt)
 			if writeErr := w.WriteEvent("", string(evt.Type), data); writeErr != nil {
@@ -139,7 +149,10 @@ func (h *ChatSSEHandler) HandleChatStream(ctx context.Context, c *app.RequestCon
 	}
 
 	// Legacy mode: plain text tokens.
-	ch, err := agent.Chat(ctx, req.SessionID, req.Message)
+	ch, handled, err := h.turnLoops.Chat(ctx, req.AgentID, agent, req.SessionID, req.Message)
+	if !handled {
+		ch, err = agent.Chat(ctx, req.SessionID, req.Message)
+	}
 	if err != nil {
 		c.JSON(500, map[string]string{"error": err.Error()})
 		return
@@ -156,6 +169,38 @@ func (h *ChatSSEHandler) HandleChatStream(ctx context.Context, c *app.RequestCon
 	}
 	// Signal stream completion.
 	_ = w.WriteEvent("", "message", []byte("[DONE]"))
+}
+
+// chatAbortRequest is the JSON body for POST /api/v1/chat/abort.
+type chatAbortRequest struct {
+	AgentID   string `json:"agent_id"`
+	SessionID string `json:"session_id"`
+}
+
+// HandleChatAbort stops an active TurnLoop-backed chat stream.
+func (h *ChatSSEHandler) HandleChatAbort(_ context.Context, c *app.RequestContext) {
+	var req chatAbortRequest
+	if err := c.BindJSON(&req); err != nil {
+		c.JSON(400, map[string]string{"error": "invalid request body: " + err.Error()})
+		return
+	}
+	if req.AgentID == "" {
+		req.AgentID = "research-agent"
+	}
+	if req.SessionID == "" {
+		c.JSON(400, map[string]string{"error": "session_id is required"})
+		return
+	}
+	if h.turnLoops == nil {
+		c.JSON(200, map[string]string{"status": "no_active_loop"})
+		return
+	}
+
+	if h.turnLoops.Abort(req.AgentID, req.SessionID) {
+		c.JSON(200, map[string]string{"status": "aborted"})
+		return
+	}
+	c.JSON(200, map[string]string{"status": "no_active_loop"})
 }
 
 // chatResumeRequest is the JSON body for POST /api/v1/chat/resume.

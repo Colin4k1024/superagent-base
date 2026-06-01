@@ -47,20 +47,30 @@ func NewEventAgent(inner Agent) EventAgent {
 // Agent into structured A2UI events. Special interrupt signals embedded in
 // the token stream are decoded; all other tokens become text delta events.
 func (e *eventAgentWrapper) ChatWithEvents(ctx context.Context, sessionID string, message string) (*a2ui.EventStream, error) {
-	stream := a2ui.NewEventStream(200)
-
 	// Attach the EventStream to context so the A2UI callback can emit
 	// tool_call/tool_result events during internal ReAct processing.
+	stream := a2ui.NewEventStream(200)
 	ctx = a2ui.WithEventStream(ctx, stream)
 
 	// Register the A2UI callback handler to intercept tool lifecycle events.
 	ctx = callbacks.InitCallbacks(ctx, &callbacks.RunInfo{Name: "a2ui-event-agent"}, a2ui.NewA2UICallback())
 
 	ch, err := e.Agent.Chat(ctx, sessionID, message)
+	return TokenStreamToEventStream(ctx, ch, err, stream), nil
+}
+
+// ContextWithA2UIStream attaches stream and the A2UI callback to ctx.
+func ContextWithA2UIStream(ctx context.Context, stream *a2ui.EventStream) context.Context {
+	ctx = a2ui.WithEventStream(ctx, stream)
+	return callbacks.InitCallbacks(ctx, &callbacks.RunInfo{Name: "a2ui-event-agent"}, a2ui.NewA2UICallback())
+}
+
+// TokenStreamToEventStream translates a plain token channel into A2UI events.
+func TokenStreamToEventStream(ctx context.Context, ch <-chan string, err error, stream *a2ui.EventStream) *a2ui.EventStream {
 	if err != nil {
 		stream.SendError("chat_failed", err.Error())
 		stream.Close()
-		return stream, nil
+		return stream
 	}
 
 	go func() {
@@ -74,7 +84,7 @@ func (e *eventAgentWrapper) ChatWithEvents(ctx context.Context, sessionID string
 		stream.SendDone()
 	}()
 
-	return stream, nil
+	return stream
 }
 
 // isInterruptSignal returns true when token carries an embedded interrupt

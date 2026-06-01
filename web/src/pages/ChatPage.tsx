@@ -13,13 +13,14 @@ export default function ChatPage() {
   const [selectedAgent, setSelectedAgent] = useState('')
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
-  const [isLoading, setIsLoading] = useState(false)
+  const [activeStreamCount, setActiveStreamCount] = useState(0)
   const [sessionId] = useState(() => `session-${Date.now()}`)
   const [showBackToBottom, setShowBackToBottom] = useState(false)
+  const isLoading = activeStreamCount > 0
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
-  const abortRef = useRef<AbortController | null>(null)
+  const abortRefs = useRef<Map<string, AbortController>>(new Map())
   const userScrollingRef = useRef(false)
 
   // Load agents
@@ -62,104 +63,116 @@ export default function ChatPage() {
 
   // Stop generation
   const handleStop = useCallback(() => {
-    abortRef.current?.abort()
-    abortRef.current = null
-    setIsLoading(false)
-  }, [])
+    if (selectedAgent) {
+      void chatApi.abort(selectedAgent, sessionId).catch(() => {})
+    }
+    abortRefs.current.forEach((controller) => controller.abort())
+    abortRefs.current.clear()
+    setActiveStreamCount(0)
+  }, [selectedAgent, sessionId])
 
   // Send message
   const handleSend = useCallback(() => {
     const text = input.trim()
-    if (!text || !selectedAgent || isLoading) return
+    if (!text || !selectedAgent) return
 
-    const userMsg: ChatMessage = { role: 'user', content: text }
+    const now = Date.now()
+    const assistantId = `assistant-${now}-${Math.random().toString(36).slice(2)}`
+    const userMsg: ChatMessage = { id: `user-${now}`, role: 'user', content: text }
     setMessages((prev) => [...prev, userMsg])
     setInput('')
-    setIsLoading(true)
+    setActiveStreamCount((count) => count + 1)
     userScrollingRef.current = false
 
     // Create assistant placeholder
-    const assistantMsg: ChatMessage = { role: 'assistant', content: '' }
+    const assistantMsg: ChatMessage = { id: assistantId, role: 'assistant', content: '' }
     setMessages((prev) => [...prev, assistantMsg])
 
     const callbacks: ChatStreamCallbacks = {
       onToken: (token) => {
         setMessages((prev) => {
+          const idx = prev.findIndex((msg) => msg.id === assistantId)
+          if (idx < 0) return prev
           const updated = [...prev]
-          const last = updated[updated.length - 1]
-          if (last.role === 'assistant') {
-            updated[updated.length - 1] = { ...last, content: last.content + token }
+          const target = updated[idx]
+          if (target.role === 'assistant') {
+            updated[idx] = { ...target, content: target.content + token }
           }
           return updated
         })
       },
       onThinking: (text) => {
         setMessages((prev) => {
+          const idx = prev.findIndex((msg) => msg.id === assistantId)
+          if (idx < 0) return prev
           const updated = [...prev]
-          const last = updated[updated.length - 1]
-          if (last.role === 'assistant') {
-            updated[updated.length - 1] = {
-              ...last,
-              thinking: (last.thinking || '') + text,
-            }
+          const target = updated[idx]
+          if (target.role === 'assistant') {
+            updated[idx] = { ...target, thinking: (target.thinking || '') + text }
           }
           return updated
         })
       },
       onToolCall: (name, args) => {
         setMessages((prev) => {
+          const idx = prev.findIndex((msg) => msg.id === assistantId)
+          if (idx < 0) return prev
           const updated = [...prev]
-          const last = updated[updated.length - 1]
-          if (last.role === 'assistant') {
-            const toolCalls = [...(last.toolCalls || [])]
+          const target = updated[idx]
+          if (target.role === 'assistant') {
+            const toolCalls = [...(target.toolCalls || [])]
             toolCalls.push({ name, args, status: 'calling' })
-            updated[updated.length - 1] = { ...last, toolCalls }
+            updated[idx] = { ...target, toolCalls }
           }
           return updated
         })
       },
       onToolResult: (name: string, result: string) => {
         setMessages((prev) => {
+          const idx = prev.findIndex((msg) => msg.id === assistantId)
+          if (idx < 0) return prev
           const updated = [...prev]
-          const last = updated[updated.length - 1]
-          if (last.role === 'assistant' && last.toolCalls) {
-            const toolCalls = [...last.toolCalls]
+          const target = updated[idx]
+          if (target.role === 'assistant' && target.toolCalls) {
+            const toolCalls = [...target.toolCalls]
             // Find last calling tool with this name
-            let idx = -1
+            let toolIdx = -1
             for (let i = toolCalls.length - 1; i >= 0; i--) {
               if (toolCalls[i].name === name && toolCalls[i].status === 'calling') {
-                idx = i
+                toolIdx = i
                 break
               }
             }
-            if (idx >= 0) {
-              toolCalls[idx] = { ...toolCalls[idx], result, status: 'done' }
+            if (toolIdx >= 0) {
+              toolCalls[toolIdx] = { ...toolCalls[toolIdx], result, status: 'done' }
             }
-            updated[updated.length - 1] = { ...last, toolCalls }
+            updated[idx] = { ...target, toolCalls }
           }
           return updated
         })
       },
       onDone: () => {
-        setIsLoading(false)
-        abortRef.current = null
+        abortRefs.current.delete(assistantId)
+        setActiveStreamCount((count) => Math.max(0, count - 1))
       },
       onError: (err) => {
         setMessages((prev) => {
+          const idx = prev.findIndex((msg) => msg.id === assistantId)
+          if (idx < 0) return prev
           const updated = [...prev]
-          const last = updated[updated.length - 1]
-          if (last.role === 'assistant') {
-            updated[updated.length - 1] = { ...last, content: `Error: ${err.message}` }
+          const target = updated[idx]
+          if (target.role === 'assistant') {
+            updated[idx] = { ...target, content: `Error: ${err.message}` }
           }
           return updated
         })
-        setIsLoading(false)
-        abortRef.current = null
+        abortRefs.current.delete(assistantId)
+        setActiveStreamCount((count) => Math.max(0, count - 1))
       },
     }
 
-    abortRef.current = chatApi.sendMessage(selectedAgent, sessionId, text, callbacks)
-  }, [input, selectedAgent, isLoading, sessionId])
+    abortRefs.current.set(assistantId, chatApi.sendMessage(selectedAgent, sessionId, text, callbacks))
+  }, [input, selectedAgent, sessionId])
 
   return (
     <div className="flex flex-col h-full bg-gradient-to-b from-gray-50 to-white">

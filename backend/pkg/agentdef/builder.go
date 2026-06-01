@@ -111,16 +111,16 @@ func WithRedisClient(client cache.Cmdable) BuilderOption {
 
 // AgentBuilder converts AgentDefinitions into running Agent instances.
 type AgentBuilder struct {
-	modelRouter         modelrouter.Router
-	toolManager         *tool.Manager
-	memoryFactory       func(config memory.BackendConfig) (memory.Backend, error)
-	mcpRegistry         *mcp.Registry
-	skillManager        *skill.Manager
-	modelConfig         ModelRuntimeConfig
-	agentRegistry       func(name string) (Agent, bool)
-	redisClient         cache.Cmdable
-	evolutionAdvisor    *evolution.EvolutionAdvisor
-	evolutionCollector  *evolution.SignalCollector
+	modelRouter        modelrouter.Router
+	toolManager        *tool.Manager
+	memoryFactory      func(config memory.BackendConfig) (memory.Backend, error)
+	mcpRegistry        *mcp.Registry
+	skillManager       *skill.Manager
+	modelConfig        ModelRuntimeConfig
+	agentRegistry      func(name string) (Agent, bool)
+	redisClient        cache.Cmdable
+	evolutionAdvisor   *evolution.EvolutionAdvisor
+	evolutionCollector *evolution.SignalCollector
 }
 
 // NewAgentBuilder creates an AgentBuilder with optional configuration.
@@ -265,50 +265,37 @@ func (b *AgentBuilder) Build(ctx context.Context, def *AgentDefinition) (Agent, 
 	// Gather Eino-compatible tools from resolved refs.
 	einoTools := b.resolveEinoTools(ctx, toolRefs)
 
-	if len(einoTools) > 0 {
-		// ADK ChatModelAgent with tool calling (replaces legacy react.NewAgent).
-		maxStep := 10
-		if def.Spec.MaxTurns > 0 {
-			maxStep = def.Spec.MaxTurns
-		}
-		adkHandlers, err := resolveADKHandlers(ctx, def.Spec.Middleware)
-		if err != nil {
-			return nil, fmt.Errorf("agentdef: Build %q: resolve adk handlers: %w", def.Metadata.Name, err)
-		}
-		adkAgent, err := adk.NewChatModelAgent(ctx, &adk.ChatModelAgentConfig{
-			Name:        def.Metadata.Name,
-			Description: def.Spec.SystemPrompt,
-			Instruction: def.Spec.SystemPrompt,
-			Model:       chatModel,
-			ToolsConfig: adk.ToolsConfig{
-				ToolsNodeConfig: compose.ToolsNodeConfig{
-					Tools: einoTools,
-				},
+	maxStep := 10
+	if def.Spec.MaxTurns > 0 {
+		maxStep = def.Spec.MaxTurns
+	}
+	adkHandlers, err := resolveADKHandlers(ctx, def.Spec.Middleware)
+	if err != nil {
+		return nil, fmt.Errorf("agentdef: Build %q: resolve adk handlers: %w", def.Metadata.Name, err)
+	}
+	adkAgent, err := adk.NewChatModelAgent(ctx, &adk.ChatModelAgentConfig{
+		Name:        def.Metadata.Name,
+		Description: def.Spec.SystemPrompt,
+		Instruction: def.Spec.SystemPrompt,
+		Model:       chatModel,
+		ToolsConfig: adk.ToolsConfig{
+			ToolsNodeConfig: compose.ToolsNodeConfig{
+				Tools: einoTools,
 			},
-			MaxIterations: maxStep,
-			Handlers:      adkHandlers,
-		})
-		if err != nil {
-			return nil, fmt.Errorf("agentdef: Build: create adk agent: %w", err)
-		}
-		built = &adkChatModelAgent{
-			def:          def,
-			modelID:      effectiveModelID,
-			provider:     protocol,
-			memBackend:   memBackend,
-			agent:        adkAgent,
-			systemPrompt: def.Spec.SystemPrompt,
-		}
-	} else {
-		// Simple chat agent without tools.
-		built = &einoChatAgent{
-			def:          def,
-			modelID:      effectiveModelID,
-			provider:     protocol,
-			memBackend:   memBackend,
-			chatModel:    chatModel,
-			systemPrompt: def.Spec.SystemPrompt,
-		}
+		},
+		MaxIterations: maxStep,
+		Handlers:      adkHandlers,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("agentdef: Build: create adk agent: %w", err)
+	}
+	built = &adkChatModelAgent{
+		def:          def,
+		modelID:      effectiveModelID,
+		provider:     protocol,
+		memBackend:   memBackend,
+		agent:        adkAgent,
+		systemPrompt: def.Spec.SystemPrompt,
 	}
 
 	// Apply middleware wrapping (timeout, retry, rate_limit, cache).
@@ -321,44 +308,29 @@ func (b *AgentBuilder) Build(ctx context.Context, def *AgentDefinition) (Agent, 
 		if fbErr != nil {
 			return nil, fmt.Errorf("agentdef: Build %q: create fallback model: %w", def.Metadata.Name, fbErr)
 		}
-		var fbAgent Agent
-		if len(einoTools) > 0 {
-			maxStep := 10
-			if def.Spec.MaxTurns > 0 {
-				maxStep = def.Spec.MaxTurns
-			}
-			fbADKAgent, fbADKErr := adk.NewChatModelAgent(ctx, &adk.ChatModelAgentConfig{
-				Name:        def.Metadata.Name + "_fallback",
-				Description: def.Spec.SystemPrompt,
-				Instruction: def.Spec.SystemPrompt,
-				Model:       fallbackModel,
-				ToolsConfig: adk.ToolsConfig{
-					ToolsNodeConfig: compose.ToolsNodeConfig{
-						Tools: einoTools,
-					},
+		fbADKAgent, fbADKErr := adk.NewChatModelAgent(ctx, &adk.ChatModelAgentConfig{
+			Name:        def.Metadata.Name + "_fallback",
+			Description: def.Spec.SystemPrompt,
+			Instruction: def.Spec.SystemPrompt,
+			Model:       fallbackModel,
+			ToolsConfig: adk.ToolsConfig{
+				ToolsNodeConfig: compose.ToolsNodeConfig{
+					Tools: einoTools,
 				},
-				MaxIterations: maxStep,
-			})
-			if fbADKErr != nil {
-				return nil, fmt.Errorf("agentdef: Build: create fallback adk agent: %w", fbADKErr)
-			}
-			fbAgent = &adkChatModelAgent{
-				def:          def,
-				modelID:      fallbackModelID,
-				provider:     protocol,
-				memBackend:   memBackend,
-				agent:        fbADKAgent,
-				systemPrompt: def.Spec.SystemPrompt,
-			}
-		} else {
-			fbAgent = &einoChatAgent{
-				def:          def,
-				modelID:      fallbackModelID,
-				provider:     protocol,
-				memBackend:   memBackend,
-				chatModel:    fallbackModel,
-				systemPrompt: def.Spec.SystemPrompt,
-			}
+			},
+			MaxIterations: maxStep,
+			Handlers:      adkHandlers,
+		})
+		if fbADKErr != nil {
+			return nil, fmt.Errorf("agentdef: Build: create fallback adk agent: %w", fbADKErr)
+		}
+		var fbAgent Agent = &adkChatModelAgent{
+			def:          def,
+			modelID:      fallbackModelID,
+			provider:     protocol,
+			memBackend:   memBackend,
+			agent:        fbADKAgent,
+			systemPrompt: def.Spec.SystemPrompt,
 		}
 		// Apply the same middleware to the fallback agent.
 		fbAgent = b.applyMiddleware(fbAgent, def)
@@ -483,7 +455,6 @@ func (b *AgentBuilder) applyMiddleware(agent Agent, def *AgentDefinition) Agent 
 	}
 	return result
 }
-
 
 // resolveEinoTools converts resolved tool refs to Eino einotool.BaseTool instances.
 // Supports builtin (via tool.Manager), skill:// (via skill.Manager), and
@@ -977,8 +948,6 @@ func (a *einoGraphAgent) Chat(ctx context.Context, _ string, message string) (<-
 	}()
 	return ch, nil
 }
-
-
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 

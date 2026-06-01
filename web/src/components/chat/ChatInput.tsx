@@ -18,12 +18,12 @@ export default function ChatInput({ value, onChange, onSend, onStop, isLoading, 
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
       if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault()
-        if (!isLoading && value.trim()) {
+        if (!disabled && value.trim()) {
           onSend()
         }
       }
     },
-    [isLoading, value, onSend],
+    [disabled, value, onSend],
   )
 
   const handleInput = useCallback(
@@ -49,8 +49,20 @@ export default function ChatInput({ value, onChange, onSend, onStop, isLoading, 
             value={value}
             onChange={handleInput}
             onKeyDown={handleKeyDown}
-            disabled={disabled || isLoading}
+            disabled={disabled}
           />
+          {isLoading && value.trim() && (
+            <button
+              onClick={onSend}
+              disabled={disabled}
+              className="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-lg bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white transition-colors disabled:cursor-not-allowed"
+              title="发送"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h14M12 5l7 7-7 7" />
+              </svg>
+            </button>
+          )}
           {isLoading ? (
             <button
               onClick={onStop}
