@@ -1,0 +1,12 @@
+{
+  "id": "integrate-eino-turnloop",
+  "title": "集成 Eino ADK TurnLoop 到现有聊天流",
+  "status": "completed",
+  "complexity": "M",
+  "risk": "medium",
+  "domain": "fullstack",
+  "currentPhase": "completed",
+  "nextAction": "归档任务",
+  "createdAt": "2026-06-01T12:38:06Z",
+  "branch": "main"
+}
