@@ -1,0 +1,12 @@
+{
+  "id": "pull-latest-code",
+  "title": "拉取远端最新代码到本地",
+  "status": "completed",
+  "complexity": "S",
+  "risk": "low",
+  "domain": "devops",
+  "currentPhase": "completed",
+  "nextAction": "已确认本地分支为最新",
+  "createdAt": "2026-06-01T11:57:13Z",
+  "branch": "main"
+}
