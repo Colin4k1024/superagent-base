@@ -61,6 +61,8 @@ export interface ChatMessage {
   card?: CardData
   references?: Reference[]
   toolCalls?: ToolCallInfo[]
+  /** True when the turn was cancelled by a preempt or abort before completion. */
+  preempted?: boolean
 }
 
 export interface AdminAgent {
@@ -390,6 +392,7 @@ export interface ChatStreamCallbacks {
   onToolCall?: (name: string, args: string) => void
   onToolResult?: (name: string, result: string) => void
   onDone: () => void
+  onPreempted?: () => void
   onError: (err: Error) => void
 }
 
@@ -405,7 +408,7 @@ export const chatApi = {
     message: string,
     callbacks: ChatStreamCallbacks,
   ): AbortController {
-    const { onToken, onThinking, onToolCall, onToolResult, onDone, onError } = callbacks
+    const { onToken, onThinking, onToolCall, onToolResult, onDone, onPreempted, onError } = callbacks
     const controller = new AbortController()
 
     const run = async () => {
@@ -474,6 +477,9 @@ export const chatApi = {
                 case 'done':
                   onDone()
                   return
+                case 'preempted':
+                  onPreempted?.()
+                  return
                 default:
                   if (content) onToken(content)
               }
@@ -495,6 +501,21 @@ export const chatApi = {
 
     run()
     return controller
+  },
+
+  /**
+   * Tell the backend to abort the active turn for a session (fire-and-forget).
+   */
+  async abort(agentId: string, sessionId: string): Promise<void> {
+    try {
+      await fetch(`${API_BASE}/chat/abort`, {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({ agent_id: agentId, session_id: sessionId }),
+      })
+    } catch {
+      // best-effort; ignore errors
+    }
   },
 }
 

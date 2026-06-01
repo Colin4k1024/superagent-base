@@ -31,12 +31,16 @@ import (
 // ChatSSEHandler provides HTTP endpoints for direct agent interaction
 // without going through the full Coze conversation pipeline.
 type ChatSSEHandler struct {
-	runtime *agentdef.AgentRuntime
+	runtime     *agentdef.AgentRuntime
+	sessionLoop *agentdef.SessionLoop
 }
 
 // NewChatSSEHandler creates a ChatSSEHandler.
 func NewChatSSEHandler(rt *agentdef.AgentRuntime) *ChatSSEHandler {
-	return &ChatSSEHandler{runtime: rt}
+	return &ChatSSEHandler{
+		runtime:     rt,
+		sessionLoop: agentdef.NewSessionLoop(),
+	}
 }
 
 // chatStreamRequest is the JSON body for POST /api/v1/chat/stream.
@@ -113,6 +117,11 @@ func (h *ChatSSEHandler) HandleChatStream(ctx context.Context, c *app.RequestCon
 	ctx, span := observe.StartAgentSpan(ctx, req.AgentID, "chat")
 	defer span.End()
 
+	// Start a new turn for this session; cancels any active turn (preempt).
+	// turnCtx is derived from ctx so it is also cancelled on client disconnect.
+	turnCtx := h.sessionLoop.StartTurn(req.SessionID, ctx)
+	defer h.sessionLoop.EndTurn(req.SessionID)
+
 	// Set SSE-specific headers before writing the first byte.
 	c.Response.Header.Set("Cache-Control", "no-cache")
 	c.Response.Header.Set("Connection", "keep-alive")
@@ -124,7 +133,7 @@ func (h *ChatSSEHandler) HandleChatStream(ctx context.Context, c *app.RequestCon
 
 	if useA2UI {
 		eventAgent := agentdef.NewEventAgent(agent)
-		stream, _ := eventAgent.ChatWithEvents(ctx, req.SessionID, req.Message)
+		stream, _ := eventAgent.ChatWithEvents(turnCtx, req.SessionID, req.Message)
 		for evt := range stream.Chan() {
 			data, _ := json.Marshal(evt)
 			if writeErr := w.WriteEvent("", string(evt.Type), data); writeErr != nil {
@@ -135,11 +144,17 @@ func (h *ChatSSEHandler) HandleChatStream(ctx context.Context, c *app.RequestCon
 				return
 			}
 		}
+		// If the turn was cancelled by the loop (preempt/abort) but the client is
+		// still connected, send a preempted event so the UI can react.
+		if turnCtx.Err() != nil && ctx.Err() == nil {
+			data, _ := json.Marshal(map[string]string{"type": "preempted"})
+			_ = w.WriteEvent("", "preempted", data)
+		}
 		return
 	}
 
 	// Legacy mode: plain text tokens.
-	ch, err := agent.Chat(ctx, req.SessionID, req.Message)
+	ch, err := agent.Chat(turnCtx, req.SessionID, req.Message)
 	if err != nil {
 		c.JSON(500, map[string]string{"error": err.Error()})
 		return
@@ -154,8 +169,10 @@ func (h *ChatSSEHandler) HandleChatStream(ctx context.Context, c *app.RequestCon
 			return
 		}
 	}
-	// Signal stream completion.
-	_ = w.WriteEvent("", "message", []byte("[DONE]"))
+	// Only send [DONE] when the turn completed normally (not preempted/aborted).
+	if turnCtx.Err() == nil {
+		_ = w.WriteEvent("", "message", []byte("[DONE]"))
+	}
 }
 
 // chatResumeRequest is the JSON body for POST /api/v1/chat/resume.
@@ -273,6 +290,32 @@ func (h *ChatSSEHandler) HandleGetInterruptState(ctx context.Context, c *app.Req
 
 	data, _ := json.Marshal(state)
 	c.JSON(200, map[string]any{"interrupted": true, "state": json.RawMessage(data)})
+}
+
+// chatAbortRequest is the JSON body for POST /api/v1/chat/abort.
+type chatAbortRequest struct {
+	AgentID   string `json:"agent_id"`
+	SessionID string `json:"session_id"`
+}
+
+// HandleChatAbort immediately cancels the active turn for a session.
+//
+// POST /api/v1/chat/abort
+// Body: {"session_id": "s1"}
+//
+// Returns {"aborted": true} if there was an active turn, {"aborted": false} otherwise.
+func (h *ChatSSEHandler) HandleChatAbort(_ context.Context, c *app.RequestContext) {
+	var req chatAbortRequest
+	if err := c.BindJSON(&req); err != nil {
+		c.JSON(400, map[string]string{"error": "invalid request body: " + err.Error()})
+		return
+	}
+	if req.SessionID == "" {
+		c.JSON(400, map[string]string{"error": "session_id is required"})
+		return
+	}
+	aborted := h.sessionLoop.Abort(req.SessionID)
+	c.JSON(200, map[string]any{"aborted": aborted})
 }
 
 // HandleListAgents returns JSON describing all agents known to the runtime.
