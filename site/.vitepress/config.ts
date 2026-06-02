@@ -61,7 +61,8 @@ export default defineConfig({
             { text: 'MCP 集成', link: '/advanced/mcp' },
             { text: '经验自进化', link: '/advanced/evolution' },
             { text: 'Agent Loop 自主循环', link: '/advanced/agentloop' },
-            { text: 'TurnLoop 抢占与中止', link: '/advanced/turnloop' }
+            { text: 'TurnLoop 抢占与中止', link: '/advanced/turnloop' },
+            { text: 'Langfuse 可观测性', link: '/advanced/langfuse' }
           ]
         }
       ]
