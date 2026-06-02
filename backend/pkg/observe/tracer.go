@@ -18,6 +18,7 @@ package observe
 
 import (
 	"context"
+	"fmt"
 
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
@@ -35,22 +36,15 @@ type TracerConfig struct {
 	ServiceName string
 	Endpoint    string // OTel collector gRPC endpoint, e.g. "otel-collector:4317"
 	Enabled     bool
+	Langfuse    LangfuseConfig
 }
 
-// InitTracer sets up the OTLP gRPC exporter and registers a global TracerProvider.
+// InitTracer sets up exporters and registers a global TracerProvider.
+// Supports dual-export: OTel Collector (gRPC) and/or Langfuse (HTTP/protobuf).
 // Returns a shutdown function that must be called on application exit to flush spans.
 func InitTracer(ctx context.Context, cfg TracerConfig) (func(context.Context) error, error) {
-	if !cfg.Enabled {
-		// Return a no-op shutdown when tracing is disabled.
+	if !cfg.Enabled && !cfg.Langfuse.Enabled {
 		return func(_ context.Context) error { return nil }, nil
-	}
-
-	exporter, err := otlptracegrpc.New(ctx,
-		otlptracegrpc.WithEndpoint(cfg.Endpoint),
-		otlptracegrpc.WithInsecure(),
-	)
-	if err != nil {
-		return nil, err
 	}
 
 	res, err := resource.New(ctx,
@@ -62,18 +56,61 @@ func InitTracer(ctx context.Context, cfg TracerConfig) (func(context.Context) er
 		resource.WithOS(),
 	)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("observe: resource creation failed: %w", err)
 	}
 
-	tp := sdktrace.NewTracerProvider(
-		sdktrace.WithBatcher(exporter),
-		sdktrace.WithResource(res),
-		sdktrace.WithSampler(sdktrace.AlwaysSample()),
-	)
+	var opts []sdktrace.TracerProviderOption
+	opts = append(opts, sdktrace.WithResource(res))
 
+	var shutdowns []func(context.Context) error
+
+	// OTel Collector gRPC exporter.
+	if cfg.Enabled {
+		grpcExp, err := otlptracegrpc.New(ctx,
+			otlptracegrpc.WithEndpoint(cfg.Endpoint),
+			otlptracegrpc.WithInsecure(),
+		)
+		if err != nil {
+			return nil, fmt.Errorf("observe: gRPC exporter failed: %w", err)
+		}
+		opts = append(opts, sdktrace.WithBatcher(grpcExp))
+		shutdowns = append(shutdowns, grpcExp.Shutdown)
+	}
+
+	// Langfuse OTLP HTTP exporter.
+	if cfg.Langfuse.Enabled {
+		lfExp, err := newLangfuseExporter(ctx, cfg.Langfuse)
+		if err != nil {
+			return nil, fmt.Errorf("observe: langfuse exporter failed: %w", err)
+		}
+		opts = append(opts, sdktrace.WithBatcher(lfExp))
+		shutdowns = append(shutdowns, lfExp.Shutdown)
+	}
+
+	// Use the more restrictive sampler when Langfuse has a custom rate.
+	sampler := sdktrace.AlwaysSample()
+	if cfg.Langfuse.Enabled && cfg.Langfuse.SampleRate < 1.0 {
+		sampler = newLangfuseSampler(cfg.Langfuse.SampleRate)
+	}
+	opts = append(opts, sdktrace.WithSampler(sampler))
+
+	tp := sdktrace.NewTracerProvider(opts...)
 	otel.SetTracerProvider(tp)
 
-	return tp.Shutdown, nil
+	shutdown := func(ctx context.Context) error {
+		var firstErr error
+		if err := tp.Shutdown(ctx); err != nil && firstErr == nil {
+			firstErr = err
+		}
+		for _, fn := range shutdowns {
+			if err := fn(ctx); err != nil && firstErr == nil {
+				firstErr = err
+			}
+		}
+		return firstErr
+	}
+
+	return shutdown, nil
 }
 
 // tracer returns the package-level named tracer from the global provider.
@@ -82,7 +119,6 @@ func tracer() trace.Tracer {
 }
 
 // StartAgentSpan starts a span for an agent operation.
-// The caller must call span.End() when the operation completes.
 func StartAgentSpan(ctx context.Context, agentID string, operation string) (context.Context, trace.Span) {
 	return tracer().Start(ctx, "agent."+operation,
 		trace.WithAttributes(
@@ -92,11 +128,14 @@ func StartAgentSpan(ctx context.Context, agentID string, operation string) (cont
 	)
 }
 
-// StartModelSpan starts a span for a model API call.
-// The caller must call span.End() when the operation completes.
+// StartModelSpan starts a span for a model API call with gen_ai semantic conventions.
 func StartModelSpan(ctx context.Context, modelID string, provider string) (context.Context, trace.Span) {
-	return tracer().Start(ctx, "model.invoke",
+	return tracer().Start(ctx, "gen_ai.chat",
 		trace.WithAttributes(
+			attribute.String("gen_ai.system", provider),
+			attribute.String("gen_ai.request.model", modelID),
+			attribute.String("gen_ai.operation.name", "chat"),
+			// Keep legacy attributes for backward compatibility.
 			attribute.String("model.id", modelID),
 			attribute.String("model.provider", provider),
 		),
@@ -104,7 +143,6 @@ func StartModelSpan(ctx context.Context, modelID string, provider string) (conte
 }
 
 // StartToolSpan starts a span for a tool invocation.
-// The caller must call span.End() when the operation completes.
 func StartToolSpan(ctx context.Context, toolName string) (context.Context, trace.Span) {
 	return tracer().Start(ctx, "tool.invoke",
 		trace.WithAttributes(

@@ -18,6 +18,7 @@ package observe
 
 import (
 	"context"
+	"encoding/json"
 	"time"
 
 	"github.com/cloudwego/eino/callbacks"
@@ -36,6 +37,7 @@ type startTimeKey struct{}
 
 // EinoObserveCallback implements Eino's callback interface to feed both
 // OpenTelemetry tracing and Prometheus metrics from component lifecycle events.
+// Spans are enriched with gen_ai.* semantic conventions for Langfuse compatibility.
 type EinoObserveCallback struct {
 	tracer trace.Tracer
 }
@@ -54,10 +56,23 @@ func NewEinoObserveCallback() callbacks.Handler {
 }
 
 // OnStart creates a span and records the operation start time for the component.
-func (c *EinoObserveCallback) OnStart(ctx context.Context, info *callbacks.RunInfo, _ callbacks.CallbackInput) context.Context {
+func (c *EinoObserveCallback) OnStart(ctx context.Context, info *callbacks.RunInfo, input callbacks.CallbackInput) context.Context {
 	spanName, attrs := spanNameAndAttrs(info)
 
 	ctx, span := c.tracer.Start(ctx, spanName, trace.WithAttributes(attrs...))
+
+	// Record input content for LLM observability.
+	if info.Component == components.ComponentOfChatModel {
+		if inputStr := marshalInput(input); inputStr != "" {
+			span.SetAttributes(attribute.String("input.value", inputStr))
+		}
+	}
+
+	// Propagate Langfuse context attributes from parent context.
+	if lfCtx := getLangfuseContext(ctx); lfCtx != nil {
+		lfCtx.applyToSpan(span)
+	}
+
 	ctx = context.WithValue(ctx, spanKey{}, span)
 	ctx = context.WithValue(ctx, startTimeKey{}, time.Now())
 
@@ -76,13 +91,28 @@ func (c *EinoObserveCallback) OnEnd(ctx context.Context, info *callbacks.RunInfo
 		provider, modelID := resolveModelInfo(info)
 		ModelRequestDuration.WithLabelValues(modelID, provider).Observe(elapsed)
 
-		// Record token counts if available in the output.
 		if cbOut := model.ConvCallbackOutput(output); cbOut != nil && cbOut.Message != nil {
+			// Record output content.
+			if span != nil {
+				if outputStr := marshalMessage(cbOut.Message); outputStr != "" {
+					span.SetAttributes(attribute.String("output.value", outputStr))
+				}
+			}
+
+			// Record token usage with gen_ai semantic conventions.
 			if cbOut.Message.ResponseMeta != nil {
 				usage := cbOut.Message.ResponseMeta.Usage
 				if usage != nil {
 					ModelTokensTotal.WithLabelValues(modelID, provider, "input").Add(float64(usage.PromptTokens))
 					ModelTokensTotal.WithLabelValues(modelID, provider, "output").Add(float64(usage.CompletionTokens))
+
+					if span != nil {
+						span.SetAttributes(
+							attribute.Int64("gen_ai.usage.input_tokens", int64(usage.PromptTokens)),
+							attribute.Int64("gen_ai.usage.output_tokens", int64(usage.CompletionTokens)),
+							attribute.Int64("gen_ai.usage.total_tokens", int64(usage.PromptTokens+usage.CompletionTokens)),
+						)
+					}
 				}
 			}
 		}
@@ -90,6 +120,13 @@ func (c *EinoObserveCallback) OnEnd(ctx context.Context, info *callbacks.RunInfo
 	case components.ComponentOfTool:
 		ToolInvocationsTotal.WithLabelValues(info.Name, "success").Inc()
 		ToolInvocationDuration.WithLabelValues(info.Name).Observe(elapsed)
+
+		// Record tool output.
+		if span != nil {
+			if outputStr := marshalOutput(output); outputStr != "" {
+				span.SetAttributes(attribute.String("output.value", outputStr))
+			}
+		}
 	}
 
 	if span != nil {
@@ -127,7 +164,11 @@ func spanNameAndAttrs(info *callbacks.RunInfo) (string, []attribute.KeyValue) {
 	switch info.Component {
 	case components.ComponentOfChatModel:
 		provider, modelID := resolveModelInfo(info)
-		return "model.invoke", []attribute.KeyValue{
+		return "gen_ai.chat", []attribute.KeyValue{
+			attribute.String("gen_ai.system", provider),
+			attribute.String("gen_ai.request.model", modelID),
+			attribute.String("gen_ai.operation.name", "chat"),
+			// Legacy attributes for backward compatibility.
 			attribute.String("model.id", modelID),
 			attribute.String("model.provider", provider),
 			attribute.String("eino.component", string(info.Component)),
@@ -152,19 +193,64 @@ func spanNameAndAttrs(info *callbacks.RunInfo) (string, []attribute.KeyValue) {
 }
 
 // resolveModelInfo extracts provider and model ID from RunInfo.
-// Falls back to info.Name when structured metadata is absent.
 func resolveModelInfo(info *callbacks.RunInfo) (provider, modelID string) {
-	// info.Name is typically set to the model identifier by Eino model components.
 	modelID = info.Name
 	provider = "unknown"
 	return provider, modelID
 }
 
 // errorType classifies an error into a short string label for Prometheus.
-// Extend this function to classify well-known Eino error types as needed.
 func errorType(err error) string {
 	if err == nil {
 		return "none"
 	}
 	return "error"
+}
+
+// marshalInput serializes callback input to a JSON string for tracing.
+func marshalInput(input callbacks.CallbackInput) string {
+	if input == nil {
+		return ""
+	}
+	if cbIn := model.ConvCallbackInput(input); cbIn != nil {
+		if cbIn.Messages != nil {
+			data, err := json.Marshal(cbIn.Messages)
+			if err == nil {
+				return truncate(string(data), 32000)
+			}
+		}
+	}
+	return ""
+}
+
+// marshalMessage serializes a model message to JSON for tracing.
+func marshalMessage(msg interface{}) string {
+	if msg == nil {
+		return ""
+	}
+	data, err := json.Marshal(msg)
+	if err != nil {
+		return ""
+	}
+	return truncate(string(data), 32000)
+}
+
+// marshalOutput serializes callback output to a string for tracing.
+func marshalOutput(output callbacks.CallbackOutput) string {
+	if output == nil {
+		return ""
+	}
+	data, err := json.Marshal(output)
+	if err != nil {
+		return ""
+	}
+	return truncate(string(data), 32000)
+}
+
+// truncate limits string length to avoid oversized span attributes.
+func truncate(s string, maxLen int) string {
+	if len(s) <= maxLen {
+		return s
+	}
+	return s[:maxLen] + "...[truncated]"
 }
