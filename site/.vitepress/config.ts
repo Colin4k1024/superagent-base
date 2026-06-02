@@ -58,6 +58,7 @@ export default defineConfig({
             { text: '多 Agent 编排', link: '/advanced/multi-agent' },
             { text: 'MCP 集成', link: '/advanced/mcp' },
             { text: '经验自进化', link: '/advanced/evolution' },
+            { text: 'TurnLoop 会话循环', link: '/advanced/turnloop' },
             { text: 'Agent Loop 自主循环', link: '/advanced/agentloop' }
           ]
         }
