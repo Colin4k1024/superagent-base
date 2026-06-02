@@ -17,6 +17,7 @@
 | **多 Agent 编排** | Supervisor / Sequential / Parallel 三种模式 |
 | **Workflow / Graph Tool** | DAG 执行，拓扑排序，节点类型：llm_call / agent_call / tool_call / code / condition |
 | **Eino Dev 可视化编排** | 通过 VS Code "Eino Dev" 插件图形化编排 Eino Graph，导出原生 Go 代码后注册到 `pkg/graphs/`，YAML 引用即可热加载 |
+| **TurnLoop 会话循环** | 基于 Eino ADK TurnLoop，为 chat Agent 提供 Push / Preempt / Abort 语义，支持打断生成、中止会话、idle 自动回收 |
 | **中断/恢复** | 检测确认请求 → 保存 checkpoint → HTTP Resume API 恢复对话 |
 | **A2UI 协议** | 结构化流式事件（text / thinking / tool_call / tool_result / code_block / interrupt / error / done / progress / agent_switch） |
 | **Experience Self-Evolution** | 本地 MySQL 存储执行经验，自动收集信号 → 基因提炼 → 推荐注入 system prompt，零外部依赖 |
@@ -84,6 +85,7 @@ make dev-down
 | 方法 | 路径 | 说明 |
 |------|------|------|
 | `POST` | `/api/v2/chat/stream` | 流式对话（SSE），支持 Legacy / A2UI 两种模式 |
+| `POST` | `/api/v2/chat/abort` | 中止活跃的 TurnLoop 会话 |
 | `POST` | `/api/v2/chat/resume` | 恢复中断的对话 |
 | `GET` | `/api/v2/chat/interrupt_state` | 查询会话中断状态 |
 | `GET` | `/api/v2/agents` | 列出所有已加载 Agent |
@@ -479,7 +481,7 @@ spec:
 | Agent 管理 | `/agents` | 列表、创建、编辑、复制、删除 |
 | Agent 编辑器 | `/agents/:name/edit` | Monaco YAML + 表单双向同步 + 内嵌测试对话 |
 | Workflow 编辑器 | `/agents/:name/workflow` | React Flow DAG 画布，拖放节点，自动布局 |
-| 对话 | `/chat` | 流式对话，Agent 切换，多轮记忆 |
+| 对话 | `/chat` | 流式对话，Agent 切换，多轮记忆，停止生成（TurnLoop Abort） |
 | 监控 | `/monitor` | 系统状态、Prometheus 指标、实时日志、热重载管理 |
 | Skills | `/skills` | 搜索、安装、卸载技能 |
 | Evolution | `/evolution` | 经验自进化管理（概览 / 基因库） |
@@ -496,6 +498,7 @@ spec:
 | [docs/model-config.md](docs/model-config.md) | 模型配置：LM Studio / Ollama / OpenAI / DeepSeek / Claude 等 |
 | [docs/deployment.md](docs/deployment.md) | 部署指南：本地开发 / Docker Compose / Kubernetes Helm |
 | [docs/a2ui-protocol.md](docs/a2ui-protocol.md) | A2UI 协议：事件类型、SSE 格式、客户端集成 |
+| [docs/turnloop.md](docs/turnloop.md) | TurnLoop 会话循环：Push/Preempt/Abort 语义、架构、API |
 | [docs/interrupt-resume.md](docs/interrupt-resume.md) | 中断/恢复：工作原理、YAML 配置、HTTP API |
 | [docs/workflow-guide.md](docs/workflow-guide.md) | Workflow 图执行：节点类型、边定义、变量映射 |
 | [docs/skill-development.md](docs/skill-development.md) | 技能开发：内置技能、自定义技能、HTTP 技能托管 |
@@ -514,7 +517,7 @@ superagent-base/
 │   ├── domain/               核心领域逻辑
 │   ├── infra/                基础设施适配器
 │   └── pkg/
-│       ├── agentdef/         Agent YAML 运行时（schema/parser/builder/runtime/interrupt/workflow/orchestration）
+│       ├── agentdef/         Agent YAML 运行时（schema/parser/builder/runtime/turnloop/interrupt/workflow/orchestration）
 │       ├── graphs/           Eino Dev 图注册表 — 放入生成的图代码并 Register()（Coming Soon）
 │       ├── a2ui/             A2UI 协议（event.go + encoder.go）
 │       ├── evolution/        Experience Self-Evolution（本地 MySQL：Signal 收集 / Advisor 推荐 / Gene Store）

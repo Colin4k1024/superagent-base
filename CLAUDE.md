@@ -92,6 +92,8 @@ backend/
 
 **Hot-reload**: Agent YAML files in `configs/agents/` are watched via fsnotify; changes propagate automatically without server restart.
 
+**TurnLoop**: ADK-backed chat agents automatically use Eino TurnLoop for push/preempt/abort semantics. `TurnLoopManager` in `pkg/agentdef/turnloop.go` manages per-(agent, session) loops. Non-ADK agents fallback to `Agent.Chat()`.
+
 ## Key Design Patterns
 
 - **Kubernetes-like YAML schema**: Agent definitions use `apiVersion: superagent/v1`, `kind: Agent`, `metadata`, `spec` — inspired by K8s resource manifests.
