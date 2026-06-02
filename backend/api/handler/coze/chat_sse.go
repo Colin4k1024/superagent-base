@@ -117,6 +117,13 @@ func (h *ChatSSEHandler) HandleChatStream(ctx context.Context, c *app.RequestCon
 	ctx, span := observe.StartAgentSpan(ctx, req.AgentID, "chat")
 	defer span.End()
 
+	// OBS-005: Inject Langfuse trace context for session/user correlation.
+	ctx = observe.WithLangfuseContext(ctx, &observe.LangfuseTraceContext{
+		SessionID: req.SessionID,
+		TraceName: "agent." + req.AgentID,
+		Tags:      []string{mode},
+	})
+
 	// Start a new turn for this session; cancels any active turn (preempt).
 	// turnCtx is derived from ctx so it is also cancelled on client disconnect.
 	turnCtx := h.sessionLoop.StartTurn(req.SessionID, ctx)

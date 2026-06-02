@@ -71,10 +71,18 @@ func main() {
 
 	setLogLevel()
 
-	shutdownTracer, err := observe.InitTracer(ctx, observe.LoadConfigFromEnv())
+	otelCfg := observe.LoadConfigFromEnv()
+	shutdownTracer, err := observe.InitTracer(ctx, otelCfg)
 	if err != nil {
 		logs.Warnf("InitTracer failed (tracing disabled): %v", err)
 		shutdownTracer = func(_ context.Context) error { return nil }
+	} else {
+		if otelCfg.Enabled {
+			logs.Infof("OpenTelemetry tracing enabled (endpoint: %s)", otelCfg.Endpoint)
+		}
+		if otelCfg.Langfuse.Enabled {
+			logs.Infof("Langfuse tracing enabled (host: %s)", otelCfg.Langfuse.Host)
+		}
 	}
 	defer func() { _ = shutdownTracer(ctx) }()
 

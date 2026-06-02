@@ -22,6 +22,7 @@
 - [HiAgent RAG 集成](advanced/hiagent-rag)
 - [Skill 开发](advanced/skill-development)
 - [TurnLoop 抢占与中止](advanced/turnloop)
+- [Langfuse 可观测性](advanced/langfuse)
 - [演进历史](advanced/evolution)
 
 ### API 参考

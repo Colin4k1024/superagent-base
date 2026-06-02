@@ -17,7 +17,9 @@
 package observe
 
 import (
+	"encoding/base64"
 	"os"
+	"strconv"
 	"strings"
 )
 
@@ -27,19 +29,78 @@ const (
 	envServiceName    = "SERVICE_NAME"
 	defaultEndpoint   = "otel-collector:4317"
 	defaultSvcName    = "superagent-base"
+
+	envLangfuseEnabled   = "LANGFUSE_ENABLED"
+	envLangfusePublicKey = "LANGFUSE_PUBLIC_KEY"
+	envLangfuseSecretKey = "LANGFUSE_SECRET_KEY"
+	envLangfuseHost      = "LANGFUSE_HOST"
+	envLangfuseDebug     = "LANGFUSE_DEBUG"
+	envLangfuseSampleRate = "LANGFUSE_SAMPLE_RATE"
+
+	defaultLangfuseHost = "https://cloud.langfuse.com"
 )
+
+// LangfuseConfig holds Langfuse-specific OTLP export settings.
+type LangfuseConfig struct {
+	Enabled    bool
+	PublicKey  string
+	SecretKey  string
+	Host       string // Base URL, e.g. "https://cloud.langfuse.com" or self-hosted
+	Debug      bool
+	SampleRate float64 // 0.0-1.0, default 1.0 (100%)
+}
+
+// OTLPEndpoint returns the Langfuse OTLP endpoint path.
+func (c LangfuseConfig) OTLPEndpoint() string {
+	host := strings.TrimRight(c.Host, "/")
+	return host + "/api/public/otel"
+}
+
+// AuthHeader returns the Basic Auth header value for Langfuse.
+func (c LangfuseConfig) AuthHeader() string {
+	creds := c.PublicKey + ":" + c.SecretKey
+	return "Basic " + base64.StdEncoding.EncodeToString([]byte(creds))
+}
 
 // LoadConfigFromEnv reads tracer configuration from environment variables.
 //
 // Environment variables:
-//   - SERVICE_NAME    — service name reported to the OTel collector (default: "superagent-base")
-//   - OTEL_ENDPOINT   — gRPC endpoint of the OTel collector (default: "otel-collector:4317")
-//   - OTEL_ENABLED    — set to "true" or "1" to enable tracing (default: disabled)
+//   - SERVICE_NAME       — service name reported to the OTel collector (default: "superagent-base")
+//   - OTEL_ENDPOINT      — gRPC endpoint of the OTel collector (default: "otel-collector:4317")
+//   - OTEL_ENABLED       — set to "true" or "1" to enable tracing (default: disabled)
 func LoadConfigFromEnv() TracerConfig {
 	return TracerConfig{
 		ServiceName: envOr(envServiceName, defaultSvcName),
 		Endpoint:    envOr(envOtelEndpoint, defaultEndpoint),
 		Enabled:     isTrue(os.Getenv(envOtelEnabled)),
+		Langfuse:    loadLangfuseConfig(),
+	}
+}
+
+// loadLangfuseConfig reads Langfuse configuration from environment variables.
+//
+// Environment variables:
+//   - LANGFUSE_ENABLED     — set to "true" or "1" to enable Langfuse export
+//   - LANGFUSE_PUBLIC_KEY  — Langfuse project public key (pk-lf-...)
+//   - LANGFUSE_SECRET_KEY  — Langfuse project secret key (sk-lf-...)
+//   - LANGFUSE_HOST        — Langfuse base URL (default: "https://cloud.langfuse.com")
+//   - LANGFUSE_DEBUG       — set to "true" for debug logging
+//   - LANGFUSE_SAMPLE_RATE — trace sampling rate 0.0-1.0 (default: 1.0)
+func loadLangfuseConfig() LangfuseConfig {
+	rate := 1.0
+	if v := os.Getenv(envLangfuseSampleRate); v != "" {
+		if parsed, err := strconv.ParseFloat(v, 64); err == nil && parsed >= 0 && parsed <= 1 {
+			rate = parsed
+		}
+	}
+
+	return LangfuseConfig{
+		Enabled:    isTrue(os.Getenv(envLangfuseEnabled)),
+		PublicKey:  os.Getenv(envLangfusePublicKey),
+		SecretKey:  os.Getenv(envLangfuseSecretKey),
+		Host:       envOr(envLangfuseHost, defaultLangfuseHost),
+		Debug:      isTrue(os.Getenv(envLangfuseDebug)),
+		SampleRate: rate,
 	}
 }
 
