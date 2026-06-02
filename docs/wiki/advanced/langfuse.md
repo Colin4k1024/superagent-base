@@ -56,6 +56,22 @@ LANGFUSE_HOST=https://cloud.langfuse.com
 3. 进入 **Settings → API Keys**
 4. 复制 Public Key 和 Secret Key
 
+### 内部环境参考
+
+| 环境 | LANGFUSE_HOST | 说明 |
+|------|---------------|------|
+| 测试环境 | `http://10.250.5.144:3000` | 内网自建实例 |
+| 生产环境 | `https://langfuse.haier.net` | 生产域名 |
+
+测试环境配置示例：
+
+```bash
+LANGFUSE_ENABLED=true
+LANGFUSE_PUBLIC_KEY=pk-lf-1a3ecbeb-82ec-4af5-a491-221113148deb
+LANGFUSE_SECRET_KEY=sk-lf-59d4be03-5eeb-4361-88a7-03f782598120
+LANGFUSE_HOST=http://10.250.5.144:3000
+```
+
 ## 工作原理
 
 ### 双导出架构
