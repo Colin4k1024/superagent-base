@@ -27,6 +27,7 @@ export default function Sidebar() {
     { to: '/skills', label: t('nav.skills'), icon: '🧩' },
     { to: '/settings', label: t('nav.settings'), icon: '⚙️' },
     { to: '/evolution', label: t('nav.evolution'), icon: '◈' },
+    { to: '/observability', label: t('nav.observability'), icon: '📈' },
     { to: '/xiaohai-debug', label: '小海调试', icon: '🔌' },
   ]
 

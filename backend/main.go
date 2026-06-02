@@ -391,6 +391,15 @@ func startHttpServer(agentRT *agentdef.AgentRuntime, skillMgr *skill.Manager, to
 	adminGroup.POST("/webhooks/:id/test", webhookH.HandleTest)
 	adminGroup.GET("/webhooks/:id/logs", webhookH.HandleLogs)
 
+	// Observability dashboard endpoints — Prometheus overview + Langfuse proxy.
+	monitorH := cozehandler.NewMonitorHandler(observe.NewLangfuseClient(observe.LoadConfigFromEnv().Langfuse))
+	monitorGroup := adminGroup.Group("/monitor")
+	monitorGroup.GET("/overview", monitorH.HandleOverview)
+	monitorGroup.GET("/traces", monitorH.HandleListTraces)
+	monitorGroup.GET("/traces/:id", monitorH.HandleGetTrace)
+	monitorGroup.GET("/metrics/daily", monitorH.HandleDailyMetrics)
+	monitorGroup.GET("/sessions", monitorH.HandleSessions)
+
 	// 集团小海对接接口 (集团IT智能体输出规范 v1.0.0) — Api-Key 鉴权.
 	xiaohaiH := cozehandler.NewXiaohaiHandler(agentRT)
 	xiaohaiGroup := s.Group("/api/v1/xiaohai")

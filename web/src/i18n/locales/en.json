@@ -12,7 +12,8 @@
     "logout": "Logout",
     "logoutConfirmTitle": "Confirm Logout",
     "logoutConfirmMessage": "Are you sure you want to log out? You will need to sign in again.",
-    "evolution": "Evolution"
+    "evolution": "Evolution",
+    "observability": "Observability"
   },
   "login": {
     "title": "Superagent",
@@ -130,6 +131,76 @@
     "confidence": "Confidence",
     "contributor": "Contributor",
     "created": "Created"
+  },
+  "observability": {
+    "title": "Observability",
+    "tabs": {
+      "overview": "Overview",
+      "traces": "Traces",
+      "tokens": "Token Usage",
+      "tools": "Tools",
+      "agents": "Agent Analytics",
+      "models": "Model Routing"
+    },
+    "metrics": {
+      "requests": "Total Requests",
+      "sessions": "Active Sessions",
+      "inputTokens": "Input Tokens",
+      "outputTokens": "Output Tokens",
+      "toolCalls": "Tool Calls",
+      "errors": "Errors"
+    },
+    "overview": {
+      "topAgents": "Top Agents",
+      "topModels": "Top Models",
+      "topTools": "Top Tools"
+    },
+    "traces": {
+      "name": "Name",
+      "time": "Time",
+      "latency": "Latency",
+      "status": "Status"
+    },
+    "tokens": {
+      "title": "Token Usage",
+      "trend": "Token Trend",
+      "dailyTraces": "Daily Traces",
+      "summary": "Summary"
+    },
+    "tools": {
+      "invocations": "Tool Invocations",
+      "name": "Tool Name",
+      "count": "Invocations",
+      "successRate": "Success Rate"
+    },
+    "agents": {
+      "requests": "Requests by Agent",
+      "latency": "Avg Latency by Agent",
+      "requestCount": "Requests",
+      "avgLatency": "Avg Latency"
+    },
+    "models": {
+      "tokenUsage": "Token Usage by Model",
+      "routeDecisions": "Route Decisions",
+      "model": "Model",
+      "tokens": "Tokens",
+      "errors": "Errors",
+      "errorRate": "Error Rate",
+      "strategy": "Strategy",
+      "decisionCount": "Decisions"
+    },
+    "traceDetail": {
+      "status": "Status",
+      "latency": "Latency",
+      "spans": "Spans",
+      "cost": "Cost",
+      "startedAt": "Started at",
+      "waterfall": "Span Waterfall",
+      "spanList": "Span Details",
+      "io": "Input / Output",
+      "showRaw": "Show raw JSON",
+      "hideRaw": "Hide raw JSON"
+    }
   },
   "common": {
     "loading": "Loading...",
