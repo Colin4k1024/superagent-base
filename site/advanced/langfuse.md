@@ -38,11 +38,9 @@ LANGFUSE_PUBLIC_KEY=pk-lf-xxxxxxxx
 LANGFUSE_SECRET_KEY=sk-lf-xxxxxxxx
 
 # Langfuse 服务地址
-# Cloud 版本：
-#   EU: https://cloud.langfuse.com (默认)
-#   US: https://us.cloud.langfuse.com
-# 自建版本：填写你的 Langfuse 实例地址
-LANGFUSE_HOST=https://cloud.langfuse.com
+# 内部测试环境：http://10.250.5.144:3000
+# 内部生产环境：https://langfuse.haier.net
+LANGFUSE_HOST=http://10.250.5.144:3000
 
 # 可选配置
 # LANGFUSE_SAMPLE_RATE=1.0    # 采样率 0.0-1.0，默认 1.0 (100%)
@@ -51,7 +49,7 @@ LANGFUSE_HOST=https://cloud.langfuse.com
 
 ### 获取凭证
 
-1. 登录 [Langfuse Dashboard](https://cloud.langfuse.com)
+1. 登录 [Langfuse Dashboard](http://10.250.5.144:3000)
 2. 创建或选择一个 Project
 3. 进入 **Settings → API Keys**
 4. 复制 Public Key 和 Secret Key
@@ -187,7 +185,7 @@ cd langfuse
 docker compose up -d
 
 # 配置环境变量指向自建实例
-LANGFUSE_HOST=http://your-langfuse-host:3000
+LANGFUSE_HOST=http://10.250.5.144:3000
 ```
 
 ## 故障排查
