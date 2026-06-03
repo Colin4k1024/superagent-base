@@ -21,6 +21,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 	"os/exec"
 	"time"
 
@@ -78,7 +79,13 @@ async def main(args):
 // JavaScript is not currently supported by the underlying runner.
 type CodeExecTool struct{}
 
+// newCodeExecTool returns nil when CODE_EXECUTE_ENABLED != "true".
+// C-4: code_execute has no sandbox isolation; disabled by default for security.
+// Set CODE_EXECUTE_ENABLED=true only in controlled environments with proper isolation.
 func newCodeExecTool() *CodeExecTool {
+	if os.Getenv("CODE_EXECUTE_ENABLED") != "true" {
+		return nil
+	}
 	return &CodeExecTool{}
 }
 

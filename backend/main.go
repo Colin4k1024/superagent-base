@@ -312,8 +312,9 @@ func startHttpServer(agentRT *agentdef.AgentRuntime, skillMgr *skill.Manager, to
 
 	router.GeneratedRegister(s)
 
-	// Infrastructure endpoints — no auth required.
-	s.GET("/metrics", observe.MetricsHandler)
+	// Infrastructure endpoints.
+	// /metrics is protected by MetricsAuthMW: requires Bearer token when METRICS_TOKEN env is set.
+	s.GET("/metrics", middleware.MetricsAuthMW(), observe.MetricsHandler)
 	s.GET("/health", func(_ context.Context, ctx *app.RequestContext) {
 		ctx.JSON(200, map[string]any{"status": "ok"})
 	})

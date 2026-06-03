@@ -26,7 +26,7 @@ import "github.com/cloudwego/eino/components/tool"
 //	Original tools
 //	  web_search    — web search via configured provider
 //	  http_request  — generic HTTP client
-//	  code_execute  — execute Python / Bash code blocks
+//	  code_execute  — execute Python / Bash code blocks (disabled by default, C-4)
 //
 //	File-system tools (opencode-inspired)
 //	  file_read     — read file contents with optional line-range
@@ -47,11 +47,10 @@ import "github.com/cloudwego/eino/components/tool"
 //	  git_diff      — staged / unstaged diff
 //	  git_log       — recent commit history
 func GetAllBuiltinTools() []tool.InvokableTool {
-	return []tool.InvokableTool{
+	tools := []tool.InvokableTool{
 		// ── original tools ────────────────────────────────────────────────
 		newWebSearchTool(),
 		newHTTPRequestTool(),
-		newCodeExecTool(),
 
 		// ── file-system tools ─────────────────────────────────────────────
 		// file_write and file_edit are registered with AllowWrite=true so that
@@ -75,4 +74,10 @@ func GetAllBuiltinTools() []tool.InvokableTool {
 		newGitDiffTool(),
 		newGitLogTool(),
 	}
+	// code_execute is disabled by default (no sandbox isolation, C-4).
+	// Enable with CODE_EXECUTE_ENABLED=true in controlled environments only.
+	if t := newCodeExecTool(); t != nil {
+		tools = append(tools, t)
+	}
+	return tools
 }
