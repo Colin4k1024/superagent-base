@@ -131,24 +131,37 @@ oceanbase_server_debug:
 help:
 	@echo "Usage: make [target]"
 	@echo ""
-	@echo "Targets:"
-	@echo "  debug            - Start the debug environment."
-	@echo "  env              - Setup env file."
-	@echo "  fe               - Build the frontend."
-	@echo "  server           - Build and run the server binary."
-	@echo "  build_server     - Build the server binary."
+	@echo "Development (lightweight — MySQL + Redis only):"
+	@echo "  dev              - Start dev middleware + backend (recommended)."
+	@echo "  dev-middleware   - Start MySQL + Redis containers only."
+	@echo "  dev-server       - Build and run backend (requires middleware running)."
+	@echo "  dev-down         - Stop dev containers."
+	@echo "  dev-clean        - Stop containers and delete dev data."
+	@echo ""
+	@echo "Build & Test:"
+	@echo "  build            - Compile backend to bin/superagent."
+	@echo "  test             - Run core package tests (pkg/...)."
+	@echo "  test-all         - Run all Go tests."
+	@echo "  proto-gen        - Generate Go code from api/proto/ definitions."
+	@echo ""
+	@echo "Full Debug Stack (MySQL + Redis + ES + MinIO + NSQ):"
+	@echo "  debug            - Start the full debug environment."
+	@echo "  env              - Setup env file (docker/.env.debug)."
+	@echo "  fe               - Build frontend assets into bin/resources/static."
+	@echo "  server           - Build and run the server binary (debug stack)."
+	@echo "  build_server     - Build the server binary without running."
 	@echo "  sync_db          - Sync opencoze_latest_schema.hcl to the database."
 	@echo "  dump_db          - Dump the database to opencoze_latest_schema.hcl and migrations files."
-	@echo "  sql_init         - Init sql data..."
+	@echo "  sql_init         - Init sql data."
 	@echo "  dump_sql_schema  - Dump the database schema to sql file."
-	@echo "  middleware       - Setup middlewares docker environment, but exclude the server app."
-	@echo "  web              - Setup web docker environment, include middlewares docker."
-	@echo "  down             - Stop the docker containers."
-	@echo "  down_web         - Stop the web docker containers."
-	@echo "  clean            - Stop the docker containers and clean volumes."
-	@echo "  python           - Setup python environment."
+	@echo "  middleware       - Start middleware containers only (no server)."
+	@echo "  web              - Start web docker environment including middlewares."
+	@echo "  down             - Stop all debug docker containers."
+	@echo "  down_web         - Stop web docker containers."
+	@echo "  clean            - Stop containers and remove volume data."
+	@echo "  python           - Setup Python environment."
 	@echo "  atlas-hash       - Rehash atlas migration files."
-	@echo "  setup_es_index   - Setup elasticsearch index."
+	@echo "  setup_es_index   - Setup Elasticsearch index."
 	@echo ""
 	@echo "OceanBase Commands:"
 	@echo "  oceanbase_env    - Setup OceanBase environment file (like 'env')."
@@ -193,10 +206,11 @@ build:
 
 # Proto generation
 # Requires: protoc, protoc-gen-go, protoc-gen-go-grpc
-# Install with:
-#   brew install protobuf
-#   go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
-#   go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
+# Install protoc:
+#   macOS:  brew install protobuf
+#   Linux:  apt-get install -y protobuf-compiler   (or download from github.com/protocolbuffers/protobuf/releases)
+#   Both:   go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+#   Both:   go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
 PROTO_DIR := api/proto
 GRPC_GEN_DIR := backend/api/grpc/gen
 MODULE := github.com/superagent-ai/superagent-base/backend

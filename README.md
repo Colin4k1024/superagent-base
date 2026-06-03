@@ -426,7 +426,7 @@ AgentBuilder.Build() → EvolutionAdvisor.Recommend(query)
 EVOLUTION_ENABLED=true
 
 # 启动后，执行对话即开始收集信号
-# 访问 http://localhost:3000/evolution 查看基因库
+# 访问 http://localhost:3500/evolution 查看基因库
 ```
 
 ---
@@ -490,7 +490,7 @@ spec:
 
 ## Web UI 功能
 
-访问 `http://localhost:3000`（开发模式）或 `http://localhost:8888`（生产构建）。
+访问 `http://localhost:3500`（开发模式）或 `http://localhost:8888`（生产构建）。
 
 | 页面 | 路径 | 功能 |
 |------|------|------|
