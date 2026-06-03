@@ -18,8 +18,22 @@ package agentdef
 
 import (
 	"context"
+	"os"
+	"strconv"
 	"sync"
+	"time"
 )
+
+// defaultTurnTimeout is the per-turn timeout when TURN_TIMEOUT_SECONDS is not set.
+// Zero means no additional timeout (the parent/HTTP context still applies).
+var defaultTurnTimeout = func() time.Duration {
+	if s := os.Getenv("TURN_TIMEOUT_SECONDS"); s != "" {
+		if n, err := strconv.Atoi(s); err == nil && n > 0 {
+			return time.Duration(n) * time.Second
+		}
+	}
+	return 0
+}()
 
 // SessionLoop manages per-session turn lifecycle.
 //
@@ -27,6 +41,9 @@ import (
 //   - Preempt: when a new message arrives for an active session, the current
 //     turn is cancelled so the agent stops at its next context-check boundary.
 //   - Abort: the user explicitly requests the active turn to stop immediately.
+//
+// Per-turn timeout is configurable via the TURN_TIMEOUT_SECONDS env var.
+// When set, each turn is bounded by that duration regardless of the parent context.
 //
 // All methods are safe for concurrent use.
 type SessionLoop struct {
@@ -45,6 +62,7 @@ func NewSessionLoop() *SessionLoop { return &SessionLoop{} }
 // If there is already an active turn it is cancelled first (preempt).
 // The returned context is derived from parent, so it is also cancelled when
 // the parent (e.g. the HTTP request context) is cancelled.
+// When TURN_TIMEOUT_SECONDS is set, an additional per-turn deadline is applied.
 // The caller must call EndTurn when the turn completes.
 func (s *SessionLoop) StartTurn(sessionID string, parent context.Context) context.Context {
 	e := s.getOrCreate(sessionID)
@@ -53,7 +71,13 @@ func (s *SessionLoop) StartTurn(sessionID string, parent context.Context) contex
 	if e.cancel != nil {
 		e.cancel() // preempt the current turn
 	}
-	ctx, cancel := context.WithCancel(parent)
+	var ctx context.Context
+	var cancel context.CancelFunc
+	if defaultTurnTimeout > 0 {
+		ctx, cancel = context.WithTimeout(parent, defaultTurnTimeout)
+	} else {
+		ctx, cancel = context.WithCancel(parent)
+	}
 	e.cancel = cancel
 	return ctx
 }
