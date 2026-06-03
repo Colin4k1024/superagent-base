@@ -8,7 +8,7 @@ metadata:
 spec:
   type: supervisor
   model:
-    primary: Qwen3-Coder-Next-4bit
+    primary: qwen-max
   system_prompt: |
     You are a team supervisor coordinating specialized agents to complete tasks.
 

@@ -50,10 +50,11 @@ type LangfuseConfig struct {
 	SampleRate float64 // 0.0-1.0, default 1.0 (100%)
 }
 
-// OTLPEndpoint returns the Langfuse OTLP endpoint path.
+// OTLPEndpoint returns the full Langfuse OTLP traces endpoint URL.
+// Langfuse v3+ expects /api/public/otel/v1/traces when using WithEndpointURL.
 func (c LangfuseConfig) OTLPEndpoint() string {
 	host := strings.TrimRight(c.Host, "/")
-	return host + "/api/public/otel"
+	return host + "/api/public/otel/v1/traces"
 }
 
 // AuthHeader returns the Basic Auth header value for Langfuse.

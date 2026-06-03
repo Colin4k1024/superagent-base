@@ -73,7 +73,7 @@ export default function TracesTab() {
                 >
                   <td className="px-4 py-2 font-mono text-xs">{trace.name || trace.id.slice(0, 8)}</td>
                   <td className="px-4 py-2 text-gray-500">{trace.timestamp ? new Date(trace.timestamp).toLocaleString() : '-'}</td>
-                  <td className="px-4 py-2">{trace.latency != null ? `${(trace.latency / 1000).toFixed(2)}s` : '-'}</td>
+                  <td className="px-4 py-2">{trace.latency != null ? `${trace.latency.toFixed(2)}s` : '-'}</td>
                   <td className="px-4 py-2">
                     <span className={`inline-block px-2 py-0.5 rounded text-xs ${trace.status === 'ERROR' ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
                       {trace.status || 'OK'}

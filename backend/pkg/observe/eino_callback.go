@@ -19,11 +19,14 @@ package observe
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"io"
 	"time"
 
 	"github.com/cloudwego/eino/callbacks"
 	"github.com/cloudwego/eino/components"
 	"github.com/cloudwego/eino/components/model"
+	"github.com/cloudwego/eino/schema"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
@@ -34,6 +37,28 @@ type spanKey struct{}
 
 // startTimeKey is a private context key type for storing operation start times.
 type startTimeKey struct{}
+
+// modelIDKey carries the model ID through agent context for callback labeling.
+type modelIDKey struct{}
+
+// providerKey carries the provider name through agent context.
+type providerKey struct{}
+
+// WithModelInfo injects model identity into ctx so Eino callbacks can label metrics correctly.
+func WithModelInfo(ctx context.Context, modelID, provider string) context.Context {
+	ctx = context.WithValue(ctx, modelIDKey{}, modelID)
+	return context.WithValue(ctx, providerKey{}, provider)
+}
+
+func modelInfoFromCtx(ctx context.Context) (modelID, provider string) {
+	if v, ok := ctx.Value(modelIDKey{}).(string); ok && v != "" {
+		modelID = v
+	}
+	if v, ok := ctx.Value(providerKey{}).(string); ok && v != "" {
+		provider = v
+	}
+	return
+}
 
 // EinoObserveCallback implements Eino's callback interface to feed both
 // OpenTelemetry tracing and Prometheus metrics from component lifecycle events.
@@ -51,13 +76,14 @@ func NewEinoObserveCallback() callbacks.Handler {
 	return callbacks.NewHandlerBuilder().
 		OnStartFn(cb.OnStart).
 		OnEndFn(cb.OnEnd).
+		OnEndWithStreamOutputFn(cb.OnEndWithStream).
 		OnErrorFn(cb.OnError).
 		Build()
 }
 
 // OnStart creates a span and records the operation start time for the component.
 func (c *EinoObserveCallback) OnStart(ctx context.Context, info *callbacks.RunInfo, input callbacks.CallbackInput) context.Context {
-	spanName, attrs := spanNameAndAttrs(info)
+	spanName, attrs := spanNameAndAttrs(ctx, info)
 
 	ctx, span := c.tracer.Start(ctx, spanName, trace.WithAttributes(attrs...))
 
@@ -88,7 +114,7 @@ func (c *EinoObserveCallback) OnEnd(ctx context.Context, info *callbacks.RunInfo
 
 	switch info.Component {
 	case components.ComponentOfChatModel:
-		provider, modelID := resolveModelInfo(info)
+		provider, modelID := resolveModelInfo(ctx, info)
 		ModelRequestDuration.WithLabelValues(modelID, provider).Observe(elapsed)
 
 		if cbOut := model.ConvCallbackOutput(output); cbOut != nil && cbOut.Message != nil {
@@ -137,13 +163,74 @@ func (c *EinoObserveCallback) OnEnd(ctx context.Context, info *callbacks.RunInfo
 	return ctx
 }
 
+// OnEndWithStream handles streaming ChatModel output — drains the stream in a
+// goroutine to capture token usage from the final chunk.
+func (c *EinoObserveCallback) OnEndWithStream(ctx context.Context, info *callbacks.RunInfo, output *schema.StreamReader[callbacks.CallbackOutput]) context.Context {
+	start, _ := ctx.Value(startTimeKey{}).(time.Time)
+
+	if info.Component != components.ComponentOfChatModel {
+		// Non-model streaming (e.g. tool output streams) — just close the reader.
+		go func() { _ = output; output.Close() }()
+		return ctx
+	}
+
+	provider, modelID := resolveModelInfo(ctx, info)
+	span, _ := ctx.Value(spanKey{}).(trace.Span)
+
+	go func() {
+		defer output.Close()
+		var promptTokens, completionTokens int
+		for {
+			chunk, err := output.Recv()
+			if err != nil {
+				if !errors.Is(err, io.EOF) {
+					if span != nil {
+						span.RecordError(err)
+						span.SetStatus(codes.Error, err.Error())
+					}
+				}
+				break
+			}
+			if cbOut := model.ConvCallbackOutput(chunk); cbOut != nil && cbOut.Message != nil {
+				if cbOut.Message.ResponseMeta != nil && cbOut.Message.ResponseMeta.Usage != nil {
+					promptTokens = cbOut.Message.ResponseMeta.Usage.PromptTokens
+					completionTokens = cbOut.Message.ResponseMeta.Usage.CompletionTokens
+				}
+			}
+		}
+
+		elapsed := time.Since(start).Seconds()
+		ModelRequestDuration.WithLabelValues(modelID, provider).Observe(elapsed)
+
+		if promptTokens > 0 || completionTokens > 0 {
+			ModelTokensTotal.WithLabelValues(modelID, provider, "input").Add(float64(promptTokens))
+			ModelTokensTotal.WithLabelValues(modelID, provider, "output").Add(float64(completionTokens))
+		}
+
+		// Close the span after stream is fully consumed so token attributes land in Langfuse.
+		if span != nil {
+			if promptTokens > 0 || completionTokens > 0 {
+				span.SetAttributes(
+					attribute.Int64("gen_ai.usage.input_tokens", int64(promptTokens)),
+					attribute.Int64("gen_ai.usage.output_tokens", int64(completionTokens)),
+					attribute.Int64("gen_ai.usage.total_tokens", int64(promptTokens+completionTokens)),
+				)
+			}
+			span.SetStatus(codes.Ok, "")
+			span.End()
+		}
+	}()
+
+	return ctx
+}
+
 // OnError records the error in the active span and increments error counters.
 func (c *EinoObserveCallback) OnError(ctx context.Context, info *callbacks.RunInfo, err error) context.Context {
 	span, _ := ctx.Value(spanKey{}).(trace.Span)
 
 	switch info.Component {
 	case components.ComponentOfChatModel:
-		provider, modelID := resolveModelInfo(info)
+		provider, modelID := resolveModelInfo(ctx, info)
 		ModelErrorsTotal.WithLabelValues(modelID, provider, errorType(err)).Inc()
 
 	case components.ComponentOfTool:
@@ -160,10 +247,10 @@ func (c *EinoObserveCallback) OnError(ctx context.Context, info *callbacks.RunIn
 }
 
 // spanNameAndAttrs returns an OTel span name and attribute set for a given RunInfo.
-func spanNameAndAttrs(info *callbacks.RunInfo) (string, []attribute.KeyValue) {
+func spanNameAndAttrs(ctx context.Context, info *callbacks.RunInfo) (string, []attribute.KeyValue) {
 	switch info.Component {
 	case components.ComponentOfChatModel:
-		provider, modelID := resolveModelInfo(info)
+		provider, modelID := resolveModelInfo(ctx, info)
 		return "gen_ai.chat", []attribute.KeyValue{
 			attribute.String("gen_ai.system", provider),
 			attribute.String("gen_ai.request.model", modelID),
@@ -192,10 +279,16 @@ func spanNameAndAttrs(info *callbacks.RunInfo) (string, []attribute.KeyValue) {
 	}
 }
 
-// resolveModelInfo extracts provider and model ID from RunInfo.
-func resolveModelInfo(info *callbacks.RunInfo) (provider, modelID string) {
-	modelID = info.Name
-	provider = "unknown"
+// resolveModelInfo extracts provider and model ID — prefers context-injected values
+// (set via WithModelInfo before agent execution), falls back to RunInfo.Name.
+func resolveModelInfo(ctx context.Context, info *callbacks.RunInfo) (provider, modelID string) {
+	modelID, provider = modelInfoFromCtx(ctx)
+	if modelID == "" {
+		modelID = info.Name
+	}
+	if provider == "" {
+		provider = "openai"
+	}
 	return provider, modelID
 }
 
