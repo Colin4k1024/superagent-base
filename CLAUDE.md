@@ -37,7 +37,7 @@ cd backend && go test ./pkg/tool/... -v -count=1
 ### Frontend
 
 ```bash
-cd web && npm run dev     # Dev server on port 3000, proxies /api -> :8888
+cd web && npm run dev     # Dev server on port 3500, proxies /api -> :8888
 cd web && npm run build   # TypeScript check + Vite build
 ```
 
@@ -116,7 +116,7 @@ backend/
 |---------|------|
 | Hertz HTTP | 8888 |
 | gRPC | 50051 |
-| Web UI (dev) | 3000 |
+| Web UI (dev) | 3500 |
 | MySQL | 3306 |
 | Redis | 6379 |
 
