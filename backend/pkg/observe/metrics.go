@@ -101,29 +101,35 @@ var (
 
 // Evolution metrics.
 var (
+	// Q-4: all evolution metrics use the superagent_ namespace for consistency.
 	EvolutionSignalsTotal = promauto.NewCounterVec(prometheus.CounterOpts{
-		Name: "evolution_signals_total",
-		Help: "Total evolution signals collected by type",
+		Namespace: "superagent",
+		Name:      "evolution_signals_total",
+		Help:      "Total evolution signals collected by type",
 	}, []string{"signal_type"})
 
 	EvolutionGenesShared = promauto.NewCounter(prometheus.CounterOpts{
-		Name: "evolution_genes_shared_total",
-		Help: "Total genes successfully shared to Experience Repo",
+		Namespace: "superagent",
+		Name:      "evolution_genes_shared_total",
+		Help:      "Total genes successfully shared to Experience Repo",
 	})
 
 	EvolutionShareFailed = promauto.NewCounter(prometheus.CounterOpts{
-		Name: "evolution_share_failed_total",
-		Help: "Total gene share failures",
+		Namespace: "superagent",
+		Name:      "evolution_share_failed_total",
+		Help:      "Total gene share failures",
 	})
 
 	EvolutionShareDropped = promauto.NewCounter(prometheus.CounterOpts{
-		Name: "evolution_share_dropped_total",
-		Help: "Total signals dropped due to semaphore backpressure",
+		Namespace: "superagent",
+		Name:      "evolution_share_dropped_total",
+		Help:      "Total signals dropped due to semaphore backpressure",
 	})
 
 	EvolutionRecommendationsServed = promauto.NewCounter(prometheus.CounterOpts{
-		Name: "evolution_recommendations_served_total",
-		Help: "Total gene recommendations served to agents",
+		Namespace: "superagent",
+		Name:      "evolution_recommendations_served_total",
+		Help:      "Total gene recommendations served to agents",
 	})
 )
 
