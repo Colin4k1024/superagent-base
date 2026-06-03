@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"strings"
 	"time"
@@ -142,6 +143,9 @@ func NewAgentBuilder(opts ...BuilderOption) *AgentBuilder {
 //
 // For orchestration types (supervisor, sequential, parallel, plan_execute) the
 // builder resolves sub-agent references via the registered agent registry.
+// IMPORTANT: two-pass build order — leaf agents (chat_model_agent, deep_agent,
+// etc.) must be registered before orchestration agents that reference them.
+// AgentRuntime.BuildAll enforces this order automatically.
 //
 // When spec.interrupt.enabled is true, the resulting agent is wrapped with
 // NewInterruptableAgent so that confirmation-seeking model outputs are
@@ -385,6 +389,10 @@ func (b *AgentBuilder) maybeWrapInterruptable(ctx context.Context, agent Agent, 
 		if b.redisClient != nil {
 			store = checkpoint.NewRedisStore(b.redisClient)
 		} else {
+			// S-5: Redis backend requested but no client configured — fall back to
+			// in-memory store. Checkpoints are NOT durable across restarts and will
+			// not work in multi-replica deployments. Set REDIS_ADDR to fix this.
+			log.Printf("[WARN] agentdef: agent %q requests redis checkpoint backend but no Redis client is configured; using in-memory store (not durable)", def.Metadata.Name)
 			store = checkpoint.NewInMemoryStore()
 		}
 	default:

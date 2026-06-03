@@ -53,7 +53,8 @@ type chatStreamRequest struct {
 
 // HandleChatStream streams agent response tokens as Server-Sent Events.
 //
-// POST /api/v1/chat/stream
+// POST /api/v2/chat/stream  (canonical)
+// POST /api/v1/chat/stream  (deprecated — returns Deprecation header pointing to v2)
 // Body: {"agent_id": "research-agent", "session_id": "s1", "message": "hello"}
 //
 // Legacy mode (default):
