@@ -85,4 +85,13 @@ EXPOSE 8888
 
 ENV SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
 
+# D-1: Run as non-root user to reduce container attack surface.
+RUN addgroup -S appgroup && adduser -S appuser -G appgroup && \
+    chown -R appuser:appgroup /app
+USER appuser
+
+# D-2: Health check so orchestrators (k8s, compose) can detect unhealthy containers.
+HEALTHCHECK --interval=15s --timeout=5s --start-period=30s --retries=3 \
+    CMD wget -qO- http://localhost:8888/health || exit 1
+
 CMD ["/app/opencoze"]

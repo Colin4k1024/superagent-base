@@ -25,7 +25,11 @@ func GetAllBuiltinTools() []tool.InvokableTool {
 	tools := []tool.InvokableTool{
 		newWebSearchTool(),
 		newHTTPRequestTool(),
-		newCodeExecTool(),
+	}
+	// code_execute is disabled by default (no sandbox isolation, C-4).
+	// Enable with CODE_EXECUTE_ENABLED=true in controlled environments only.
+	if t := newCodeExecTool(); t != nil {
+		tools = append(tools, t)
 	}
 	if t := newHiAgentRAGTool(); t != nil {
 		tools = append(tools, t)
