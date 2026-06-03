@@ -28,8 +28,8 @@ export default function TokenUsageTab() {
   }, [range])
 
   const labels = metrics.map((m) => m.date?.slice(5, 10) || '')
-  const inputTokens = metrics.map((m) => m.usage?.[0]?.inputUsage || 0)
-  const outputTokens = metrics.map((m) => m.usage?.[0]?.outputUsage || 0)
+  const inputTokens = metrics.map((m) => (m.usage || []).reduce((s, u) => s + (u.inputUsage || 0), 0))
+  const outputTokens = metrics.map((m) => (m.usage || []).reduce((s, u) => s + (u.outputUsage || 0), 0))
   const traceCounts = metrics.map((m) => m.countTraces || 0)
 
   return (

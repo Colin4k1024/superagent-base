@@ -10,9 +10,7 @@ metadata:
 spec:
   type: chat_model_agent
   model:
-    router: capability-based
-    primary: deepseek-r1
-    fallback: gpt-4o
+    primary: qwen-max
   system_prompt: |
     You are a professional research assistant. Help users analyze topics,
     find information, and provide well-structured summaries.

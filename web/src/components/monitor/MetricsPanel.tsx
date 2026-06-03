@@ -47,7 +47,7 @@ function buildKpiCards(
       label: 'Agents Ready',
       value:
         status && status.agents
-          ? `${status.agents.filter((a) => a.status?.toLowerCase() === 'running').length} / ${status.agent_count}`
+          ? `${status.agents.filter((a) => ['running', 'ok'].includes(a.status?.toLowerCase() ?? '')).length} / ${status.agent_count}`
           : '—',
       sub: 'running agents',
       history: [],

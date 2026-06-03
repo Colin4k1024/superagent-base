@@ -30,6 +30,7 @@ import (
 
 	"github.com/superagent-ai/superagent-base/backend/pkg/memory"
 	"github.com/superagent-ai/superagent-base/backend/pkg/modelrouter"
+	"github.com/superagent-ai/superagent-base/backend/pkg/observe"
 )
 
 // chatAgent is the stub implementation used when no real model endpoint is
@@ -96,6 +97,7 @@ func (a *einoChatAgent) Chat(ctx context.Context, sessionID string, message stri
 		})
 	}
 
+	ctx = observe.WithModelInfo(ctx, a.modelID, a.provider)
 	reader, err := a.chatModel.Stream(ctx, msgs)
 	if err != nil {
 		return nil, fmt.Errorf("agentdef: chat: stream: %w", err)
@@ -163,6 +165,7 @@ func (a *adkChatModelAgent) Chat(ctx context.Context, sessionID string, message 
 	msgs = append(msgs, schema.UserMessage(message))
 	persistUserMessage(ctx, sessionID, message, a.memBackend)
 
+	ctx = observe.WithModelInfo(ctx, a.modelID, a.provider)
 	iter := a.agent.Run(ctx, &adk.AgentInput{
 		Messages:       msgs,
 		EnableStreaming: true,

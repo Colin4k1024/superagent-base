@@ -8,7 +8,7 @@ metadata:
 spec:
   type: chat_model_agent
   model:
-    primary: Qwen3-Coder-Next-4bit
+    primary: qwen-max
   system_prompt: |
     You are a capable AI assistant with access to tools. Use the ReAct
     (Reasoning + Acting) pattern to solve problems:

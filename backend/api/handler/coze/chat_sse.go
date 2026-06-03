@@ -19,6 +19,7 @@ package coze
 import (
 	"context"
 	"encoding/json"
+	"strings"
 	"time"
 
 	"github.com/cloudwego/hertz/pkg/app"
@@ -97,9 +98,11 @@ func (h *ChatSSEHandler) HandleChatStream(ctx context.Context, c *app.RequestCon
 
 	// OBS-004: Record request metrics (count + latency).
 	start := time.Now()
+	requestStatus := "success"
 	defer func() {
 		duration := time.Since(start).Seconds()
 		observe.AgentRequestDuration.WithLabelValues(req.AgentID).Observe(duration)
+		observe.AgentRequestsTotal.WithLabelValues(req.AgentID, requestStatus).Inc()
 	}()
 
 	// Detect A2UI mode from request header or query parameter.
@@ -163,10 +166,14 @@ func (h *ChatSSEHandler) HandleChatStream(ctx context.Context, c *app.RequestCon
 	// Legacy mode: plain text tokens.
 	ch, err := agent.Chat(turnCtx, req.SessionID, req.Message)
 	if err != nil {
+		requestStatus = "error"
 		c.JSON(500, map[string]string{"error": err.Error()})
 		return
 	}
 	for token := range ch {
+		if strings.HasPrefix(token, "[error]") {
+			requestStatus = "error"
+		}
 		if writeErr := w.WriteEvent("", "message", []byte(token)); writeErr != nil {
 			// Client disconnected; drain the channel and return.
 			go func() {
