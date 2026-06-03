@@ -57,7 +57,8 @@ type Metadata struct {
 // AgentSpec holds the behavioural configuration for the agent.
 type AgentSpec struct {
 	// Type selects the agent execution mode.
-	// Must be one of: chat_model_agent, deep_agent, workflow, supervisor, sequential, parallel, plan_execute, agentloop.
+	// Stable:      chat_model_agent, workflow, supervisor, sequential, parallel, agentloop, eino_graph.
+	// Experimental: deep_agent (no long-term memory integration), plan_execute (planner/executor split unstable).
 	Type         string           `yaml:"type"                    json:"type"`
 	// Model configures model selection and routing.
 	Model        ModelSpec        `yaml:"model"                   json:"model"`
