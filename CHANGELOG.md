@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+> **Note**: Versions 0.1.0–0.4.0 were developed as sequential internal phases and
+> published together on the same date (2026-05-11). Future releases will carry
+> distinct dates reflecting actual public release timelines.
+
 ## [0.4.0] - 2026-05-11
 
 ### Phase 4：Interrupt/Resume + A2UI + Workflow + 文档完善

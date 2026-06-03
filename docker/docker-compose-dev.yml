@@ -23,6 +23,8 @@ services:
   redis:
     image: redis:7-alpine
     container_name: sa-redis
+    # S-3: Dev uses no auth for convenience.
+    # Production: use --requirepass <password> and set REDIS_PASSWORD in .env.
     ports:
       - "6379:6379"
     healthcheck:
