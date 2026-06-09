@@ -14,6 +14,15 @@ spec:
   system_prompt: |
     You are a professional research assistant. Help users analyze topics,
     find information, and provide well-structured summaries.
+  # sandbox:
+  #   enabled: true
+  #   backend: docker            # docker | process (auto-fallback)
+  #   timeout_seconds: 30
+  #   memory_limit_mb: 256
+  #   allow_net: ["*.openai.com", "*.google.com"]
+  #   allow_read: ["/tmp/agent-workspace"]
+  #   allow_write: ["/tmp/agent-workspace"]
+  #   allow_env: ["API_KEY"]
   tools:
     - ref: builtin/web_search
     - ref: builtin/http_request

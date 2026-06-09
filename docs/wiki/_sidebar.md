@@ -18,6 +18,7 @@
 - [Interrupt / Resume](advanced/interrupt-resume)
 - [Workflow DAG 引擎](advanced/workflow)
 - [多 Agent 编排](advanced/multi-agent)
+- [Tool 沙盒模式](advanced/sandbox)
 - [MCP 集成](advanced/mcp)
 - [HiAgent RAG 集成](advanced/hiagent-rag)
 - [Skill 开发](advanced/skill-development)
