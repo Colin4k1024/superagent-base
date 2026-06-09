@@ -46,6 +46,7 @@ Agent YAML 文件存放在配置目录（默认 `configs/agents/`）中，运行
 | `workflow` | WorkflowSpec | 否 | 图工作流定义（type=workflow 时必填） |
 | `interrupt` | InterruptConfig | 否 | 中断/恢复配置 |
 | `evolution` | EvolutionSpec | 否 | 经验自进化配置 |
+| `sandbox` | SandboxSpec | 否 | 工具沙盒隔离配置，详见 [Tool 沙盒模式](/advanced/sandbox) |
 
 ### spec.type 可选值
 

@@ -88,6 +88,8 @@ type AgentSpec struct {
 	MaxTurns      int                `yaml:"max_turns,omitempty"     json:"max_turns,omitempty"`
 	// Evolution enables local experience self-evolution.
 	Evolution     *EvolutionSpec     `yaml:"evolution,omitempty"     json:"evolution,omitempty"`
+	// Sandbox configures tool execution isolation for this agent.
+	Sandbox       *SandboxSpec       `yaml:"sandbox,omitempty"       json:"sandbox,omitempty"`
 }
 
 // EvolutionSpec configures experience self-evolution for an agent.
@@ -108,6 +110,28 @@ type EvolutionAdviseSpec struct {
 	MinConfidence float64 `yaml:"min_confidence,omitempty" json:"min_confidence,omitempty"`
 	// MaxSuggestions caps the number of Gene recommendations injected into the prompt.
 	MaxSuggestions int `yaml:"max_suggestions,omitempty" json:"max_suggestions,omitempty"`
+}
+
+// SandboxSpec configures tool execution isolation for an agent.
+// When Enabled is true, all tool invocations are executed inside an isolated sandbox.
+type SandboxSpec struct {
+	// Enabled activates sandbox isolation for all tools in this agent.
+	Enabled bool `yaml:"enabled" json:"enabled"`
+	// Backend selects the isolation backend: "docker" (container-level) or "process" (OS-level).
+	// Defaults to "docker" when empty; falls back to "process" if Docker is unavailable.
+	Backend string `yaml:"backend,omitempty" json:"backend,omitempty"`
+	// TimeoutSeconds is the per-tool execution timeout inside the sandbox.
+	TimeoutSeconds int `yaml:"timeout_seconds,omitempty" json:"timeout_seconds,omitempty"`
+	// MemoryLimitMB caps memory usage for sandboxed tool execution.
+	MemoryLimitMB int64 `yaml:"memory_limit_mb,omitempty" json:"memory_limit_mb,omitempty"`
+	// AllowNet is a whitelist of network destinations (glob patterns, e.g. "*.openai.com").
+	AllowNet []string `yaml:"allow_net,omitempty" json:"allow_net,omitempty"`
+	// AllowRead is a whitelist of readable filesystem paths.
+	AllowRead []string `yaml:"allow_read,omitempty" json:"allow_read,omitempty"`
+	// AllowWrite is a whitelist of writable filesystem paths.
+	AllowWrite []string `yaml:"allow_write,omitempty" json:"allow_write,omitempty"`
+	// AllowEnv is a whitelist of environment variable names passed to the sandbox.
+	AllowEnv []string `yaml:"allow_env,omitempty" json:"allow_env,omitempty"`
 }
 
 // WorkflowSpec defines a graph-based workflow composed of nodes and edges.

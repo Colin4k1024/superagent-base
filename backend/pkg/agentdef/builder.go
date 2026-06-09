@@ -275,7 +275,7 @@ func (b *AgentBuilder) Build(ctx context.Context, def *AgentDefinition) (Agent, 
 		if def.Spec.MaxTurns > 0 {
 			maxStep = def.Spec.MaxTurns
 		}
-		adkHandlers, err := resolveADKHandlers(ctx, def.Spec.Middleware)
+		adkHandlers, err := resolveADKHandlers(ctx, def.Spec.Middleware, def.Spec.Sandbox, def.Spec.Tools)
 		if err != nil {
 			return nil, fmt.Errorf("agentdef: Build %q: resolve adk handlers: %w", def.Metadata.Name, err)
 		}
@@ -743,7 +743,7 @@ func (b *AgentBuilder) buildADKSupervisor(ctx context.Context, def *AgentDefinit
 		maxStep = def.Spec.Orchestration.MaxRounds
 	}
 
-	adkHandlers, err := resolveADKHandlers(ctx, def.Spec.Middleware)
+	adkHandlers, err := resolveADKHandlers(ctx, def.Spec.Middleware, def.Spec.Sandbox, def.Spec.Tools)
 	if err != nil {
 		return nil, fmt.Errorf("agentdef: buildADKSupervisor %q: resolve handlers: %w", def.Metadata.Name, err)
 	}
