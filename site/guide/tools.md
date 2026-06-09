@@ -35,11 +35,28 @@ spec:
 
 | 中间件 | 功能 |
 |--------|------|
+| **Sandbox** | 沙盒隔离执行（需显式启用） |
 | Retry | 失败重试（可配次数和退避策略） |
 | Timeout | 执行超时控制 |
 | RateLimit | RPM 限流 |
 | Cache | 结果缓存（幂等工具） |
 | Log | 调用日志 |
+
+## 沙盒模式
+
+通过 `spec.sandbox` 为所有工具开启安全隔离执行：
+
+```yaml
+spec:
+  sandbox:
+    enabled: true
+    backend: docker            # docker | process（自动降级）
+    timeout_seconds: 30
+    memory_limit_mb: 256
+    allow_net: ["*.openai.com"]
+```
+
+支持 per-tool 策略覆盖，完整说明详见 [Tool 沙盒模式](/advanced/sandbox)。
 
 ## MCP 工具
 

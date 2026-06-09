@@ -56,6 +56,7 @@ export default defineConfig({
             { text: 'A2UI 协议', link: '/advanced/a2ui-protocol' },
             { text: '中断与恢复', link: '/advanced/interrupt-resume' },
             { text: '工作流编排', link: '/advanced/workflow' },
+            { text: 'Tool 沙盒模式', link: '/advanced/sandbox' },
             { text: 'Skill 开发', link: '/advanced/skill-development' },
             { text: '多 Agent 编排', link: '/advanced/multi-agent' },
             { text: 'MCP 集成', link: '/advanced/mcp' },
