@@ -1,4 +1,4 @@
-# Example: native Eino graph agent
+# Example: native Eino graph agent with middleware
 #
 # 1. Generate your graph with the Eino Dev VS Code plugin.
 # 2. Drop the Go file into backend/pkg/graphs/ and add:
@@ -20,5 +20,19 @@ spec:
   type: eino_graph
   graph: hello-world              # must match graphs.Register("hello-world", ...)
   system_prompt: "You are a helpful assistant powered by a native Eino graph."
+  middleware:
+    # [audit_log] 审计日志：记录 graph 执行全程
+    - name: audit_log
+      level: info
+      include_messages: false
+    # [guardrails] 输入围栏：基本输入保护
+    - name: guardrails
+      max_input_length: 10000
+    # [context_injection] 上下文注入：注入时间戳
+    - name: context_injection
+      inject_timestamp: true
+    # [post_processing] 后处理：输出长度限制
+    - name: post_processing
+      max_output_length: 8000
   observability:
     metrics: true

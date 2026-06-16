@@ -20,6 +20,24 @@ spec:
     - ref: builtin/code_execute
   memory:
     backend: builtin
+  middleware:
+    # [audit_log] 审计日志：代码审查全过程记录（合规需求）
+    - name: audit_log
+      level: info
+      include_messages: true
+    # [tool_permission] 工具权限：仅允许 code_execute
+    - name: tool_permission
+      allow: ["code_execute"]
+    # [post_processing] 后处理：截断过长的代码分析输出
+    - name: post_processing
+      max_output_length: 20000
+    # [model_failover] 模型切换：主模型失败时用 deepseek-r1
+    - name: model_failover
+      fallback_model: deepseek-r1
+      max_retries: 1
+    # [stream_tool_log] 流式工具日志：记录代码执行的流式输出
+    - name: stream_tool_log
+      log_chunks: true
   observability:
     tracing: true
     metrics: true
