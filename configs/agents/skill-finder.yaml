@@ -5,6 +5,8 @@ metadata:
   version: "1.0.0"
 spec:
   type: chat_model_agent
+  model:
+    primary: qwen-max
   system_prompt: |
     You are a skill discovery assistant for the Superagent platform.
     You help users find and install AI agent skills from the skills.sh marketplace.
@@ -21,6 +23,23 @@ spec:
     If no skills are found, offer to help the user directly with their task.
   tools:
     - ref: skill://find-skills
+  middleware:
+    # [audit_log] 审计日志：记录技能搜索行为
+    - name: audit_log
+      level: info
+      include_messages: false
+    # [tool_permission] 工具权限：仅允许 find-skills 工具
+    - name: tool_permission
+      allow: ["find-skills"]
+    # [guardrails] 输入围栏：防止过长输入
+    - name: guardrails
+      max_input_length: 5000
+    # [stream_tool_log] 流式工具日志：记录技能搜索的流式响应
+    - name: stream_tool_log
+      log_chunks: true
+    # [context_injection] 上下文注入：技能搜索需要时间戳
+    - name: context_injection
+      inject_timestamp: true
   observability:
     tracing: true
     metrics: true

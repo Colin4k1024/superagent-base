@@ -27,6 +27,31 @@ spec:
     session_window: 20
   max_turns: 25
   middleware:
+    # [guardrails] 输入输出围栏：自主循环场景需要更大限制
+    - name: guardrails
+      max_input_length: 100000
+      max_output_length: 50000
+    # [audit_log] 审计日志：追踪自主循环全过程
+    - name: audit_log
+      level: info
+      include_messages: false
+    # [context_injection] 上下文注入：注入时间戳帮助 agent 感知执行时长
+    - name: context_injection
+      inject_timestamp: true
+    # [tool_permission] 工具权限：允许代码执行和网络搜索
+    - name: tool_permission
+      allow: ["code_execute", "web_search"]
+    # [stream_tool_log] 流式工具日志：记录流式工具执行详情
+    - name: stream_tool_log
+      log_chunks: true
+    # [post_processing] 后处理：单轮输出不超过 8K
+    - name: post_processing
+      max_output_length: 8000
+    # [model_failover] 模型 failover：长时间运行场景需要高可用
+    - name: model_failover
+      fallback_model: deepseek-coder
+      max_retries: 2
+    # Legacy middleware（由外层 applyMiddleware 处理）
     - name: timeout
       seconds: 120
     - name: retry

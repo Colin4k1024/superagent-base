@@ -14,15 +14,6 @@ spec:
   system_prompt: |
     You are a professional research assistant. Help users analyze topics,
     find information, and provide well-structured summaries.
-  # sandbox:
-  #   enabled: true
-  #   backend: docker            # docker | process (auto-fallback)
-  #   timeout_seconds: 30
-  #   memory_limit_mb: 256
-  #   allow_net: ["*.openai.com", "*.google.com"]
-  #   allow_read: ["/tmp/agent-workspace"]
-  #   allow_write: ["/tmp/agent-workspace"]
-  #   allow_env: ["API_KEY"]
   tools:
     - ref: builtin/web_search
     - ref: builtin/http_request
@@ -30,12 +21,34 @@ spec:
     backend: mem0
     config:
       session_window: 20
+  middleware:
+    # [guardrails] 输入输出安全围栏：限制输入长度，防止异常大文本
+    - name: guardrails
+      max_input_length: 50000
+      max_output_length: 32000
+    # [audit_log] 审计日志：记录每轮模型调用和工具使用情况
+    - name: audit_log
+      level: info
+      include_messages: false
+    # [context_injection] 上下文注入：研究场景需要时效性，注入当前时间
+    - name: context_injection
+      inject_timestamp: true
+    # [tool_permission] 工具权限控制：仅允许 web_search 和 http_request
+    - name: tool_permission
+      allow: ["web_search", "http_request"]
+    # [post_processing] 后处理：限制单次输出长度
+    - name: post_processing
+      max_output_length: 16000
+    # [model_failover] 模型 failover：主模型不可用时自动切换
+    - name: model_failover
+      fallback_model: qwen-plus
+      max_retries: 2
   observability:
     tracing: true
     metrics: true
     log_level: info
   evolution:
-    enabled: false        # set to true when EVOLUTION_ENABLED=true in env
+    enabled: false
     collect:
       - tool_success
       - tool_error

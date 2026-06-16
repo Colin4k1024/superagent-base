@@ -7,22 +7,49 @@ metadata:
     team: engineering
     tier: production
 spec:
+  type: agentloop
   model:
-    id: claude-sonnet-4-6
+    primary: claude-sonnet-4-6
     temperature: 0.1
-    maxTokens: 8192
-  prompt:
-    system: |
-      You are an expert software engineer.  You:
-      - Write clean, idiomatic code that follows project conventions.
-      - Explain code changes clearly with reasoning and trade-offs.
-      - Identify bugs and propose minimal, targeted fixes.
-      - Prefer small, reviewable diffs over large rewrites.
-      - Ask clarifying questions before making assumptions about requirements.
+    max_tokens: 8192
+  system_prompt: |
+    You are an expert software engineer. You:
+    - Write clean, idiomatic code that follows project conventions.
+    - Explain code changes clearly with reasoning and trade-offs.
+    - Identify bugs and propose minimal, targeted fixes.
+    - Prefer small, reviewable diffs over large rewrites.
+    - Ask clarifying questions before making assumptions about requirements.
+    When the task is fully complete, include [DONE] in your response.
   tools:
-    - code_exec
-    - web_search
+    - ref: builtin/code_execute
+    - ref: builtin/web_search
   memory:
     backend: builtin
-    maxMessages: 30
-  maxTurns: 15
+    config:
+      session_window: 30
+  max_turns: 15
+  middleware:
+    # [guardrails] 输入输出围栏：代码场景需要较大输入限制
+    - name: guardrails
+      max_input_length: 200000
+      max_output_length: 100000
+    # [audit_log] 审计日志：记录代码生成全过程
+    - name: audit_log
+      level: info
+      include_messages: true
+    # [context_injection] 上下文注入：注入时间戳
+    - name: context_injection
+      inject_timestamp: true
+    # [tool_permission] 工具权限：允许代码执行和搜索
+    - name: tool_permission
+      allow: ["code_execute", "web_search"]
+    # [post_processing] 后处理：防止单轮超大输出
+    - name: post_processing
+      max_output_length: 16000
+    # [model_failover] 模型 failover：编码场景用 deepseek 作为备用
+    - name: model_failover
+      fallback_model: deepseek-coder
+      max_retries: 1
+    # [stream_tool_log] 流式工具日志：记录代码执行细节
+    - name: stream_tool_log
+      log_chunks: true

@@ -16,6 +16,25 @@ spec:
     1. DocumentAnalyzer：分析文档结构、关键实体和主题
     2. ContentSummarizer：将分析结果提炼为结构化摘要
     3. ReportGenerator：生成最终的 Markdown 格式报告
+  middleware:
+    # [guardrails] 输入围栏：文档处理需要支持大文本输入
+    - name: guardrails
+      max_input_length: 500000
+      max_output_length: 100000
+    # [audit_log] 审计日志：记录流水线执行全过程
+    - name: audit_log
+      level: info
+      include_messages: false
+    # [context_injection] 上下文注入：注入处理时间
+    - name: context_injection
+      inject_timestamp: true
+    # [post_processing] 后处理：最终报告长度限制
+    - name: post_processing
+      max_output_length: 50000
+    # [model_failover] 模型 failover：文档处理场景需要高可用
+    - name: model_failover
+      fallback_model: qwen-max
+      max_retries: 2
   workflow:
     nodes:
       - id: document_analyzer

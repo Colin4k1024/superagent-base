@@ -20,3 +20,25 @@ spec:
 
   memory:
     backend: builtin
+
+  middleware:
+    # [context_injection] 上下文注入：注入时间戳确保回答时效性
+    - name: context_injection
+      inject_timestamp: true
+    # [tool_permission] 工具权限：仅允许 RAG 检索工具
+    - name: tool_permission
+      allow: ["hiagent_rag"]
+    # [audit_log] 审计日志：记录检索和回答过程
+    - name: audit_log
+      level: info
+      include_messages: false
+    # [guardrails] 围栏：防止异常输入
+    - name: guardrails
+      max_input_length: 10000
+    # [post_processing] 后处理：确保回答精炼
+    - name: post_processing
+      max_output_length: 4096
+    # [model_failover] 模型 failover：RAG 场景对可用性要求高
+    - name: model_failover
+      fallback_model: qwen-turbo
+      max_retries: 2

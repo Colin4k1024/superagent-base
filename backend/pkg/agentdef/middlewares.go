@@ -47,12 +47,41 @@ func resolveADKHandlers(ctx context.Context, specs []MiddlewareSpec, sandboxSpec
 	}
 
 	for _, spec := range specs {
+		var h adk.ChatModelAgentMiddleware
+		var err error
+
 		switch spec.Name {
 		case "reduction":
-			h, err := buildReductionHandler(ctx, spec.Config)
-			if err != nil {
-				return nil, fmt.Errorf("agentdef: middleware %q: %w", spec.Name, err)
+			h, err = buildReductionHandler(ctx, spec.Config)
+		case "audit_log":
+			h, err = buildAuditLogHandler(ctx, spec.Config)
+		case "tool_permission":
+			h, err = buildToolPermissionHandler(ctx, spec.Config)
+		case "context_injection":
+			h, err = buildContextInjectionHandler(ctx, spec.Config)
+		case "post_processing":
+			h, err = buildPostProcessingHandler(ctx, spec.Config)
+		case "guardrails":
+			h, err = buildGuardrailsHandler(ctx, spec.Config)
+		case "model_failover":
+			h, err = buildModelFailoverHandler(ctx, spec.Config)
+		case "stream_tool_log":
+			h, err = buildStreamToolLogHandler(ctx, spec.Config)
+		// Legacy outer-layer middleware: handled by applyMiddleware, skip here.
+		case "timeout", "retry", "rate_limit", "cache":
+			continue
+		default:
+			factory, ok := GetMiddlewareFactory(spec.Name)
+			if !ok {
+				return nil, fmt.Errorf("agentdef: unknown middleware %q (not built-in and not registered)", spec.Name)
 			}
+			h, err = factory(ctx, spec.Config)
+		}
+
+		if err != nil {
+			return nil, fmt.Errorf("agentdef: middleware %q: %w", spec.Name, err)
+		}
+		if h != nil {
 			handlers = append(handlers, h)
 		}
 	}
