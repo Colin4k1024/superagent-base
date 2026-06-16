@@ -659,11 +659,18 @@ func (b *AgentBuilder) buildSupervisor(ctx context.Context, def *AgentDefinition
 		}
 	}
 
+	// Build summarize function if result_aggregation is "summarize".
+	var summarizeFn SummarizeFunc
+	if def.Spec.Orchestration != nil && def.Spec.Orchestration.ResultAggregation == "summarize" {
+		summarizeFn = buildDefaultSummarizeFunc(mainAgent)
+	}
+
 	dt := &delegateTool{
-		subAgents:   subAgents,
-		timeout:     delegationTimeout,
-		fallback:    delegationFallback,
-		parallelMax: delegationParallelMax,
+		subAgents:    subAgents,
+		timeout:      delegationTimeout,
+		fallback:     delegationFallback,
+		parallelMax:  delegationParallelMax,
+		summarizeFn:  summarizeFn,
 	}
 
 	return &SupervisorAgent{
@@ -675,6 +682,28 @@ func (b *AgentBuilder) buildSupervisor(ctx context.Context, def *AgentDefinition
 		delegate:    dt,
 		def:         def,
 	}, nil
+}
+
+// buildDefaultSummarizeFunc creates a SummarizeFunc that uses the given agent
+// to compress multiple delegation results into a concise summary.
+// Each invocation derives a unique sub-session from context to avoid cross-user contamination.
+func buildDefaultSummarizeFunc(agent Agent) SummarizeFunc {
+	return func(ctx context.Context, inputs []string) (string, error) {
+		// Derive session from delegation scope context — each summarize call is isolated.
+		parentSessionID, round := getDelegationScope(ctx)
+		summarizeSessionID := SubSessionID(parentSessionID, "internal", fmt.Sprintf("summarize-r%d", round))
+
+		prompt := "Summarize the following results concisely in 2-3 sentences:\n\n" + strings.Join(inputs, "\n\n")
+		ch, err := agent.Chat(ctx, summarizeSessionID, prompt)
+		if err != nil {
+			return "", err
+		}
+		var sb strings.Builder
+		for token := range ch {
+			sb.WriteString(token)
+		}
+		return sb.String(), nil
+	}
 }
 
 // adkAgentFrom returns the underlying adk.Agent if the agent was built with ADK.
@@ -855,6 +884,9 @@ func (b *AgentBuilder) buildPlanExecute(ctx context.Context, def *AgentDefinitio
 
 // buildAgentLoop constructs an AgentLoopAgent. It builds a chat_model_agent
 // (with tools if configured) and wraps it in the autonomous loop.
+// The inner mainAgent is built WITHOUT memory to prevent double-storage:
+// AgentLoopAgent itself manages the accumulated context fed to the LLM,
+// so having the inner agent also persist/retrieve history would cause O(n²) growth.
 func (b *AgentBuilder) buildAgentLoop(ctx context.Context, def *AgentDefinition) (Agent, error) {
 	syntheticDef := &AgentDefinition{
 		APIVersion: def.APIVersion,
@@ -865,13 +897,23 @@ func (b *AgentBuilder) buildAgentLoop(ctx context.Context, def *AgentDefinition)
 			Model:         def.Spec.Model,
 			SystemPrompt:  def.Spec.SystemPrompt,
 			Tools:         def.Spec.Tools,
-			Memory:        def.Spec.Memory,
+			// Memory intentionally omitted: AgentLoop manages context externally.
 			Observability: def.Spec.Observability,
 		},
 	}
 	mainAgent, err := b.Build(ctx, syntheticDef)
 	if err != nil {
 		return nil, fmt.Errorf("agentdef: buildAgentLoop %q: build main agent: %w", def.Metadata.Name, err)
+	}
+
+	// Resolve outer memory backend for persisting the initial input and final output.
+	var outerMemBackend memory.Backend
+	if b.memoryFactory != nil && def.Spec.Memory.Backend != "" {
+		cfg := memory.BackendConfig{
+			Type:    def.Spec.Memory.Backend,
+			Options: def.Spec.Memory.Config,
+		}
+		outerMemBackend, _ = b.memoryFactory(cfg)
 	}
 
 	maxTurns := defaultMaxTurns
@@ -885,6 +927,7 @@ func (b *AgentBuilder) buildAgentLoop(ctx context.Context, def *AgentDefinition)
 		mainAgent:   mainAgent,
 		def:         def,
 		maxTurns:    maxTurns,
+		memBackend:  outerMemBackend,
 	}
 	return b.maybeWrapInterruptable(ctx, agent, def), nil
 }

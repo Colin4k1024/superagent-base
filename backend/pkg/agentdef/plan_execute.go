@@ -53,7 +53,8 @@ func (a *PlanExecuteAgent) Chat(ctx context.Context, sessionID string, message s
 
 		// Phase 1: Generate plan.
 		planPrompt := "Create a step-by-step plan to accomplish: " + message
-		planCh, err := a.mainAgent.Chat(ctx, sessionID, planPrompt)
+		planSessionID := SubSessionID(sessionID, "plan", "planner")
+		planCh, err := a.mainAgent.Chat(ctx, planSessionID, planPrompt)
 		if err != nil {
 			select {
 			case ch <- fmt.Sprintf("[plan_execute] planning error: %v", err):
@@ -117,7 +118,8 @@ func (a *PlanExecuteAgent) Chat(ctx context.Context, sessionID string, message s
 				return
 			}
 
-			stepCh, stepErr := executor.Chat(ctx, sessionID, step)
+			stepSessionID := SubSessionID(sessionID, "plan", fmt.Sprintf("step%d", i))
+			stepCh, stepErr := executor.Chat(ctx, stepSessionID, step)
 			if stepErr != nil {
 				select {
 				case ch <- fmt.Sprintf("[error in step %d]: %v\n", i+1, stepErr):

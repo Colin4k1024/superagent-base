@@ -20,6 +20,9 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
+
+	"github.com/superagent-ai/superagent-base/backend/pkg/memory"
 )
 
 const (
@@ -31,12 +34,17 @@ const (
 // task is complete or maxTurns is exhausted. Each turn calls the underlying
 // LLM agent, checks if the output signals completion (via [DONE] marker),
 // and feeds accumulated context back for the next turn.
+//
+// The inner mainAgent is built without memory to prevent double-storage.
+// This agent manages its own outer memBackend for persisting initial input
+// and final output only.
 type AgentLoopAgent struct {
 	name        string
 	description string
 	mainAgent   Agent
 	def         *AgentDefinition
 	maxTurns    int
+	memBackend  memory.Backend
 }
 
 func (a *AgentLoopAgent) Name() string                    { return a.name }
@@ -49,6 +57,16 @@ func (a *AgentLoopAgent) Chat(ctx context.Context, sessionID string, message str
 	ch := make(chan string, 100)
 	go func() {
 		defer close(ch)
+
+		// Persist user input to outer memory (async, inside goroutine to avoid
+		// blocking callers when backend is slow/network-backed).
+		if a.memBackend != nil && sessionID != "" {
+			_ = a.memBackend.AddMessage(ctx, sessionID, memory.Message{
+				Role:      "user",
+				Content:   message,
+				Timestamp: time.Now().Unix(),
+			})
+		}
 
 		currentInput := message
 		var history strings.Builder
@@ -89,6 +107,7 @@ func (a *AgentLoopAgent) Chat(ctx context.Context, sessionID string, message str
 
 			// Check for completion signal.
 			if strings.Contains(output, doneMarker) {
+				a.persistFinalOutput(ctx, sessionID, history.String()+output)
 				return
 			}
 
@@ -97,9 +116,20 @@ func (a *AgentLoopAgent) Chat(ctx context.Context, sessionID string, message str
 			currentInput = history.String() + "\nContinue working on the task. If the task is complete, include [DONE] in your response."
 		}
 
+		a.persistFinalOutput(ctx, sessionID, history.String())
 		a.emit(ch, ctx, fmt.Sprintf("\n[agentloop] reached max turns (%d)", a.maxTurns))
 	}()
 	return ch, nil
+}
+
+func (a *AgentLoopAgent) persistFinalOutput(ctx context.Context, sessionID, content string) {
+	if a.memBackend != nil && sessionID != "" {
+		_ = a.memBackend.AddMessage(ctx, sessionID, memory.Message{
+			Role:      "assistant",
+			Content:   content,
+			Timestamp: time.Now().Unix(),
+		})
+	}
 }
 
 func (a *AgentLoopAgent) emit(ch chan<- string, ctx context.Context, msg string) {
