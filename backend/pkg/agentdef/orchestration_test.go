@@ -815,10 +815,11 @@ func TestDelegateTool_Execute_Success(t *testing.T) {
 		parallelMax: 3,
 	}
 
-	out := dt.execute(context.Background(), DelegateToolInput{
+	ctx := withDelegationScope(context.Background(), "test-session", 1)
+	out := dt.execute(ctx, DelegateToolInput{
 		AgentName: "w",
 		Task:      "do work",
-	})
+	}, "test-session", 1)
 	if out.Status != "success" {
 		t.Errorf("status = %q, want success", out.Status)
 	}
@@ -834,7 +835,7 @@ func TestDelegateTool_Execute_MissingAgent(t *testing.T) {
 		fallback:    "skip",
 		parallelMax: 3,
 	}
-	out := dt.execute(context.Background(), DelegateToolInput{AgentName: "ghost", Task: "x"})
+	out := dt.execute(context.Background(), DelegateToolInput{AgentName: "ghost", Task: "x"}, "test-session", 1)
 	if out.Status != "error" {
 		t.Errorf("status = %q, want error", out.Status)
 	}
@@ -850,7 +851,8 @@ func TestDelegateTool_ExecuteDelegations_Parallel(t *testing.T) {
 		parallelMax: 2,
 	}
 
-	results := dt.executeDelegations(context.Background(), []DelegateToolInput{
+	delegCtx := withDelegationScope(context.Background(), "test-session", 1)
+	results := dt.executeDelegations(delegCtx, []DelegateToolInput{
 		{AgentName: "a", Task: "task a"},
 		{AgentName: "b", Task: "task b"},
 	})
@@ -869,7 +871,7 @@ func TestAggregateResults_Concat(t *testing.T) {
 		{output: DelegateToolOutput{AgentName: "a", Result: "res-a", Status: "success"}},
 		{output: DelegateToolOutput{AgentName: "b", Result: "res-b", Status: "success"}},
 	}
-	out := aggregateResults(results, "concat")
+	out := aggregateResults(context.Background(), results, "concat", nil)
 	if !strings.Contains(out, "res-a") || !strings.Contains(out, "res-b") {
 		t.Errorf("concat output missing results: %q", out)
 	}
@@ -879,9 +881,46 @@ func TestAggregateResults_Structured(t *testing.T) {
 	results := []delegationResult{
 		{output: DelegateToolOutput{AgentName: "a", Result: "r", Status: "success"}},
 	}
-	out := aggregateResults(results, "structured")
+	out := aggregateResults(context.Background(), results, "structured", nil)
 	if !strings.Contains(out, `"agent_name"`) {
 		t.Errorf("structured output should contain JSON: %q", out)
+	}
+}
+
+func TestAggregateResults_Summarize_WithFunc(t *testing.T) {
+	results := []delegationResult{
+		{output: DelegateToolOutput{AgentName: "a", Result: "detailed result from agent a that is quite long"}},
+		{output: DelegateToolOutput{AgentName: "b", Result: "detailed result from agent b that is also long"}},
+	}
+	mockSummarize := func(_ context.Context, inputs []string) (string, error) {
+		return fmt.Sprintf("summary of %d results", len(inputs)), nil
+	}
+	out := aggregateResults(context.Background(), results, "summarize", mockSummarize)
+	if out != "summary of 2 results" {
+		t.Errorf("summarize output = %q, want %q", out, "summary of 2 results")
+	}
+}
+
+func TestAggregateResults_Summarize_FallbackOnError(t *testing.T) {
+	results := []delegationResult{
+		{output: DelegateToolOutput{AgentName: "a", Result: "res-a"}},
+	}
+	failingSummarize := func(_ context.Context, _ []string) (string, error) {
+		return "", fmt.Errorf("model error")
+	}
+	out := aggregateResults(context.Background(), results, "summarize", failingSummarize)
+	if !strings.Contains(out, "res-a") {
+		t.Errorf("should fall back to concat on error, got: %q", out)
+	}
+}
+
+func TestAggregateResults_Summarize_NilFunc(t *testing.T) {
+	results := []delegationResult{
+		{output: DelegateToolOutput{AgentName: "a", Result: "res-a"}},
+	}
+	out := aggregateResults(context.Background(), results, "summarize", nil)
+	if !strings.Contains(out, "res-a") {
+		t.Errorf("should fall back to concat with nil func, got: %q", out)
 	}
 }
 

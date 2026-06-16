@@ -27,6 +27,10 @@ import (
 
 // ─── Delegation types ─────────────────────────────────────────────────────────
 
+// SummarizeFunc compresses multiple text results into a concise summary.
+// Used by aggregateResults when mode="summarize".
+type SummarizeFunc func(ctx context.Context, inputs []string) (string, error)
+
 // DelegateToolInput is the structured input for the delegate_to_agent tool.
 type DelegateToolInput struct {
 	AgentName string `json:"agent_name"`
@@ -49,17 +53,48 @@ type delegationResult struct {
 	err      error
 }
 
+// ─── Context keys for delegation scope ───────────────────────────────────────
+
+type delegationScopeKey struct{}
+
+type delegationScope struct {
+	sessionID string
+	round     int
+}
+
+// withDelegationScope attaches delegation scope to context (race-safe per-call).
+func withDelegationScope(ctx context.Context, sessionID string, round int) context.Context {
+	return context.WithValue(ctx, delegationScopeKey{}, delegationScope{sessionID: sessionID, round: round})
+}
+
+func getDelegationScope(ctx context.Context) (string, int) {
+	if s, ok := ctx.Value(delegationScopeKey{}).(delegationScope); ok {
+		return s.sessionID, s.round
+	}
+	return "", 0
+}
+
 // ─── delegateTool ─────────────────────────────────────────────────────────────
+
+// SubSessionID generates a namespaced session ID for child agents to prevent
+// context pollution between parent and child sessions.
+func SubSessionID(parentID, qualifier, agentName string) string {
+	return parentID + "::" + qualifier + "::" + agentName
+}
 
 // delegateTool is an in-process tool that routes calls to sub-agents.
 // It is registered with the supervisor's ReAct agent so the LLM can invoke it
 // via standard tool-call mechanics.
+//
+// sessionID and round are NOT stored on the struct to avoid race conditions
+// when multiple callers invoke the same SupervisorAgent concurrently.
+// Instead they are passed per-call via executeDelegationsScoped.
 type delegateTool struct {
-	subAgents   map[string]Agent
-	timeout     time.Duration
-	fallback    string // skip | abort | ask_supervisor
-	parallelMax int
-	sessionID   string
+	subAgents    map[string]Agent
+	timeout      time.Duration
+	fallback     string // skip | abort | ask_supervisor
+	parallelMax  int
+	summarizeFn  SummarizeFunc  // optional: called when aggregation mode is "summarize"
 }
 
 // Info returns the tool schema consumed by Eino / the LLM.
@@ -88,20 +123,22 @@ func (d *delegateTool) Info(_ context.Context) (*toolInfo, error) {
 	}, nil
 }
 
-// Invoke executes the delegation synchronously.
+// Invoke executes the delegation synchronously. Session scope is retrieved from context.
 func (d *delegateTool) Invoke(ctx context.Context, inputJSON string) (string, error) {
 	var inp DelegateToolInput
 	if err := json.Unmarshal([]byte(inputJSON), &inp); err != nil {
 		return "", fmt.Errorf("delegate_to_agent: invalid input JSON: %w", err)
 	}
 
-	out := d.execute(ctx, inp)
+	sessionID, round := getDelegationScope(ctx)
+	out := d.execute(ctx, inp, sessionID, round)
 	raw, _ := json.Marshal(out)
 	return string(raw), nil
 }
 
-// execute runs a single delegation with timeout.
-func (d *delegateTool) execute(ctx context.Context, inp DelegateToolInput) DelegateToolOutput {
+// execute runs a single delegation with timeout. sessionID and round are passed
+// explicitly to avoid storing mutable state on the struct (race-safe).
+func (d *delegateTool) execute(ctx context.Context, inp DelegateToolInput, sessionID string, round int) DelegateToolOutput {
 	sub, ok := d.subAgents[inp.AgentName]
 	if !ok {
 		return DelegateToolOutput{
@@ -125,8 +162,10 @@ func (d *delegateTool) execute(ctx context.Context, inp DelegateToolInput) Deleg
 		msg = inp.Context + "\n\n" + inp.Task
 	}
 
+	subSessionID := SubSessionID(sessionID, fmt.Sprintf("sub::r%d", round), inp.AgentName)
+
 	start := time.Now()
-	ch, err := sub.Chat(delegateCtx, d.sessionID, msg)
+	ch, err := sub.Chat(delegateCtx, subSessionID, msg)
 	if err != nil {
 		return DelegateToolOutput{
 			AgentName: inp.AgentName,
@@ -189,7 +228,8 @@ func (d *delegateTool) executeDelegations(ctx context.Context, inputs []Delegate
 			}
 			mu.Unlock()
 
-			out := d.execute(ctx, in)
+			sessionID, round := getDelegationScope(ctx)
+			out := d.execute(ctx, in, sessionID, round)
 			res := delegationResult{input: in, output: out}
 			if out.Status != "success" {
 				res.err = fmt.Errorf("delegation to %q: %s", in.AgentName, out.Result)
@@ -212,7 +252,9 @@ func (d *delegateTool) executeDelegations(ctx context.Context, inputs []Delegate
 
 // aggregateResults combines delegation results into a single string for the
 // next round's input.  mode: "concat" (default), "summarize", "structured".
-func aggregateResults(results []delegationResult, mode string) string {
+// When mode="summarize" and summarizeFn is non-nil, it calls the function to
+// produce a compressed summary; otherwise falls back to concat.
+func aggregateResults(ctx context.Context, results []delegationResult, mode string, summarizeFn SummarizeFunc) string {
 	if len(results) == 0 {
 		return ""
 	}
@@ -225,13 +267,22 @@ func aggregateResults(results []delegationResult, mode string) string {
 		raw, _ := json.MarshalIndent(out, "", "  ")
 		return string(raw)
 	case "summarize":
-		// Simple concat with agent name headers — richer summarisation would
-		// require another LLM call which we avoid to keep the loop clean.
+		if summarizeFn != nil {
+			inputs := make([]string, 0, len(results))
+			for _, r := range results {
+				inputs = append(inputs, fmt.Sprintf("[%s]: %s", r.output.AgentName, r.output.Result))
+			}
+			summary, err := summarizeFn(ctx, inputs)
+			if err == nil && summary != "" {
+				return summary
+			}
+			// On error, fall through to concat.
+		}
 		fallthrough
 	default: // "concat"
 		var sb strings.Builder
 		for _, r := range results {
-			sb.WriteString(fmt.Sprintf("[%s]: %s\n", r.output.AgentName, r.output.Result))
+			fmt.Fprintf(&sb, "[%s]: %s\n", r.output.AgentName, r.output.Result)
 		}
 		return sb.String()
 	}

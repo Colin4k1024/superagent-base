@@ -61,8 +61,6 @@ func (s *SupervisorAgent) Chat(ctx context.Context, sessionID string, message st
 		// Fallback for tests that construct SupervisorAgent without a delegate.
 		return s.mainAgent.Chat(ctx, sessionID, message)
 	}
-	s.delegate.sessionID = sessionID
-
 	enrichedPrompt := buildSupervisorPrompt(s.def.Spec.SystemPrompt, s.subAgents)
 	ch := make(chan string, 100)
 
@@ -122,7 +120,9 @@ func (s *SupervisorAgent) Chat(ctx context.Context, sessionID string, message st
 			}
 
 			// Execute delegations (parallel, bounded by parallelMax).
-			results := s.delegate.executeDelegations(ctx, delegations)
+			// Pass session scope via context to avoid race conditions.
+			delegCtx := withDelegationScope(ctx, sessionID, round+1)
+			results := s.delegate.executeDelegations(delegCtx, delegations)
 
 			// Check abort on any failure.
 			if s.delegate.fallback == "abort" {
@@ -138,7 +138,7 @@ func (s *SupervisorAgent) Chat(ctx context.Context, sessionID string, message st
 			}
 
 			// Aggregate results as the next round's input.
-			input = aggregateResults(results, aggregationMode)
+			input = aggregateResults(ctx, results, aggregationMode, s.delegate.summarizeFn)
 		}
 
 		// maxRounds exhausted — emit a final error token.
@@ -238,7 +238,8 @@ func (s *SequentialAgent) Chat(ctx context.Context, sessionID string, message st
 				return
 			}
 			var result strings.Builder
-			subCh, err := agent.Chat(ctx, sessionID, currentInput)
+			stepSessionID := SubSessionID(sessionID, fmt.Sprintf("seq.step%d", i), agent.Name())
+			subCh, err := agent.Chat(ctx, stepSessionID, currentInput)
 			if err != nil {
 				select {
 				case ch <- fmt.Sprintf("[error in step %d (%s)]: %v", i+1, agent.Name(), err):
@@ -304,7 +305,8 @@ func (p *ParallelAgent) Chat(ctx context.Context, sessionID string, message stri
 			go func(idx int, a Agent) {
 				defer wg.Done()
 				var out strings.Builder
-				subCh, err := a.Chat(childCtx, sessionID, message)
+				branchSessionID := SubSessionID(sessionID, fmt.Sprintf("par.branch%d", idx), a.Name())
+				subCh, err := a.Chat(childCtx, branchSessionID, message)
 				if err != nil {
 					results <- agentResult{index: idx, name: a.Name(), output: fmt.Sprintf("[error]: %v", err)}
 					return
