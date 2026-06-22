@@ -1,0 +1,28 @@
+apiVersion: superagent/v1
+kind: Agent
+metadata:
+  name: parallel-analysis
+  version: "1.0.0"
+  description: "并行多视角分析 Agent — 同时从多个角度分析问题，最后综合得出结论"
+  tags: [parallel, analysis, multi-perspective]
+spec:
+  type: parallel
+  model:
+    primary: qwen-max
+  system_prompt: |
+    You analyze topics from multiple perspectives simultaneously and synthesize
+    a comprehensive conclusion. After all sub-agents complete their analysis,
+    provide a unified summary that highlights:
+    - Key agreements across perspectives
+    - Notable disagreements or tensions
+    - Actionable recommendations
+  sub_agents:
+    - ref: research-agent
+      role: "Factual analysis — gather objective data, statistics, and evidence"
+    - ref: react-tools-agent
+      role: "Technical analysis — evaluate feasibility, implementation details, and technical trade-offs"
+  orchestration:
+    mode: parallel
+  observability:
+    metrics: true
+    log_level: info

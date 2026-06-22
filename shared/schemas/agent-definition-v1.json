@@ -1,0 +1,369 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://superagent-base.io/schemas/agent-definition-v1.json",
+  "title": "AgentDefinition",
+  "description": "Unified Agent YAML schema shared across Go, Python, and Java bases.",
+  "type": "object",
+  "required": ["apiVersion", "kind", "metadata", "spec"],
+  "properties": {
+    "apiVersion": {
+      "type": "string",
+      "const": "superagent/v1"
+    },
+    "kind": {
+      "type": "string",
+      "const": "Agent"
+    },
+    "metadata": {
+      "$ref": "#/$defs/Metadata"
+    },
+    "spec": {
+      "$ref": "#/$defs/AgentSpec"
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "Metadata": {
+      "type": "object",
+      "required": ["name"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[a-z0-9-]+$",
+          "description": "Unique agent identifier, lowercase alphanumeric with hyphens."
+        },
+        "version": {
+          "type": "string",
+          "description": "Semantic version string."
+        },
+        "tags": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Free-form labels for grouping/filtering."
+        },
+        "labels": {
+          "type": "object",
+          "additionalProperties": { "type": "string" },
+          "description": "Arbitrary key/value pairs."
+        }
+      },
+      "additionalProperties": false
+    },
+    "AgentSpec": {
+      "type": "object",
+      "required": ["type"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "chat_model_agent",
+            "deep_agent",
+            "supervisor",
+            "sequential",
+            "parallel",
+            "plan_execute",
+            "workflow",
+            "agentloop",
+            "eino_graph"
+          ],
+          "description": "Agent execution mode."
+        },
+        "model": { "$ref": "#/$defs/ModelSpec" },
+        "system_prompt": {
+          "type": "string",
+          "description": "System-level instruction for the agent."
+        },
+        "tools": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/ToolRef" },
+          "description": "Tool references the agent may invoke."
+        },
+        "memory": { "$ref": "#/$defs/MemorySpec" },
+        "middleware": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/MiddlewareSpec" },
+          "description": "Ordered list of middleware components."
+        },
+        "observability": { "$ref": "#/$defs/ObsSpec" },
+        "sub_agents": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/SubAgentRef" },
+          "description": "Sub-agent references for orchestration types."
+        },
+        "orchestration": { "$ref": "#/$defs/OrchestrationSpec" },
+        "workflow": { "$ref": "#/$defs/WorkflowSpec" },
+        "interrupt": { "$ref": "#/$defs/InterruptConfig" },
+        "graph": {
+          "type": "string",
+          "description": "Registered Eino graph name for type=eino_graph."
+        },
+        "max_turns": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Max autonomous iterations for agentloop. Defaults to 25."
+        },
+        "evolution": { "$ref": "#/$defs/EvolutionSpec" },
+        "sandbox": { "$ref": "#/$defs/SandboxSpec" }
+      },
+      "additionalProperties": false
+    },
+    "ModelSpec": {
+      "type": "object",
+      "required": ["primary"],
+      "properties": {
+        "protocol": {
+          "type": "string",
+          "enum": ["openai", "claude", "deepseek", "gemini", "ark", "ollama", "qwen"],
+          "description": "LLM provider protocol. Defaults to openai."
+        },
+        "router": {
+          "type": "string",
+          "description": "Named routing strategy."
+        },
+        "primary": {
+          "type": "string",
+          "description": "Default model ID."
+        },
+        "fallback": {
+          "type": "string",
+          "description": "Model ID when primary is unavailable."
+        },
+        "base_url": {
+          "type": "string",
+          "description": "Override global model endpoint."
+        },
+        "api_key_env": {
+          "type": "string",
+          "description": "Environment variable name for API key."
+        }
+      },
+      "additionalProperties": false
+    },
+    "ToolRef": {
+      "type": "object",
+      "required": ["ref"],
+      "properties": {
+        "ref": {
+          "type": "string",
+          "description": "Tool reference URI: builtin/<name>, mcp://server/tool, skill://name."
+        },
+        "config": {
+          "type": "object",
+          "description": "Tool-specific configuration."
+        }
+      },
+      "additionalProperties": false
+    },
+    "MemorySpec": {
+      "type": "object",
+      "properties": {
+        "backend": {
+          "type": "string",
+          "enum": ["builtin", "mem0", "zep", "letta"],
+          "description": "Memory backend type. Defaults to builtin."
+        },
+        "config": {
+          "type": "object",
+          "description": "Backend-specific configuration."
+        }
+      },
+      "additionalProperties": false
+    },
+    "MiddlewareSpec": {
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "config": { "type": "object" }
+      },
+      "additionalProperties": true
+    },
+    "ObsSpec": {
+      "type": "object",
+      "properties": {
+        "tracing": { "type": "boolean" },
+        "metrics": { "type": "boolean" },
+        "log_level": {
+          "type": "string",
+          "enum": ["trace", "debug", "info", "warn", "error"]
+        }
+      },
+      "additionalProperties": false
+    },
+    "SubAgentRef": {
+      "type": "object",
+      "required": ["ref"],
+      "properties": {
+        "ref": {
+          "type": "string",
+          "description": "Name of the sub-agent (must match metadata.name)."
+        },
+        "role": {
+          "type": "string",
+          "description": "Sub-agent's purpose within the orchestration."
+        },
+        "config": {
+          "type": "object",
+          "description": "Per-sub-agent configuration overrides."
+        }
+      },
+      "additionalProperties": false
+    },
+    "OrchestrationSpec": {
+      "type": "object",
+      "required": ["mode"],
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": ["supervisor", "sequential", "parallel", "plan_execute"]
+        },
+        "max_rounds": { "type": "integer", "minimum": 1 },
+        "delegation": { "$ref": "#/$defs/DelegationConfig" },
+        "result_aggregation": {
+          "type": "string",
+          "enum": ["concat", "summarize", "structured"]
+        }
+      },
+      "additionalProperties": false
+    },
+    "DelegationConfig": {
+      "type": "object",
+      "properties": {
+        "timeout": { "type": "string" },
+        "retry": { "type": "integer", "minimum": 0 },
+        "fallback_strategy": {
+          "type": "string",
+          "enum": ["skip", "abort", "ask_supervisor"]
+        },
+        "parallel_max": { "type": "integer", "minimum": 1 }
+      },
+      "additionalProperties": false
+    },
+    "WorkflowSpec": {
+      "type": "object",
+      "required": ["nodes"],
+      "properties": {
+        "nodes": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/WorkflowNode" }
+        },
+        "edges": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/WorkflowEdge" }
+        },
+        "variables": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/WorkflowVariable" }
+        },
+        "execution": { "$ref": "#/$defs/WorkflowExecution" }
+      },
+      "additionalProperties": false
+    },
+    "WorkflowNode": {
+      "type": "object",
+      "required": ["id", "type"],
+      "properties": {
+        "id": { "type": "string" },
+        "type": {
+          "type": "string",
+          "enum": ["llm_call", "agent_call", "tool_call", "code", "condition"]
+        },
+        "agent": { "type": "string" },
+        "tool": { "type": "string" },
+        "prompt": { "type": "string" },
+        "code": { "type": "string" },
+        "language": { "type": "string" },
+        "condition": { "type": "string" },
+        "input_mapping": {
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "WorkflowEdge": {
+      "type": "object",
+      "required": ["from", "to"],
+      "properties": {
+        "from": { "type": "string" },
+        "to": { "type": "string" },
+        "condition": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "WorkflowVariable": {
+      "type": "object",
+      "required": ["name", "from"],
+      "properties": {
+        "name": { "type": "string" },
+        "from": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "WorkflowExecution": {
+      "type": "object",
+      "properties": {
+        "max_parallelism": { "type": "integer", "minimum": 0 },
+        "error_strategy": {
+          "type": "string",
+          "enum": ["fail_fast", "best_effort"]
+        }
+      },
+      "additionalProperties": false
+    },
+    "InterruptConfig": {
+      "type": "object",
+      "required": ["enabled"],
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "checkpoint_backend": {
+          "type": "string",
+          "enum": ["redis", "memory"]
+        },
+        "timeout_seconds": { "type": "integer", "minimum": 1 }
+      },
+      "additionalProperties": false
+    },
+    "EvolutionSpec": {
+      "type": "object",
+      "required": ["enabled"],
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "collect": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["tool_success", "tool_error", "model_invoke", "agent_done"]
+          }
+        },
+        "advise": { "$ref": "#/$defs/EvolutionAdviseSpec" }
+      },
+      "additionalProperties": false
+    },
+    "EvolutionAdviseSpec": {
+      "type": "object",
+      "properties": {
+        "min_confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+        "max_suggestions": { "type": "integer", "minimum": 1 }
+      },
+      "additionalProperties": false
+    },
+    "SandboxSpec": {
+      "type": "object",
+      "required": ["enabled"],
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "backend": {
+          "type": "string",
+          "enum": ["docker", "process"]
+        },
+        "timeout_seconds": { "type": "integer", "minimum": 1 },
+        "memory_limit_mb": { "type": "integer", "minimum": 1 },
+        "allow_net": { "type": "array", "items": { "type": "string" } },
+        "allow_read": { "type": "array", "items": { "type": "string" } },
+        "allow_write": { "type": "array", "items": { "type": "string" } },
+        "allow_env": { "type": "array", "items": { "type": "string" } }
+      },
+      "additionalProperties": false
+    }
+  }
+}
