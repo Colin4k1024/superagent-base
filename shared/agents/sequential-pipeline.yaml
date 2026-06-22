@@ -1,0 +1,63 @@
+apiVersion: superagent/v1
+kind: Agent
+metadata:
+  name: sequential-pipeline
+  version: "1.0.0"
+  description: "顺序流水线 Agent — 三阶段处理：翻译 → 润色 → 校对，每步输出作为下一步输入"
+  tags: [sequential, pipeline, translation, writing]
+spec:
+  type: workflow
+  model:
+    primary: qwen-max
+  system_prompt: ""
+  workflow:
+    nodes:
+      - id: translate
+        type: llm_call
+        prompt: |
+          You are a professional translator. Translate the following text
+          into fluent, natural English. Preserve the original meaning,
+          tone, and formatting. If the text is already in English,
+          translate it to Chinese instead.
+
+          Text to translate:
+          {{.message}}
+      - id: polish
+        type: llm_call
+        prompt: |
+          You are a skilled editor. Polish the following translated text
+          to improve readability, flow, and natural expression. Fix any
+          awkward phrasing while preserving the meaning.
+
+          Do NOT change the language — only improve the quality of expression.
+
+          Text to polish:
+          {{.translation}}
+      - id: proofread
+        type: llm_call
+        prompt: |
+          You are a meticulous proofreader. Review the following polished text for:
+          - Grammar and spelling errors
+          - Punctuation issues
+          - Consistency in terminology
+          - Formatting problems
+
+          Output the final corrected version. If no issues are found,
+          output the text unchanged with a note "No corrections needed."
+
+          Text to proofread:
+          {{.polished}}
+    edges:
+      - from: START
+        to: translate
+      - from: translate
+        to: polish
+      - from: polish
+        to: proofread
+      - from: proofread
+        to: END
+    variables:
+      - name: translation
+        from: translate.output
+      - name: polished
+        from: polish.output

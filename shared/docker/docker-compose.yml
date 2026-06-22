@@ -1,0 +1,112 @@
+version: "3.8"
+
+# Superagent Three-Base Deployment
+# Go (Eino) + Python (AgentScope) + Java (AgentScope Java)
+#
+# Usage:
+#   docker compose -f shared/docker/docker-compose.yml up -d
+#   docker compose -f shared/docker/docker-compose.yml down
+
+services:
+  # ── Infrastructure ──────────────────────────────────────────────────────────
+
+  mysql:
+    image: mysql:8.0
+    container_name: superagent-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-superagent}
+      MYSQL_DATABASE: superagent
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: superagent-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Go Base (Eino) ─────────────────────────────────────────────────────────
+
+  go-base:
+    build:
+      context: ../../backend
+      dockerfile: Dockerfile
+    container_name: superagent-go
+    ports:
+      - "8888:8888"   # HTTP
+      - "50051:50051" # gRPC
+    environment:
+      APP_ENV: dev
+      MYSQL_DSN: root:${MYSQL_ROOT_PASSWORD:-superagent}@tcp(mysql:3306)/superagent?charset=utf8mb4&parseTime=True
+      REDIS_URL: redis://redis:6379
+      MODEL_API_KEY_0: ${MODEL_API_KEY_0:-sk-test}
+      MODEL_BASE_URL_0: ${MODEL_BASE_URL_0:-http://host.docker.internal:8000/v1}
+      AGENTS_DIR: /app/configs/agents
+    volumes:
+      - ../agents:/app/configs/agents:ro
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ── Python Base (AgentScope) ────────────────────────────────────────────────
+
+  python-base:
+    build:
+      context: ../../python
+      dockerfile: Dockerfile
+    container_name: superagent-python
+    ports:
+      - "8889:8889"
+    environment:
+      MODEL_API_KEY_0: ${MODEL_API_KEY_0:-sk-test}
+      MODEL_BASE_URL_0: ${MODEL_BASE_URL_0:-http://host.docker.internal:8000/v1}
+      REDIS_URL: redis://redis:6379
+      AGENTS_DIR: /app/configs/agents
+    volumes:
+      - ../agents:/app/configs/agents:ro
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ── Java Base (AgentScope Java) ─────────────────────────────────────────────
+
+  java-base:
+    build:
+      context: ../../java
+      dockerfile: Dockerfile
+    container_name: superagent-java
+    ports:
+      - "8890:8890"
+    environment:
+      SPRING_DATA_REDIS_URL: redis://redis:6379
+      SUPERAGENT_AGENTS_DIR: /app/configs/agents
+      MODEL_API_KEY_0: ${MODEL_API_KEY_0:-sk-test}
+      MODEL_BASE_URL_0: ${MODEL_BASE_URL_0:-http://host.docker.internal:8000/v1}
+    volumes:
+      - ../agents:/app/configs/agents:ro
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  mysql-data:
+  redis-data:

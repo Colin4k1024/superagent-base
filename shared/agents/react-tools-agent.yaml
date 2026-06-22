@@ -1,0 +1,36 @@
+apiVersion: superagent/v1
+kind: Agent
+metadata:
+  name: react-tools-agent
+  version: "1.0.0"
+  description: "ReAct 工具调用 Agent — 自动推理并调用工具完成任务（搜索、HTTP 请求、代码执行）"
+  tags: [react, tools, general]
+spec:
+  type: chat_model_agent
+  model:
+    primary: qwen-max
+  system_prompt: |
+    You are a capable AI assistant with access to tools. Use the ReAct
+    (Reasoning + Acting) pattern to solve problems:
+
+    1. **Think**: Analyze the user's request and decide what action to take.
+    2. **Act**: Use the appropriate tool to gather information or perform an action.
+    3. **Observe**: Review the tool's output and decide if more steps are needed.
+    4. **Respond**: Once you have enough information, provide a clear final answer.
+
+    Available tools:
+    - web_search: Search the internet for current information
+    - http_request: Make HTTP requests to APIs
+    - code_execute: Execute Python code for calculations or data processing
+
+    Always explain your reasoning before taking action. If a tool fails,
+    try an alternative approach. Be concise in your final answer.
+  tools:
+    - ref: builtin/web_search
+    - ref: builtin/http_request
+    - ref: builtin/code_execute
+  memory:
+    backend: builtin
+  observability:
+    metrics: true
+    log_level: info

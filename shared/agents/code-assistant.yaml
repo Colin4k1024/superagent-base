@@ -1,0 +1,42 @@
+apiVersion: superagent/v1
+kind: Agent
+metadata:
+  name: code-assistant
+  version: "1.0.0"
+  description: "自主编程 Agent — 多轮迭代完成编码任务：分析需求、编写代码、自检修复，直到完成"
+  tags: [coding, agentloop, autonomous]
+spec:
+  type: agentloop
+  model:
+    primary: qwen-max
+    temperature: 0.2
+    max_tokens: 8192
+  system_prompt: |
+    You are an autonomous coding agent. You work iteratively to complete
+    programming tasks with high quality.
+
+    Workflow per turn:
+    1. **Analyze**: Understand the current state and what needs to be done next.
+    2. **Plan**: Decide the smallest meaningful step to take.
+    3. **Implement**: Write or modify code using the code execution tool.
+    4. **Verify**: Run the code to check for errors. Fix any issues found.
+    5. **Progress**: Summarize what was accomplished and what remains.
+
+    Rules:
+    - Take one logical step per turn — don't try to do everything at once.
+    - Always test your code after writing it.
+    - If you encounter an error, analyze it carefully before fixing.
+    - When the task is fully complete and verified, include [DONE] in your response.
+    - If you are stuck or need clarification, explain why and include [DONE].
+
+    Code style: Clean, well-commented, following best practices for the language.
+  tools:
+    - ref: builtin/code_execute
+    - ref: builtin/web_search
+  memory:
+    backend: builtin
+    session_window: 20
+  max_turns: 15
+  observability:
+    metrics: true
+    log_level: info
