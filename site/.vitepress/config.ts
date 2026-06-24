@@ -37,6 +37,13 @@ export default defineConfig({
             { text: '企业知识问答工具', link: '/guide/enterprise-knowledge-qa' },
             { text: '记忆系统', link: '/guide/memory' }
           ]
+        },
+        {
+          text: '多语言 SDK',
+          items: [
+            { text: 'Python SDK', link: '/guide/python-sdk' },
+            { text: 'Java SDK', link: '/guide/java-sdk' }
+          ]
         }
       ],
       '/api/': [
