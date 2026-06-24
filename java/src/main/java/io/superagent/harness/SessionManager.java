@@ -27,6 +27,10 @@ public class SessionManager {
     private final Path sessionsDir;
     private final ObjectMapper objectMapper;
 
+    public SessionManager() {
+        this(Path.of(".agentscope/sessions"));
+    }
+
     public SessionManager(WorkspaceConfig config) {
         this(config.getWorkspaceRoot().resolve("sessions"));
     }

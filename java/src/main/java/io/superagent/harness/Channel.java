@@ -32,6 +32,9 @@ public class Channel {
     private final ConcurrentHashMap<String, Semaphore> sessionLocks = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, Sinks.Many<Event>> sessionSinks = new ConcurrentHashMap<>();
 
+    public Channel() {
+    }
+
     /**
      * Handle a chat request through the channel.
      *

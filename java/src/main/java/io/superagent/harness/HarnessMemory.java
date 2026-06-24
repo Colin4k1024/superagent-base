@@ -36,6 +36,10 @@ public class HarnessMemory {
     private final Path workspacePath;
     private final Workspace workspace;
 
+    public HarnessMemory() {
+        this(Path.of(".agentscope/workspace"), new Workspace());
+    }
+
     public HarnessMemory(WorkspaceConfig config, Workspace workspace) {
         this(config.getWorkspaceRoot(), workspace);
     }

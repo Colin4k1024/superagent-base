@@ -24,6 +24,10 @@ public class SandboxManager {
     private final Map<String, SandboxHandle> activeSandboxes = new ConcurrentHashMap<>();
     private final Path sandboxStateDir;
 
+    public SandboxManager() {
+        this(Path.of(".agentscope/sandboxes"));
+    }
+
     public SandboxManager(WorkspaceConfig config) {
         this(config.getWorkspaceRoot().resolve("sandboxes"));
     }

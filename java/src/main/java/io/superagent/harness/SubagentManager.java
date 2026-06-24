@@ -26,6 +26,10 @@ public class SubagentManager {
     private final Map<String, String> declarations;
     private final ExecutorService executor;
 
+    public SubagentManager() {
+        this(Path.of(".agentscope/subagents"));
+    }
+
     public SubagentManager(WorkspaceConfig config) {
         this(config.getWorkspaceRoot().resolve("subagents"));
     }

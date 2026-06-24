@@ -32,6 +32,10 @@ public class RedisAgentStateStore implements AgentStateStore {
     private final ReactiveRedisTemplate<String, String> redisTemplate;
     private final ObjectMapper objectMapper;
 
+    public RedisAgentStateStore() {
+        this(null);
+    }
+
     public RedisAgentStateStore(ReactiveRedisTemplate<String, String> redisTemplate) {
         this.redisTemplate = redisTemplate;
         this.objectMapper = new ObjectMapper();
