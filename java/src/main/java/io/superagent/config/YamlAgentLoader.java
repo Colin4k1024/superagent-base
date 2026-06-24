@@ -103,16 +103,124 @@ public class YamlAgentLoader {
             (String) modelMap.get("router")
         );
 
-        // Stub: parse tools, memory, interrupt, etc.
+        List<AgentDefinition.ToolRef> tools = parseTools(spec);
+        AgentDefinition.MemoryConfig memory = parseMemory(spec);
+        AgentDefinition.InterruptConfig interrupt = parseInterrupt(spec);
+        List<AgentDefinition.SubAgentRef> subAgents = parseSubAgents(spec);
+        AgentDefinition.WorkflowConfig workflow = parseWorkflow(spec);
+        Map<String, Object> evolution = (Map<String, Object>) spec.getOrDefault("evolution", Map.of());
+        Map<String, Object> observability = (Map<String, Object>) spec.getOrDefault("observability", Map.of());
+
         return new AgentDefinition.Spec(
             type, model, systemPrompt,
-            List.of(),   // tools — TODO: parse
-            null,        // memory — TODO: parse
-            null,        // interrupt — TODO: parse
-            List.of(),   // subAgents — TODO: parse
-            null,        // workflow — TODO: parse
-            Map.of(),    // evolution — TODO: parse
-            Map.of()     // observability — TODO: parse
+            tools, memory, interrupt, subAgents, workflow,
+            evolution, observability
         );
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<AgentDefinition.ToolRef> parseTools(Map<String, Object> spec) {
+        Object toolsRaw = spec.get("tools");
+        if (!(toolsRaw instanceof List<?> toolsList)) return List.of();
+
+        return toolsList.stream()
+            .map(item -> {
+                if (item instanceof Map) {
+                    Map<String, Object> m = (Map<String, Object>) item;
+                    return new AgentDefinition.ToolRef((String) m.getOrDefault("ref", ""));
+                }
+                return new AgentDefinition.ToolRef(item.toString());
+            })
+            .filter(t -> !t.ref().isEmpty())
+            .toList();
+    }
+
+    @SuppressWarnings("unchecked")
+    private AgentDefinition.MemoryConfig parseMemory(Map<String, Object> spec) {
+        Map<String, Object> memMap = (Map<String, Object>) spec.get("memory");
+        if (memMap == null) return null;
+
+        String backend = (String) memMap.getOrDefault("backend", "builtin");
+        Map<String, Object> options = (Map<String, Object>) memMap.getOrDefault("options", Map.of());
+        return new AgentDefinition.MemoryConfig(backend, options);
+    }
+
+    @SuppressWarnings("unchecked")
+    private AgentDefinition.InterruptConfig parseInterrupt(Map<String, Object> spec) {
+        Map<String, Object> intMap = (Map<String, Object>) spec.get("interrupt");
+        if (intMap == null) return null;
+
+        boolean enabled = Boolean.TRUE.equals(intMap.get("enabled"));
+        String checkpointBackend = (String) intMap.getOrDefault("checkpoint_backend", "redis");
+        Object timeoutRaw = intMap.get("timeout_seconds");
+        int timeoutSeconds = timeoutRaw instanceof Number n ? n.intValue() : 300;
+        return new AgentDefinition.InterruptConfig(enabled, checkpointBackend, timeoutSeconds);
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<AgentDefinition.SubAgentRef> parseSubAgents(Map<String, Object> spec) {
+        Object subRaw = spec.get("sub_agents");
+        if (subRaw == null) subRaw = spec.get("subAgents");
+        if (!(subRaw instanceof List<?> subList)) return List.of();
+
+        return subList.stream()
+            .map(item -> {
+                if (item instanceof Map) {
+                    Map<String, Object> m = (Map<String, Object>) item;
+                    return new AgentDefinition.SubAgentRef((String) m.getOrDefault("ref", ""));
+                }
+                return new AgentDefinition.SubAgentRef(item.toString());
+            })
+            .filter(s -> !s.ref().isEmpty())
+            .toList();
+    }
+
+    @SuppressWarnings("unchecked")
+    private AgentDefinition.WorkflowConfig parseWorkflow(Map<String, Object> spec) {
+        Map<String, Object> wfMap = (Map<String, Object>) spec.get("workflow");
+        if (wfMap == null) return null;
+
+        List<AgentDefinition.WorkflowNode> nodes = List.of();
+        Object nodesRaw = wfMap.get("nodes");
+        if (nodesRaw instanceof List<?> nodesList) {
+            nodes = nodesList.stream()
+                .map(item -> {
+                    if (item instanceof Map) {
+                        Map<String, Object> m = (Map<String, Object>) item;
+                        Map<String, Object> cfg = m.get("config") instanceof Map
+                            ? (Map<String, Object>) m.get("config") : Map.of();
+                        return new AgentDefinition.WorkflowNode(
+                            (String) m.get("id"),
+                            (String) m.get("type"),
+                            (String) m.get("agent_ref"),
+                            cfg
+                        );
+                    }
+                    return null;
+                })
+                .filter(java.util.Objects::nonNull)
+                .toList();
+        }
+
+        List<AgentDefinition.WorkflowEdge> edges = List.of();
+        Object edgesRaw = wfMap.get("edges");
+        if (edgesRaw instanceof List<?> edgesList) {
+            edges = edgesList.stream()
+                .map(item -> {
+                    if (item instanceof Map) {
+                        Map<String, Object> m = (Map<String, Object>) item;
+                        return new AgentDefinition.WorkflowEdge(
+                            (String) m.get("from"),
+                            (String) m.get("to"),
+                            (String) m.get("condition")
+                        );
+                    }
+                    return null;
+                })
+                .filter(java.util.Objects::nonNull)
+                .toList();
+        }
+
+        return new AgentDefinition.WorkflowConfig(nodes, edges);
     }
 }

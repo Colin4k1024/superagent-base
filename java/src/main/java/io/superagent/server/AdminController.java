@@ -1,31 +1,39 @@
 package io.superagent.server;
 
+import io.superagent.config.AgentBuilderFactory;
+import io.superagent.config.AgentDefinition;
+import io.superagent.config.YamlAgentLoader;
 import io.superagent.mcp.MCPRegistry;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.core.publisher.Sinks;
 
+import java.time.Instant;
+import java.util.List;
 import java.util.Map;
 
-/**
- * Admin endpoints for system management.
- *
- * <p>Provides agent reload, status, log streaming, and CRUD operations
- * for agents, users, MCP servers, and webhooks.</p>
- */
 @RestController
 @RequestMapping("/api/v2/admin")
 public class AdminController {
 
-    private final MCPRegistry mcpRegistry;
+    private static final Logger log = LoggerFactory.getLogger(AdminController.class);
 
-    public AdminController(MCPRegistry mcpRegistry) {
+    private final MCPRegistry mcpRegistry;
+    private final YamlAgentLoader agentLoader;
+    private final AgentBuilderFactory agentFactory;
+    private final Sinks.Many<Map<String, Object>> logSink = Sinks.many().multicast().onBackpressureBuffer();
+
+    public AdminController(MCPRegistry mcpRegistry, YamlAgentLoader agentLoader,
+                           AgentBuilderFactory agentFactory) {
         this.mcpRegistry = mcpRegistry;
+        this.agentLoader = agentLoader;
+        this.agentFactory = agentFactory;
     }
 
-    /**
-     * Get system status.
-     */
     @GetMapping("/status")
     public Mono<Map<String, Object>> status() {
         Runtime rt = Runtime.getRuntime();
@@ -33,50 +41,77 @@ public class AdminController {
             "status", "running",
             "version", "0.1.0-java",
             "runtime", "Spring Boot 3 + WebFlux",
+            "agents_loaded", agentFactory.getBuiltAgents().size(),
+            "mcp_servers", mcpRegistry.listServers().size(),
             "memory_used_mb", (rt.totalMemory() - rt.freeMemory()) / (1024 * 1024),
             "memory_max_mb", rt.maxMemory() / (1024 * 1024),
             "processors", rt.availableProcessors()
         ));
     }
 
-    /**
-     * Trigger agent hot-reload.
-     */
     @PostMapping("/reload")
     public Mono<Map<String, Object>> reload() {
-        // TODO: Trigger YamlAgentLoader rescan + AgentBuilderFactory rebuild
-        return Mono.just(Map.of(
-            "status", "stub",
-            "message", "Agent reload not yet implemented"
-        ));
+        try {
+            List<AgentDefinition> definitions = agentLoader.loadAll();
+            int count = 0;
+            for (AgentDefinition def : definitions) {
+                agentFactory.build(def);
+                count++;
+            }
+            log.info("Agent reload completed: {} agents rebuilt", count);
+            logSink.tryEmitNext(Map.of(
+                "level", "INFO",
+                "timestamp", Instant.now().toString(),
+                "message", "Agent reload completed: " + count + " agents rebuilt"
+            ));
+            return Mono.just(Map.of(
+                "status", "success",
+                "agents_reloaded", count,
+                "total_agents", agentFactory.getBuiltAgents().size()
+            ));
+        } catch (Exception e) {
+            log.error("Agent reload failed: {}", e.getMessage());
+            return Mono.just(Map.of(
+                "status", "error",
+                "message", e.getMessage()
+            ));
+        }
     }
 
-    /**
-     * List all agents (admin view with full config).
-     */
     @GetMapping("/agents")
     public Mono<Map<String, Object>> listAgents() {
+        var agents = agentFactory.getBuiltAgents();
+        List<Map<String, Object>> agentList = agents.values().stream()
+            .map(a -> Map.<String, Object>of(
+                "name", a.getName(),
+                "type", a.getAgentType(),
+                "description", a.getDescription()
+            ))
+            .toList();
         return Mono.just(Map.of(
-            "agents", java.util.List.of(),
-            "status", "stub"
+            "agents", agentList,
+            "count", agentList.size()
         ));
     }
 
-    /**
-     * Get a specific agent definition.
-     */
     @GetMapping("/agents/{name}")
     public Mono<Map<String, Object>> getAgent(@PathVariable String name) {
+        var agent = agentFactory.getBuiltAgents().get(name);
+        if (agent == null) {
+            return Mono.just(Map.of(
+                "name", name,
+                "status", "not_found",
+                "message", "Agent not found: " + name
+            ));
+        }
         return Mono.just(Map.of(
-            "name", name,
-            "status", "stub",
-            "message", "Agent detail not yet implemented"
+            "name", agent.getName(),
+            "type", agent.getAgentType(),
+            "description", agent.getDescription(),
+            "tools", agent.getTools()
         ));
     }
 
-    /**
-     * Create or update an agent definition.
-     */
     @PostMapping("/agents")
     public Mono<Map<String, Object>> createAgent(@RequestBody Map<String, Object> definition) {
         return Mono.just(Map.of(
@@ -85,9 +120,6 @@ public class AdminController {
         ));
     }
 
-    /**
-     * Delete an agent definition.
-     */
     @DeleteMapping("/agents/{name}")
     public Mono<Map<String, Object>> deleteAgent(@PathVariable String name) {
         return Mono.just(Map.of(
@@ -97,9 +129,6 @@ public class AdminController {
         ));
     }
 
-    /**
-     * List MCP servers.
-     */
     @GetMapping("/mcp/servers")
     public Mono<Map<String, Object>> listMcpServers() {
         var servers = mcpRegistry.listServers();
@@ -110,14 +139,17 @@ public class AdminController {
         ));
     }
 
-    /**
-     * SSE log stream endpoint.
-     */
-    @GetMapping(value = "/logs", produces = org.springframework.http.MediaType.TEXT_EVENT_STREAM_VALUE)
+    @GetMapping(value = "/logs", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<Map<String, Object>> logStream() {
-        // TODO: Wire to log appender for real-time log streaming
-        return Flux.just(
-            Map.<String, Object>of("level", "INFO", "message", "Log streaming not yet implemented")
-        );
+        return logSink.asFlux()
+            .startWith(Map.<String, Object>of(
+                "level", "INFO",
+                "timestamp", Instant.now().toString(),
+                "message", "Connected to log stream"
+            ));
+    }
+
+    public Sinks.Many<Map<String, Object>> getLogSink() {
+        return logSink;
     }
 }

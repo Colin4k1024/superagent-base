@@ -10,6 +10,7 @@ import io.superagent.agents.WorkflowAgent;
 import io.superagent.models.ModelRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
@@ -17,22 +18,23 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-/**
- * Factory that builds {@link BaseAgent} instances from {@link AgentDefinition} records.
- *
- * <p>Handles two-pass build: leaf agents first, then orchestration agents
- * that reference sub-agents by name.</p>
- */
 @Component
 public class AgentBuilderFactory {
 
     private static final Logger log = LoggerFactory.getLogger(AgentBuilderFactory.class);
 
     private final ModelRegistry modelRegistry;
+    private final int defaultMaxSteps;
     private final ConcurrentHashMap<String, BaseAgent> builtAgents = new ConcurrentHashMap<>();
 
-    public AgentBuilderFactory(ModelRegistry modelRegistry) {
+    public AgentBuilderFactory(ModelRegistry modelRegistry,
+                               @Value("${superagent.agent.max-steps:10}") int defaultMaxSteps) {
         this.modelRegistry = modelRegistry;
+        this.defaultMaxSteps = defaultMaxSteps;
+    }
+
+    public AgentBuilderFactory(ModelRegistry modelRegistry) {
+        this(modelRegistry, 10);
     }
 
     /**
@@ -65,12 +67,14 @@ public class AgentBuilderFactory {
             .map(AgentDefinition.ToolRef::ref)
             .toList();
 
+        int maxSteps = defaultMaxSteps;
+
         ChatModelAgent agent = new ChatModelAgent(
             def.metadata().name(),
             def.spec().systemPrompt(),
             modelName,
             tools,
-            10,  // maxSteps — TODO: from config
+            maxSteps,
             def.spec().systemPrompt()
         );
         builtAgents.put(agent.getName(), agent);
@@ -114,8 +118,18 @@ public class AgentBuilderFactory {
     }
 
     private WorkflowAgent buildWorkflowAgent(AgentDefinition def) {
-        List<WorkflowAgent.WorkflowNode> nodes = List.of();  // TODO: parse from def
-        List<WorkflowAgent.WorkflowEdge> edges = List.of();  // TODO: parse from def
+        List<WorkflowAgent.WorkflowNode> nodes = List.of();
+        List<WorkflowAgent.WorkflowEdge> edges = List.of();
+
+        if (def.spec().workflow() != null) {
+            nodes = def.spec().workflow().nodes().stream()
+                .map(n -> new WorkflowAgent.WorkflowNode(n.id(), n.type(), n.agentRef(), n.config()))
+                .toList();
+            edges = def.spec().workflow().edges().stream()
+                .map(e -> new WorkflowAgent.WorkflowEdge(e.from(), e.to(), e.condition()))
+                .toList();
+        }
+
         WorkflowAgent agent = new WorkflowAgent(
             def.metadata().name(),
             def.spec().systemPrompt(),
