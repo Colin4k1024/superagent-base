@@ -37,6 +37,13 @@ export default defineConfig({
             { text: '海尔知识问答工具', link: '/guide/haier-knowledge-qa' },
             { text: '记忆系统', link: '/guide/memory' }
           ]
+        },
+        {
+          text: '多语言 SDK',
+          items: [
+            { text: 'Python SDK', link: '/guide/python-sdk' },
+            { text: 'Java SDK', link: '/guide/java-sdk' }
+          ]
         }
       ],
       '/api/': [
