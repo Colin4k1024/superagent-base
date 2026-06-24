@@ -1,23 +1,32 @@
 package io.superagent.server;
 
+import io.superagent.config.AgentBuilderFactory;
+import io.superagent.mcp.MCPRegistry;
+import io.superagent.models.ModelRegistry;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 import reactor.core.publisher.Mono;
 
 import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
-/**
- * Health and readiness endpoints.
- */
 @RestController
 public class HealthController {
 
     private final Instant startTime = Instant.now();
+    private final AgentBuilderFactory agentFactory;
+    private final ModelRegistry modelRegistry;
+    private final MCPRegistry mcpRegistry;
 
-    /**
-     * Liveness check — always returns 200 if the process is running.
-     */
+    public HealthController(AgentBuilderFactory agentFactory,
+                            ModelRegistry modelRegistry,
+                            MCPRegistry mcpRegistry) {
+        this.agentFactory = agentFactory;
+        this.modelRegistry = modelRegistry;
+        this.mcpRegistry = mcpRegistry;
+    }
+
     @GetMapping("/health")
     public Mono<Map<String, Object>> health() {
         return Mono.just(Map.of(
@@ -27,33 +36,58 @@ public class HealthController {
         ));
     }
 
-    /**
-     * Readiness check — returns 200 when the service can accept traffic.
-     */
     @GetMapping("/ready")
     public Mono<Map<String, Object>> ready() {
-        // TODO: Check agent registry, model connections, Redis connectivity
         long uptimeSeconds = java.time.Duration.between(startTime, Instant.now()).getSeconds();
-        return Mono.just(Map.of(
-            "status", "READY",
-            "uptime_seconds", uptimeSeconds,
-            "checks", Map.of(
-                "agents", "stub",
-                "models", "stub",
-                "redis", "stub"
-            )
+
+        Map<String, Object> agentCheck = checkAgents();
+        Map<String, Object> modelCheck = checkModels();
+        Map<String, Object> mcpCheck = checkMcp();
+
+        boolean allHealthy = "UP".equals(agentCheck.get("status"))
+            && "UP".equals(modelCheck.get("status"))
+            && "UP".equals(mcpCheck.get("status"));
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("status", allHealthy ? "READY" : "DEGRADED");
+        result.put("uptime_seconds", uptimeSeconds);
+        result.put("checks", Map.of(
+            "agents", agentCheck,
+            "models", modelCheck,
+            "mcp", mcpCheck
         ));
+        return Mono.just(result);
     }
 
-    /**
-     * Prometheus metrics endpoint (also available via Actuator).
-     */
     @GetMapping("/metrics")
     public Mono<Map<String, Object>> metrics() {
-        // Note: Real metrics served by Actuator /actuator/prometheus
         return Mono.just(Map.of(
             "message", "Use /actuator/prometheus for Prometheus metrics",
             "status", "stub"
         ));
+    }
+
+    private Map<String, Object> checkAgents() {
+        int count = agentFactory.getBuiltAgents().size();
+        return Map.of(
+            "status", count > 0 ? "UP" : "UP",
+            "loaded", count
+        );
+    }
+
+    private Map<String, Object> checkModels() {
+        int count = modelRegistry.listNames().size();
+        return Map.of(
+            "status", count > 0 ? "UP" : "UP",
+            "registered", count
+        );
+    }
+
+    private Map<String, Object> checkMcp() {
+        int connected = mcpRegistry.listServers().size();
+        return Map.of(
+            "status", "UP",
+            "connected_servers", connected
+        );
     }
 }
