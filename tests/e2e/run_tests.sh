@@ -2,17 +2,18 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cd "$SCRIPT_DIR"
+cd "$SCRIPT_DIR/../.."
 
 # Colors
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
 NC='\033[0m'
 
-echo -e "${GREEN}========================================${NC}"
-echo -e "${GREEN}  Superagent-Base E2E Test Runner${NC}"
-echo -e "${GREEN}========================================${NC}"
+echo -e "${BLUE}╔════════════════════════════════════════════════════════════╗${NC}"
+echo -e "${BLUE}║   Superagent Three-Base E2E Parity Verification            ║${NC}"
+echo -e "${BLUE}╚════════════════════════════════════════════════════════════╝${NC}"
 echo ""
 
 # Check Python
@@ -21,103 +22,69 @@ if ! command -v python3 &>/dev/null; then
     exit 1
 fi
 
-# Install dependencies
-echo -e "${YELLOW}Installing dependencies...${NC}"
-pip3 install -r requirements.txt -q 2>/dev/null || pip install -r requirements.txt -q
+# Install httpx if needed
+pip3 install httpx -q 2>/dev/null || pip install httpx -q
 
-# Check services
-echo -e "${YELLOW}Checking services...${NC}"
+# Check all three bases
+echo -e "${YELLOW}Checking bases...${NC}"
 
-LLM_URL="${E2E_LLM_URL:-http://localhost:8000}"
-BACKEND_URL="${E2E_BASE_URL:-http://localhost:8888}"
+GO_OK=false
+PY_OK=false
+JAVA_OK=false
 
-if curl -s "$LLM_URL/v1/models" -H "Authorization: Bearer ${E2E_LLM_API_KEY:-123456}" >/dev/null 2>&1; then
-    echo -e "  LLM ($LLM_URL): ${GREEN}OK${NC}"
+if curl -s -o /dev/null -w "%{http_code}" "http://localhost:8888/health" 2>/dev/null | grep -q "200"; then
+    echo -e "  Go (8888): ${GREEN}OK${NC}"
+    GO_OK=true
 else
-    echo -e "  LLM ($LLM_URL): ${RED}NOT REACHABLE${NC}"
-    echo -e "${RED}Please start the LLM service first.${NC}"
+    echo -e "  Go (8888): ${RED}NOT RUNNING${NC}"
+fi
+
+if curl -s -o /dev/null -w "%{http_code}" "http://localhost:8889/health" 2>/dev/null | grep -q "200"; then
+    echo -e "  Python (8889): ${GREEN}OK${NC}"
+    PY_OK=true
+else
+    echo -e "  Python (8889): ${RED}NOT RUNNING${NC}"
+fi
+
+if curl -s -o /dev/null -w "%{http_code}" "http://localhost:8890/health" 2>/dev/null | grep -q "200"; then
+    echo -e "  Java (8890): ${GREEN}OK${NC}"
+    JAVA_OK=true
+else
+    echo -e "  Java (8890): ${RED}NOT RUNNING${NC}"
+fi
+
+if [ "$GO_OK" != "true" ] || [ "$PY_OK" != "true" ] || [ "$JAVA_OK" != "true" ]; then
+    echo ""
+    echo -e "${RED}Please start all three bases before running E2E tests.${NC}"
+    echo ""
+    echo "  Go:     cd backend && make dev-server"
+    echo "  Python: cd python && uvicorn superagent.server:app --port 8889"
+    echo "  Java:   cd java && mvn spring-boot:run"
     exit 1
 fi
 
-if curl -s "$BACKEND_URL/api/v1/agents" >/dev/null 2>&1; then
-    echo -e "  Backend ($BACKEND_URL): ${GREEN}OK${NC}"
-else
-    echo -e "  Backend ($BACKEND_URL): ${YELLOW}NOT REACHABLE${NC}"
-    echo -e "${YELLOW}Attempting to start backend...${NC}"
-
-    # Try to start backend
-    BACKEND_DIR="$(cd "$SCRIPT_DIR/../../backend" && pwd)"
-    if [ -f "$BACKEND_DIR/main.go" ]; then
-        echo -e "  Starting backend from $BACKEND_DIR..."
-        cd "$BACKEND_DIR"
-        source .env 2>/dev/null || true
-        go run . &
-        BACKEND_PID=$!
-        cd "$SCRIPT_DIR"
-
-        echo -e "  Waiting for backend to start..."
-        for i in $(seq 1 30); do
-            if curl -s "$BACKEND_URL/api/v1/agents" >/dev/null 2>&1; then
-                echo -e "  Backend started: ${GREEN}OK${NC} (PID: $BACKEND_PID)"
-                break
-            fi
-            sleep 1
-        done
-
-        if ! curl -s "$BACKEND_URL/api/v1/agents" >/dev/null 2>&1; then
-            echo -e "  ${RED}Backend failed to start${NC}"
-            kill $BACKEND_PID 2>/dev/null || true
-            exit 1
-        fi
-    else
-        echo -e "${RED}Cannot find backend. Please start it manually.${NC}"
-        exit 1
-    fi
-fi
-
 echo ""
-echo -e "${GREEN}Running E2E tests...${NC}"
+echo -e "${GREEN}Running E2E parity tests...${NC}"
 echo ""
 
-# Create reports directory
-mkdir -p reports/screenshots
+# Run the Python test suite
+python3 tests/e2e/test_parity.py
 
-# Run pytest with HTML report
-python3 -m pytest \
-    --html=reports/report.html \
-    --self-contained-html \
-    --tb=short \
-    --timeout=120 \
-    -v \
-    "$@" 2>&1 | tee reports/test_output.log
-
-EXIT_CODE=${PIPESTATUS[0]}
-
-# Generate markdown summary
-python3 generate_report.py
+EXIT_CODE=$?
 
 echo ""
 if [ $EXIT_CODE -eq 0 ]; then
-    echo -e "${GREEN}========================================${NC}"
-    echo -e "${GREEN}  ALL TESTS PASSED${NC}"
-    echo -e "${GREEN}========================================${NC}"
+    echo -e "${GREEN}╔════════════════════════════════════════════════════════════╗${NC}"
+    echo -e "${GREEN}║   ALL TESTS PASSED — Three bases have full parity         ║${NC}"
+    echo -e "${GREEN}╚════════════════════════════════════════════════════════════╝${NC}"
 else
-    echo -e "${RED}========================================${NC}"
-    echo -e "${RED}  SOME TESTS FAILED (exit: $EXIT_CODE)${NC}"
-    echo -e "${RED}========================================${NC}"
+    echo -e "${RED}╔════════════════════════════════════════════════════════════╗${NC}"
+    echo -e "${RED}║   SOME TESTS FAILED — Parity issues detected              ║${NC}"
+    echo -e "${RED}╚════════════════════════════════════════════════════════════╝${NC}"
 fi
 
 echo ""
-echo -e "Reports:"
-echo -e "  HTML: ${SCRIPT_DIR}/reports/report.html"
-echo -e "  Markdown: ${SCRIPT_DIR}/reports/report.md"
-echo -e "  Screenshots: ${SCRIPT_DIR}/reports/screenshots/"
+echo -e "Report: ${BLUE}tests/e2e/E2E_PARITY_REPORT.md${NC}"
 echo ""
-
-# Kill backend if we started it
-if [ -n "${BACKEND_PID:-}" ]; then
-    echo -e "${YELLOW}Stopping backend (PID: $BACKEND_PID)...${NC}"
-    kill $BACKEND_PID 2>/dev/null || true
-fi
 
 exit $EXIT_CODE

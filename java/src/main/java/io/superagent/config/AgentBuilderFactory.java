@@ -27,6 +27,10 @@ public class AgentBuilderFactory {
     private final int defaultMaxSteps;
     private final ConcurrentHashMap<String, BaseAgent> builtAgents = new ConcurrentHashMap<>();
 
+    public AgentBuilderFactory() {
+        this(new ModelRegistry(), 10);
+    }
+
     public AgentBuilderFactory(ModelRegistry modelRegistry,
                                @Value("${superagent.agent.max-steps:10}") int defaultMaxSteps) {
         this.modelRegistry = modelRegistry;

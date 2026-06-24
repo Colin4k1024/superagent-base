@@ -28,6 +28,10 @@ public class ToolResultEviction {
     private final int threshold;
     private final Path evictionDir;
 
+    public ToolResultEviction() {
+        this(Path.of(".agentscope/evictions"), DEFAULT_THRESHOLD);
+    }
+
     public ToolResultEviction(WorkspaceConfig config) {
         this(config.getWorkspaceRoot().resolve("evictions"), DEFAULT_THRESHOLD);
     }

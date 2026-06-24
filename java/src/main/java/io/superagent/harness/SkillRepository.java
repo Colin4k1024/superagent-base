@@ -32,6 +32,10 @@ public class SkillRepository {
     private final Path workspacePath;
     private final Map<String, SkillDefinition> skills;
 
+    public SkillRepository() {
+        this(Path.of(".agentscope/workspace"));
+    }
+
     public SkillRepository(WorkspaceConfig config) {
         this(config.getWorkspaceRoot());
     }

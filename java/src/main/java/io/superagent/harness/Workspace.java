@@ -42,6 +42,10 @@ public class Workspace {
     private Map<String, String> skills;
     private Map<String, String> subagents;
 
+    public Workspace() {
+        this(Path.of(".agentscope/workspace"));
+    }
+
     public Workspace(WorkspaceConfig config) {
         this(config.getWorkspaceRoot());
     }
