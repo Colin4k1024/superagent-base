@@ -41,6 +41,7 @@ export default defineConfig({
         {
           text: '多语言 SDK',
           items: [
+            { text: 'Go SDK', link: '/guide/go-sdk' },
             { text: 'Python SDK', link: '/guide/python-sdk' },
             { text: 'Java SDK', link: '/guide/java-sdk' }
           ]
