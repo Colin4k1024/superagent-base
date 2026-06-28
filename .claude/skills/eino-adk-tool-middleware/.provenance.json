@@ -1,0 +1,7 @@
+{
+  "source": "claude-code-session",
+  "created_at": "2026-06-09T13:55:00+08:00",
+  "confidence": 0.92,
+  "author": "learn-eval-command",
+  "context": "Extracted during tool sandbox mode implementation. Pattern verified by successful build and 19 passing tests."
+}

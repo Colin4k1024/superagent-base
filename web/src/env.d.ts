@@ -10,7 +10,7 @@ interface ImportMeta {
   readonly env: ImportMetaEnv
 }
 
-declare module '@enterprise/iam' {
+declare module '@company/iam' {
   interface UserCenterConfig {
     clientId: string
     ssoUrl: string
