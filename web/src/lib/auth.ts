@@ -1,7 +1,7 @@
-import { login as iamLogin } from '@haier/iam'
+import { login as iamLogin } from '@company/iam'
 
-const TOKEN_KEY = 'haier-user-center-access-token'
-const USER_INFO_KEY = 'haier-user-center-user-info'
+const TOKEN_KEY = 'app-access-token'
+const USER_INFO_KEY = 'app-user-info'
 
 export function getToken(): string | null {
   return localStorage.getItem(TOKEN_KEY) || null

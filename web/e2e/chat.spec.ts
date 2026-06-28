@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test'
 
 function setupAuth(page: any) {
   return page.addInitScript(() => {
-    localStorage.setItem('haier-user-center-access-token', 'test-iam-token')
+    localStorage.setItem('app-access-token', 'test-iam-token')
     localStorage.setItem('language', 'en')
   })
 }

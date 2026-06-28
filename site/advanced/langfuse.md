@@ -39,7 +39,7 @@ LANGFUSE_SECRET_KEY=sk-lf-xxxxxxxx
 
 # Langfuse 服务地址
 # 内部测试环境：http://10.250.5.144:3000
-# 内部生产环境：https://langfuse.haier.net
+# 内部生产环境：https://langfuse.example.com
 LANGFUSE_HOST=http://10.250.5.144:3000
 
 # 可选配置
@@ -59,7 +59,7 @@ LANGFUSE_HOST=http://10.250.5.144:3000
 | 环境 | LANGFUSE_HOST | 说明 |
 |------|---------------|------|
 | 测试环境 | `http://10.250.5.144:3000` | 内网自建实例 |
-| 生产环境 | `https://langfuse.haier.net` | 生产域名 |
+| 生产环境 | `https://langfuse.example.com` | 生产域名 |
 
 测试环境配置示例：
 

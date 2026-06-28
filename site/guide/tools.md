@@ -22,11 +22,8 @@ spec:
 | `http_request` | HTTP 请求 | url, method, headers, body |
 | `code_execute` | 代码执行 | language, code |
 | `hiagent_rag` | HiAgent 知识库问答 | query, user_id |
-| `haier_knowledge_qa` | 海尔企业知识问答（RAG） | query, top_k, model 等 |
 
 ::: tip 企业知识问答
-`haier_knowledge_qa` 工具对接海尔内部 RAG 知识库，支持多知识库类型、多模型切换和多轮对话。
-详见 [海尔知识问答工具](/guide/haier-knowledge-qa)。
 :::
 
 ## 工具中间件

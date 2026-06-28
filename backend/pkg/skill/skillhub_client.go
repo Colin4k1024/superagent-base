@@ -49,7 +49,7 @@ type SkillHubClientConfig struct {
 }
 
 // SkillHubClient implements HubClient for the internal SkillHub service
-// accessed through haier-gateway.
+// accessed through internal-gateway.
 type SkillHubClient struct {
 	baseURL        string
 	accessToken    string

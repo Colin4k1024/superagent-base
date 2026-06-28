@@ -5,7 +5,7 @@ test.describe('Agents Page', () => {
     // Set auth state
     await page.addInitScript(() => {
       localStorage.setItem('language', 'en')
-      localStorage.setItem('haier-user-center-access-token', 'test-iam-token')
+      localStorage.setItem('app-access-token', 'test-iam-token')
     })
     // Mock admin API to prevent 403 redirects
     await page.route('**/api/v1/admin/agents', (route) => {

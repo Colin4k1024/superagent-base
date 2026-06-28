@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { NavLink } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { logout } from '@haier/iam'
+import { logout } from '@company/iam'
 import { clearAuth } from '@/lib/auth'
 
 export default function Sidebar() {

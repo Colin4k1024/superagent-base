@@ -1,9 +1,9 @@
-image: harbor-test.haier.net/paas/node:20-alpine
+image: node:20-alpine
 
 pages:
   stage: deploy
   script:
-    - npm config set registry https://npm.haier.net
+    - npm config set registry https://registry.npmjs.org
     - cd site
     - npm ci
     - npm run build

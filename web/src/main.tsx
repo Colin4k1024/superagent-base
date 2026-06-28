@@ -1,4 +1,4 @@
-import { configUserCenter } from '@haier/iam'
+import { configUserCenter } from '@company/iam'
 import './i18n'
 import React from 'react'
 import ReactDOM from 'react-dom/client'

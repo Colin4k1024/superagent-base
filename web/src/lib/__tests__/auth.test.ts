@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 
-vi.mock('@haier/iam', () => ({
+vi.mock('@company/iam', () => ({
   login: vi.fn().mockResolvedValue(undefined),
   logout: vi.fn().mockResolvedValue(undefined),
   configUserCenter: vi.fn(),
@@ -39,9 +39,9 @@ describe('auth', () => {
       expect(getToken()).toBeNull()
     })
 
-    it('returns token from haier-user-center-access-token key', () => {
+    it('returns token from app-access-token key', () => {
       localStorageMock.getItem.mockImplementation((key: string) =>
-        key === 'haier-user-center-access-token' ? 'iam-token-123' : null,
+        key === 'app-access-token' ? 'iam-token-123' : null,
       )
       expect(getToken()).toBe('iam-token-123')
     })
@@ -53,22 +53,22 @@ describe('auth', () => {
       expect(getAccount()).toBeNull()
     })
 
-    it('returns parsed account object from haier-user-center-user-info key', () => {
+    it('returns parsed account object from app-user-info key', () => {
       localStorageMock.getItem.mockImplementation((key: string) =>
-        key === 'haier-user-center-user-info'
-          ? JSON.stringify({ name: 'test', email: 'test@haier.com' })
+        key === 'app-user-info'
+          ? JSON.stringify({ name: 'test', email: 'test@company.com' })
           : null,
       )
       const account = getAccount()
-      expect(account).toEqual({ name: 'test', email: 'test@haier.com' })
+      expect(account).toEqual({ name: 'test', email: 'test@company.com' })
     })
   })
 
   describe('clearAuth', () => {
     it('removes token and user info keys', () => {
       clearAuth()
-      expect(localStorageMock.removeItem).toHaveBeenCalledWith('haier-user-center-access-token')
-      expect(localStorageMock.removeItem).toHaveBeenCalledWith('haier-user-center-user-info')
+      expect(localStorageMock.removeItem).toHaveBeenCalledWith('app-access-token')
+      expect(localStorageMock.removeItem).toHaveBeenCalledWith('app-user-info')
     })
   })
 })

@@ -98,7 +98,6 @@ features:
     linkText: 查看认证
   - icon: "\U0001F91D"
     title: 集团小海对接
-    details: 兼容集团IT智能体输出规范 v1.0.0，作为二级智能体接入小海，支持流式/非流式双模式，execution_steps + answer + stream_end 标准事件
     link: /api/http-sse
     linkText: 查看接口
   - icon: "\U0001F4AC"
@@ -415,9 +414,7 @@ curl -N -X POST http://localhost:8888/api/v1/chat/stream \
   -d '{"agent_id":"research-agent","session_id":"s1","message":"hello"}'
 ```
 
-## 集团小海对接 API（集团IT智能体输出规范 v1.0.0）
 
-Superagent Base 可作为**二级智能体**接入海尔小海一级智能体平台，对外提供符合《集团IT智能体输出规范 v1.0.0》的标准接口。对接方式为**普通 API（Http 接口调用）**，支持流式和非流式两种模式。
 
 ### 接口总览
 

@@ -13,7 +13,7 @@ export default defineConfig({
       { text: '指南', link: '/guide/getting-started' },
       { text: 'API', link: '/api/http-sse' },
       { text: '高级', link: '/advanced/a2ui-protocol' },
-      { text: 'GitLab', link: 'https://hgit.haier.net/s04795/superagent-base' }
+      { text: 'GitLab', link: 'https://gitlab.example.com/group/superagent-base' }
     ],
 
     sidebar: {
@@ -34,7 +34,6 @@ export default defineConfig({
             { text: 'YAML 规范', link: '/guide/agent-yaml-spec' },
             { text: '模型配置', link: '/guide/model-config' },
             { text: '工具使用', link: '/guide/tools' },
-            { text: '海尔知识问答工具', link: '/guide/haier-knowledge-qa' },
             { text: '记忆系统', link: '/guide/memory' }
           ]
         },
@@ -78,7 +77,7 @@ export default defineConfig({
     },
 
     socialLinks: [
-      { icon: 'gitlab', link: 'https://hgit.haier.net/s04795/superagent-base' }
+      { icon: 'gitlab', link: 'https://gitlab.example.com/group/superagent-base' }
     ],
 
     footer: {

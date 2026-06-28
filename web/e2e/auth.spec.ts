@@ -3,16 +3,16 @@ import { test, expect } from '@playwright/test'
 test.describe('Authentication', () => {
   test('shows login page when no stored token', async ({ page }) => {
     await page.addInitScript(() => {
-      localStorage.removeItem('haier-user-center-access-token')
+      localStorage.removeItem('app-access-token')
     })
     await page.goto('/agents')
     // Login page should render with redirecting message
-    await expect(page.locator('text=Redirecting to Haier Account Center').or(page.locator('text=正在跳转海尔账号中心登录'))).toBeVisible({ timeout: 10_000 })
+    await expect(page.locator('text=Redirecting to Company Account Center').or(page.locator('text=正在跳转企业账号中心登录'))).toBeVisible({ timeout: 10_000 })
   })
 
   test('stored token bypasses login', async ({ page }) => {
     await page.addInitScript(() => {
-      localStorage.setItem('haier-user-center-access-token', 'test-iam-token')
+      localStorage.setItem('app-access-token', 'test-iam-token')
       localStorage.setItem('language', 'en')
     })
     // Mock API to prevent auth errors

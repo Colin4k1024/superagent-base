@@ -17,7 +17,7 @@
   },
   "login": {
     "title": "Superagent",
-    "redirecting": "正在跳转海尔账号中心登录...",
+    "redirecting": "正在跳转企业账号中心登录...",
     "retry": "重新登录",
     "ssoFailed": "SSO 登录失败，请确认已配置正确的应用信息"
   },
