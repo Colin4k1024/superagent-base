@@ -201,38 +201,6 @@ curl -X POST http://localhost:8888/api/v2/chat/stream \
   --no-buffer
 ```
 
-### 集团小海对接 API（集团IT智能体输出规范 v1.0.0）
-
-| 方法 | 路径 | 说明 |
-|------|------|------|
-| `POST` | `/api/v1/xiaohai/stream/:agent_id` | 流式 SSE，输出符合集团规范（execution_steps / answer / stream_end） |
-| `POST` | `/api/v1/xiaohai/chat/:agent_id` | 非流式 JSON，返回 `{code:0, data:{type,data,version}}` |
-
-**Header**: `Api-Key`（鉴权）、`Access-Token`（用户 token）
-
-**Body 示例**:
-
-```json
-{
-  "userQuery": "帮我查一下今天的日程",
-  "userToken": "user-token",
-  "terminalType": "PC",
-  "sessionId": "thread-123",
-  "hisMsg": [{"human": "你好", "ai": "有什么可以帮您？"}],
-  "fileList": [],
-  "ext_param": {}
-}
-```
-
-**流式输出示例**:
-
-```
-data: {"type":"execution_steps","data":{"content_type":"markdown","content":"正在调用 http_request ..."},"version":"1.0.0"}
-data: {"type":"execution_steps_end","version":"1.0.0"}
-data: {"type":"answer","data":{"content_type":"markdown","content":"查询结果如下..."},"version":"1.0.0"}
-data: {"type":"stream_end","version":"1.0.0"}
-```
-
 ### gRPC API
 
 | 服务 | 说明 |

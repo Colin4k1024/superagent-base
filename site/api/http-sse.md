@@ -400,11 +400,3 @@ GET /api/v2/tools
 
 ---
 
-## 集团小海对接 API
-
-| 方法 | 路径 | 描述 |
-|------|------|------|
-| POST | `/api/v1/xiaohai/stream/:agent_id` | 流式 SSE（集团 IT 智能体规范） |
-| POST | `/api/v1/xiaohai/chat/:agent_id` | 非流式 JSON |
-
-详见 [README 集团小海对接章节](https://github.com/Colin4k1024/superagent-base#集团小海对接-api集团it智能体输出规范-v100)。

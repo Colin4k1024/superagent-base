@@ -1,5 +1,5 @@
 # Stage 1: Builder for Go application
-FROM harbor-test.haier.net/paas/golang:1.24-alpine AS builder
+FROM golang:1.24-alpine AS builder
 
 # Use China mirrors for Alpine to speed up apk in CN
 RUN sed -i 's@https://dl-cdn.alpinelinux.org/@https://mirrors.aliyun.com/@g' /etc/apk/repositories
@@ -24,7 +24,7 @@ RUN go build -ldflags="-s -w" -o /app/opencoze main.go
 
 
 # Stage 2: Final image
-FROM harbor-test.haier.net/paas/alpine:3.22.0
+FROM alpine:3.22.0
 
 # Use China mirrors for Alpine to speed up apk in CN
 RUN sed -i 's@https://dl-cdn.alpinelinux.org/@https://mirrors.aliyun.com/@g' /etc/apk/repositories

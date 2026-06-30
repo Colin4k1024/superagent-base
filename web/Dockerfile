@@ -1,5 +1,5 @@
 # Stage 1: Build the React app
-FROM harbor-test.haier.net/paas/node:20-alpine AS builder
+FROM node:20-alpine AS builder
 
 WORKDIR /app
 
@@ -12,7 +12,7 @@ COPY . .
 RUN npm run build -- --mode development
 
 # Stage 2: Serve with Nginx
-FROM harbor-test.haier.net/paas/nginx:1.25-alpine
+FROM nginx:1.25-alpine
 
 # Remove default nginx config
 RUN rm /etc/nginx/conf.d/default.conf

@@ -12,8 +12,7 @@ export default defineConfig({
     nav: [
       { text: '指南', link: '/guide/getting-started' },
       { text: 'API', link: '/api/http-sse' },
-      { text: '高级', link: '/advanced/a2ui-protocol' },
-      { text: 'GitLab', link: 'https://gitlab.example.com/group/superagent-base' }
+      { text: '高级', link: '/advanced/a2ui-protocol' }
     ],
 
     sidebar: {
@@ -76,9 +75,7 @@ export default defineConfig({
       ]
     },
 
-    socialLinks: [
-      { icon: 'gitlab', link: 'https://gitlab.example.com/group/superagent-base' }
-    ],
+    socialLinks: [],
 
     footer: {
       message: 'Released under the Apache 2.0 License.',
