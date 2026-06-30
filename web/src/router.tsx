@@ -12,6 +12,7 @@ import SettingsPage from './pages/SettingsPage'
 import EvolutionPage from './pages/EvolutionPage'
 import ObservabilityPage from './pages/ObservabilityPage'
 import XiaohaiDebugPage from './pages/XiaohaiDebugPage'
+import AgentLoopChatPage from './pages/AgentLoopChatPage'
 
 export const router = createBrowserRouter([
   { path: '/login', element: <LoginPage /> },
@@ -35,6 +36,7 @@ export const router = createBrowserRouter([
           { path: 'evolution', element: <EvolutionPage /> },
           { path: 'observability', element: <ObservabilityPage /> },
           { path: 'xiaohai-debug', element: <XiaohaiDebugPage /> },
+          { path: 'agentloop-demo', element: <AgentLoopChatPage /> },
         ],
       },
     ],

@@ -2,6 +2,7 @@
 // All requests go to /api which the Vite dev proxy forwards to localhost:8888.
 
 import { getToken, handleLogin } from './auth'
+import type { InterruptField } from './agentloop-types'
 
 const API_BASE = '/api/v1'
 
@@ -394,6 +395,95 @@ export interface ChatStreamCallbacks {
   onDone: () => void
   onPreempted?: () => void
   onError: (err: Error) => void
+  onProgress?: (data: { agent_name?: string; step?: string; total: number; current: number }) => void
+  onInterrupt?: (data: { reason: string; fields: InterruptField[] }) => void
+}
+
+/**
+ * Shared SSE stream processor for A2UI JSON events and legacy raw text.
+ * Reads from a Response body reader and dispatches parsed events via callbacks.
+ */
+async function processSSEStream(
+  reader: ReadableStreamDefaultReader<Uint8Array>,
+  callbacks: ChatStreamCallbacks,
+): Promise<void> {
+  const { onToken, onThinking, onToolCall, onToolResult, onDone, onPreempted, onError, onProgress, onInterrupt } = callbacks
+  const decoder = new TextDecoder()
+  let buffer = ''
+
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) break
+
+    buffer += decoder.decode(value, { stream: true })
+    const lines = buffer.split('\n')
+    buffer = lines.pop() ?? ''
+
+    for (const line of lines) {
+      if (!line.startsWith('data: ')) continue
+      const data = line.slice(6)
+      if (data === '[DONE]') {
+        onDone()
+        return
+      }
+
+      // Try A2UI JSON format first
+      try {
+        const event = JSON.parse(data)
+        // A2UI format: {"type":"text","data":{"delta":"token"}} or {"type":"text","content":"token"}
+        const content = event.data?.delta || event.data?.content || event.content || ''
+        switch (event.type) {
+          case 'text':
+            onToken(content)
+            break
+          case 'thinking':
+            onThinking?.(content)
+            break
+          case 'tool_call': {
+            const name = event.data?.name || event.name || ''
+            const args = event.data?.arguments
+            onToolCall?.(name, typeof args === 'object' ? JSON.stringify(args, null, 2) : String(args || ''))
+            break
+          }
+          case 'tool_result': {
+            const name = event.data?.name || event.name || ''
+            const result = event.data?.result || event.data?.content || content
+            onToolResult?.(name, typeof result === 'object' ? JSON.stringify(result, null, 2) : String(result))
+            break
+          }
+          case 'error':
+            onError(new Error(content || 'Unknown error'))
+            return
+          case 'done':
+            onDone()
+            return
+          case 'preempted':
+            onPreempted?.()
+            return
+          case 'progress':
+            onProgress?.({
+              agent_name: event.data?.agent_name,
+              step: event.data?.step,
+              total: event.data?.total ?? 0,
+              current: event.data?.current ?? 0,
+            })
+            break
+          case 'interrupt':
+            onInterrupt?.({
+              reason: event.data?.reason || '',
+              fields: event.data?.fields || [],
+            })
+            break
+          default:
+            if (content) onToken(content)
+        }
+      } catch {
+        // Legacy format: raw text token
+        onToken(data)
+      }
+    }
+  }
+  onDone()
 }
 
 export const chatApi = {
@@ -408,7 +498,7 @@ export const chatApi = {
     message: string,
     callbacks: ChatStreamCallbacks,
   ): AbortController {
-    const { onToken, onThinking, onToolCall, onToolResult, onDone, onPreempted, onError } = callbacks
+    const { onDone, onError } = callbacks
     const controller = new AbortController()
 
     const run = async () => {
@@ -426,70 +516,9 @@ export const chatApi = {
         }
 
         const reader = res.body?.getReader()
-        const decoder = new TextDecoder()
-
         if (!reader) throw new Error('No readable stream on response')
 
-        let buffer = ''
-        while (true) {
-          const { done, value } = await reader.read()
-          if (done) break
-
-          buffer += decoder.decode(value, { stream: true })
-          const lines = buffer.split('\n')
-          buffer = lines.pop() ?? ''
-
-          for (const line of lines) {
-            if (!line.startsWith('data: ')) continue
-            const data = line.slice(6)
-            if (data === '[DONE]') {
-              onDone()
-              return
-            }
-
-            // Try A2UI JSON format first
-            try {
-              const event = JSON.parse(data)
-              // A2UI format: {"type":"text","data":{"delta":"token"}} or {"type":"text","content":"token"}
-              const content = event.data?.delta || event.data?.content || event.content || ''
-              switch (event.type) {
-                case 'text':
-                  onToken(content)
-                  break
-                case 'thinking':
-                  onThinking?.(content)
-                  break
-                case 'tool_call': {
-                  const tcName = event.data?.name || event.name || ''
-                  const tcArgs = event.data?.arguments
-                  onToolCall?.(tcName, typeof tcArgs === 'object' ? JSON.stringify(tcArgs, null, 2) : String(tcArgs || ''))
-                  break
-                }
-                case 'tool_result': {
-                  const trName = event.data?.name || event.name || ''
-                  const trResult = event.data?.result || event.data?.content || content
-                  onToolResult?.(trName, typeof trResult === 'object' ? JSON.stringify(trResult, null, 2) : String(trResult))
-                }
-                  break
-                case 'error':
-                  onError(new Error(content || 'Unknown error'))
-                  return
-                case 'done':
-                  onDone()
-                  return
-                case 'preempted':
-                  onPreempted?.()
-                  return
-                default:
-                  if (content) onToken(content)
-              }
-            } catch {
-              // Legacy format: raw text token
-              onToken(data)
-            }
-          }
-        }
-        onDone()
+        await processSSEStream(reader, callbacks)
       } catch (err) {
         if ((err as Error).name === 'AbortError') {
           onDone()
@@ -516,6 +545,42 @@ export const chatApi = {
     } catch {
       // best-effort; ignore errors
     }
+  },
+
+  /**
+   * Resume an interrupted agent conversation.
+   */
+  async resume(
+    agentId: string,
+    sessionId: string,
+    input: string,
+    callbacks: ChatStreamCallbacks,
+  ): Promise<AbortController> {
+    const { onDone, onError } = callbacks
+    const controller = new AbortController()
+
+    const run = async () => {
+      try {
+        const res = await fetch(`${API_BASE}/chat/resume`, {
+          method: 'POST',
+          headers: { ...authHeaders(), 'X-A2UI': 'true' },
+          body: JSON.stringify({ agent_id: agentId, session_id: sessionId, input }),
+          signal: controller.signal,
+        })
+        handleAuthError(res)
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+
+        const reader = res.body?.getReader()
+        if (!reader) throw new Error('No readable stream on response')
+
+        await processSSEStream(reader, callbacks)
+      } catch (err) {
+        if ((err as Error).name === 'AbortError') { onDone(); return }
+        onError(err instanceof Error ? err : new Error(String(err)))
+      }
+    }
+    run()
+    return controller
   },
 }
 
