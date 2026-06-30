@@ -1,10 +1,8 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 
-vi.mock('@company/iam', () => ({
-  login: vi.fn().mockResolvedValue(undefined),
-  logout: vi.fn().mockResolvedValue(undefined),
-  configUserCenter: vi.fn(),
-}))
+// Mock fetch globally
+const fetchMock = vi.fn()
+vi.stubGlobal('fetch', fetchMock)
 
 import { getToken, getAccount, isAuthenticated, clearAuth } from '../auth'
 
@@ -19,6 +17,7 @@ describe('auth', () => {
   beforeEach(() => {
     vi.stubGlobal('localStorage', localStorageMock)
     vi.clearAllMocks()
+    fetchMock.mockReset()
   })
 
   describe('isAuthenticated', () => {
@@ -28,7 +27,7 @@ describe('auth', () => {
     })
 
     it('returns true when token is present', () => {
-      localStorageMock.getItem.mockReturnValue('iam-token-xxx')
+      localStorageMock.getItem.mockReturnValue('active')
       expect(isAuthenticated()).toBe(true)
     })
   })
@@ -39,11 +38,11 @@ describe('auth', () => {
       expect(getToken()).toBeNull()
     })
 
-    it('returns token from app-access-token key', () => {
+    it('returns token from session_key key', () => {
       localStorageMock.getItem.mockImplementation((key: string) =>
-        key === 'app-access-token' ? 'iam-token-123' : null,
+        key === 'session_key' ? 'active' : null,
       )
-      expect(getToken()).toBe('iam-token-123')
+      expect(getToken()).toBe('active')
     })
   })
 
@@ -56,18 +55,18 @@ describe('auth', () => {
     it('returns parsed account object from app-user-info key', () => {
       localStorageMock.getItem.mockImplementation((key: string) =>
         key === 'app-user-info'
-          ? JSON.stringify({ name: 'test', email: 'test@company.com' })
+          ? JSON.stringify({ email: 'test@example.com' })
           : null,
       )
       const account = getAccount()
-      expect(account).toEqual({ name: 'test', email: 'test@company.com' })
+      expect(account).toEqual({ email: 'test@example.com' })
     })
   })
 
   describe('clearAuth', () => {
-    it('removes token and user info keys', () => {
+    it('removes session_key and user info keys', () => {
       clearAuth()
-      expect(localStorageMock.removeItem).toHaveBeenCalledWith('app-access-token')
+      expect(localStorageMock.removeItem).toHaveBeenCalledWith('session_key')
       expect(localStorageMock.removeItem).toHaveBeenCalledWith('app-user-info')
     })
   })

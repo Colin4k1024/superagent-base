@@ -1,17 +1,16 @@
 import { useState } from 'react'
 import { NavLink } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { logout } from '@company/iam'
-import { clearAuth } from '@/lib/auth'
+import { handleLogout } from '@/lib/auth'
 
 export default function Sidebar() {
   const { t, i18n } = useTranslation()
   const [mobileOpen, setMobileOpen] = useState(false)
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
 
-  function handleLogout() {
-    clearAuth()
-    logout()
+  async function doLogout() {
+    await handleLogout()
+    window.location.href = '/login'
   }
 
   function toggleLanguage() {
@@ -29,6 +28,7 @@ export default function Sidebar() {
     { to: '/evolution', label: t('nav.evolution'), icon: '◈' },
     { to: '/observability', label: t('nav.observability'), icon: '📈' },
     { to: '/xiaohai-debug', label: '小海调试', icon: '🔌' },
+    { to: '/agentloop-demo', label: 'AgentLoop Demo', icon: '🔄' },
   ]
 
   // On mobile: collapsed (w-16) unless mobileOpen; on md+: always w-56
@@ -124,7 +124,7 @@ export default function Sidebar() {
                 {t('common.cancel')}
               </button>
               <button
-                onClick={handleLogout}
+                onClick={doLogout}
                 className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700 transition-colors"
               >
                 {t('common.confirm')}
