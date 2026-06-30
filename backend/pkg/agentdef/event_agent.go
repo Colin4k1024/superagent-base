@@ -18,6 +18,7 @@ package agentdef
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	"github.com/cloudwego/eino/callbacks"
@@ -69,6 +70,17 @@ func (e *eventAgentWrapper) ChatWithEvents(ctx context.Context, sessionID string
 				stream.Send(a2ui.NewEvent(a2ui.EventInterrupt, parseInterruptData(token)))
 				continue
 			}
+			// Detect AgentLoop turn headers and emit as progress events
+			// so the frontend can render structured turn separators.
+			if turn, total, ok := parseTurnHeader(token); ok {
+				stream.Send(a2ui.NewEvent(a2ui.EventProgress, &a2ui.ProgressData{
+					AgentName: e.Agent.Name(),
+					Step:      fmt.Sprintf("turn_%d", turn),
+					Total:     total,
+					Current:   turn,
+				}))
+				continue
+			}
 			stream.SendText(token)
 		}
 		stream.SendDone()
@@ -99,4 +111,35 @@ func parseInterruptData(token string) *a2ui.InterruptData {
 			},
 		},
 	}
+}
+
+// parseTurnHeader detects the AgentLoop turn header pattern emitted by
+// AgentLoopAgent.Chat() and extracts turn/total numbers.
+// Pattern: "\n--- Turn N/M ---\n"
+func parseTurnHeader(token string) (turn, total int, ok bool) {
+	s := strings.TrimSpace(token)
+	if !strings.HasPrefix(s, "--- Turn ") || !strings.HasSuffix(s, "---") {
+		return 0, 0, false
+	}
+	// Extract "N/M" from "--- Turn N/M ---"
+	inner := strings.TrimPrefix(s, "--- Turn ")
+	inner = strings.TrimSuffix(inner, "---")
+	inner = strings.TrimSpace(inner)
+	// Reject if inner contains anything beyond "N/M"
+	parts := strings.SplitN(inner, "/", 2)
+	if len(parts) != 2 {
+		return 0, 0, false
+	}
+	n, m := 0, 0
+	if _, err := fmt.Sscanf(parts[0], "%d", &n); err != nil || n <= 0 {
+		return 0, 0, false
+	}
+	if _, err := fmt.Sscanf(parts[1], "%d", &m); err != nil || m <= 0 {
+		return 0, 0, false
+	}
+	// Exact match: reconstructed string must equal inner
+	if fmt.Sprintf("%d/%d", n, m) != inner {
+		return 0, 0, false
+	}
+	return n, m, true
 }
