@@ -34,8 +34,5 @@ func GetAllBuiltinTools() []tool.InvokableTool {
 	if t := newHiAgentRAGTool(); t != nil {
 		tools = append(tools, t)
 	}
-	if t := newHaierKnowledgeQATool(); t != nil {
-		tools = append(tools, t)
-	}
 	return tools
 }
