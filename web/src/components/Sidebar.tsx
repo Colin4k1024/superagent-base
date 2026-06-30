@@ -27,7 +27,6 @@ export default function Sidebar() {
     { to: '/settings', label: t('nav.settings'), icon: '⚙️' },
     { to: '/evolution', label: t('nav.evolution'), icon: '◈' },
     { to: '/observability', label: t('nav.observability'), icon: '📈' },
-    { to: '/xiaohai-debug', label: '小海调试', icon: '🔌' },
     { to: '/agentloop-demo', label: 'AgentLoop Demo', icon: '🔄' },
   ]
 

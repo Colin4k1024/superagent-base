@@ -11,8 +11,8 @@
 
 | 指标 | 值 |
 |------|---|
-| 总用例数 | 24 |
-| 通过 | 24 |
+| 总用例数 | 12 |
+| 通过 | 12 |
 | 失败 | 0 |
 | 通过率 | 100% |
 
@@ -50,29 +50,7 @@
 | data JSON 包含 type 字段 | ✅ |
 | data JSON 包含 delta 字段 | ✅ |
 
-### 5. 小海流式接口 - 集团规范 (7/7 pass)
-
-| 用例 | 结果 |
-|------|------|
-| POST /api/v1/xiaohai/stream/:agent_id 返回 data 行 | ✅ |
-| 输出包含 type=answer | ✅ |
-| 输出包含 content_type=markdown | ✅ |
-| 输出包含 version=1.0.0 | ✅ |
-| 流结束包含 type=stream_end | ✅ |
-| 工具调用发出 execution_steps | ✅ |
-| 工具完成发出 execution_steps_end | ✅ |
-
-### 6. 小海非流式接口 (5/5 pass)
-
-| 用例 | 结果 |
-|------|------|
-| POST /api/v1/xiaohai/chat/:agent_id 返回 code=0 | ✅ |
-| 响应 data 包含 type=answer | ✅ |
-| 响应 data 包含 content_type=markdown | ✅ |
-| 响应 data 包含 version=1.0.0 | ✅ |
-| content 字段非空 | ✅ |
-
-### 7. 错误处理 (2/2 pass)
+### 5. 错误处理 (2/2 pass)
 
 | 用例 | 结果 |
 |------|------|
@@ -87,8 +65,6 @@
 |------|------|------|------|
 | `/api/v1/chat/stream` | Legacy (event:message + raw text) | ✅ 不受影响 | 原有接口完全兼容 |
 | `/api/v1/chat/stream` (X-A2UI) | A2UI JSON events | ✅ 不受影响 | 结构化事件正常 |
-| `/api/v1/xiaohai/stream/:agent_id` | 集团 IT 智能体输出规范 v1.0.0 | ✅ 新增 | 流式 SSE |
-| `/api/v1/xiaohai/chat/:agent_id` | 集团规范非流式 | ✅ 新增 | JSON 响应 |
 
 ---
 
@@ -129,5 +105,5 @@ data: {"type":"stream_end","version":"1.0.0"}
 make dev
 
 # 执行测试
-bash tests/e2e_xiaohai_test.sh
+bash tests/e2e_test.sh
 ```

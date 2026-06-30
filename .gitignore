@@ -63,7 +63,5 @@ tests/e2e/reports/
 # Playwright
 web/test-results/
 web/playwright-report/
-xiaohai-hermes-daily-0.0.2-cm/
-xiaohai-hermes-daily-0.0.2-cm.zip
 *.docx
 .claude/settings.local.json

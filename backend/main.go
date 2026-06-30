@@ -401,12 +401,6 @@ func startHttpServer(agentRT *agentdef.AgentRuntime, skillMgr *skill.Manager, to
 	monitorGroup.GET("/metrics/daily", monitorH.HandleDailyMetrics)
 	monitorGroup.GET("/sessions", monitorH.HandleSessions)
 
-	// 集团小海对接接口 (集团IT智能体输出规范 v1.0.0) — Api-Key 鉴权.
-	xiaohaiH := cozehandler.NewXiaohaiHandler(agentRT)
-	xiaohaiGroup := s.Group("/api/v1/xiaohai")
-	xiaohaiGroup.POST("/stream/:agent_id", xiaohaiH.HandleStream)
-	xiaohaiGroup.POST("/chat/:agent_id", xiaohaiH.HandleNonStream)
-
 	// Session history — conversation message read/clear (backed by shared Redis memory).
 	sessionH := cozehandler.NewSessionHandler(sharedMem)
 	s.GET("/api/v1/sessions/:session_id/messages", middleware.DeprecationMW("/api/v2"), sessionH.HandleGetMessages)
@@ -433,7 +427,7 @@ func startHttpServer(agentRT *agentdef.AgentRuntime, skillMgr *skill.Manager, to
 	s.POST("/api/v1/chat/abort", middleware.DeprecationMW("/api/v2"), chatSSE.HandleChatAbort)
 
 	// V2 canonical API — same handlers, no deprecation headers.
-	registerV2Routes(s, chatSSE, adminH, agentAdmin, userAdmin, mcpAdmin, evoAdmin, webhookH, xiaohaiH, sessionH, fileH, skillMgr, toolMgr, memH, userStore)
+	registerV2Routes(s, chatSSE, adminH, agentAdmin, userAdmin, mcpAdmin, evoAdmin, webhookH, sessionH, fileH, skillMgr, toolMgr, memH, userStore)
 
 	s.Spin()
 }
@@ -449,7 +443,6 @@ func registerV2Routes(
 	mcpAdmin *cozehandler.MCPAdminHandler,
 	evoAdmin *cozehandler.EvolutionAdminHandler,
 	webhookH *cozehandler.WebhookHandler,
-	xiaohaiH *cozehandler.XiaohaiHandler,
 	sessionH *cozehandler.SessionHandler,
 	fileH *cozehandler.FileHandler,
 	skillMgr *skill.Manager,
@@ -525,11 +518,6 @@ func registerV2Routes(
 	adminGroup.DELETE("/webhooks/:id", webhookH.HandleDelete)
 	adminGroup.POST("/webhooks/:id/test", webhookH.HandleTest)
 	adminGroup.GET("/webhooks/:id/logs", webhookH.HandleLogs)
-
-	// 集团小海 — v2 path uses same handlers.
-	xiaohaiGroup := s.Group("/api/v2/xiaohai")
-	xiaohaiGroup.POST("/stream/:agent_id", xiaohaiH.HandleStream)
-	xiaohaiGroup.POST("/chat/:agent_id", xiaohaiH.HandleNonStream)
 
 	// Long-term memory — user_id scoped; read is public, mutations are public.
 	s.GET("/api/v2/memory/long-term", memH.HandleLTMList)
