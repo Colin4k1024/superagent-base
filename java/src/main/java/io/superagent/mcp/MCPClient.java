@@ -88,11 +88,11 @@ public class MCPClient {
      * @return list of tool definitions
      * @throws MCPException if the request fails
      */
+    @SuppressWarnings("unchecked") // JSON-RPC result is Map<String, Object> from raw Jackson deserialization
     public List<ToolDefinition> listTools() throws MCPException {
         ensureInitialized();
 
         Map<String, Object> result = sendRequest("tools/list", Map.of());
-        @SuppressWarnings("unchecked")
         List<Map<String, Object>> toolsList = (List<Map<String, Object>>) result.get("tools");
 
         if (toolsList == null) {

@@ -4,7 +4,6 @@ import io.agentscope.core.ReActAgent;
 import io.agentscope.core.agent.Event;
 import io.agentscope.core.agent.EventType;
 import io.agentscope.core.agent.RuntimeContext;
-import io.agentscope.core.memory.InMemoryMemory;
 import io.agentscope.core.message.Msg;
 import io.agentscope.core.message.MsgRole;
 import io.agentscope.core.model.DashScopeChatModel;
@@ -79,6 +78,9 @@ public class ChatModelAgent extends BaseAgent {
         ));
     }
 
+    @SuppressWarnings("removal") // stream(List,StreamOptions,RuntimeContext) is the only public API
+    // for per-call RuntimeContext binding via composition; withRuntimeContext is protected on ReActAgent.
+    // Migrate when AgentScope exposes a public context-binding alternative.
     @Override
     public Flux<Event> callStream(Map<String, Object> input, RuntimeContext context) {
         String userMessage = input.getOrDefault("message", "").toString();
