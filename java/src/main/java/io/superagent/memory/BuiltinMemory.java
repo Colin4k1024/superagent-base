@@ -1,6 +1,7 @@
 package io.superagent.memory;
 
 import io.agentscope.core.memory.InMemoryMemory;
+import io.agentscope.core.memory.Memory;
 import io.agentscope.core.message.Msg;
 import io.agentscope.core.message.MsgRole;
 import org.springframework.stereotype.Component;
@@ -14,11 +15,16 @@ import java.util.Map;
  * <p>Wraps the AgentScope memory implementation to provide the legacy
  * {@link MemoryStore} interface. Suitable for development and single-instance
  * deployments. Not persistent across restarts.</p>
+ *
+ * <p>The entire {@code io.agentscope.core.memory} package is deprecated for
+ * removal in AgentScope 2.0.0 with no replacement yet. This suppresses the
+ * removal warning until a successor API is available.</p>
  */
+@SuppressWarnings("removal") // entire io.agentscope.core.memory package deprecated for removal in 2.0.0 with no replacement
 @Component
 public class BuiltinMemory implements MemoryStore {
 
-    private final InMemoryMemory delegate;
+    private final Memory delegate;
 
     public BuiltinMemory() {
         this.delegate = new InMemoryMemory();
@@ -82,7 +88,7 @@ public class BuiltinMemory implements MemoryStore {
     /**
      * Get the underlying AgentScope memory instance.
      */
-    public InMemoryMemory getAgentScopeMemory() {
+    public Memory getAgentScopeMemory() {
         return delegate;
     }
 }
