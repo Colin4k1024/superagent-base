@@ -1,0 +1,139 @@
+name: sa-matrix
+
+x-env-file: &env_file
+  - .env.matrix
+
+services:
+  # ── 共享中间件 ────────────────────────────────────────────────────────
+  sa-mysql:
+    image: mysql:8.4.5
+    container_name: sa-matrix-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: sa_go
+      MYSQL_USER: coze
+      MYSQL_PASSWORD: coze123
+    ports:
+      - "3306:3306"
+    volumes:
+      - ./data/matrix-mysql:/var/lib/mysql
+      - ./volumes/mysql/schema-matrix.sql:/docker-entrypoint-initdb.d/init.sql
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-ucoze", "-pcoze123"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    networks:
+      - sa-matrix-net
+
+  sa-redis:
+    image: redis:7-alpine
+    container_name: sa-matrix-redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 3s
+      retries: 5
+    networks:
+      - sa-matrix-net
+
+  # ── Go 后端（:8888）──────────────────────────────────────────────────
+  go-backend:
+    build:
+      context: ../backend
+      dockerfile: ../Dockerfile.production
+    container_name: sa-matrix-go
+    env_file: *env_file
+    environment:
+      APP_ENV: debug
+      LISTEN_ADDR: ":8888"
+      MYSQL_DSN: ${GO_MYSQL_DSN}
+      REDIS_ADDR: ${GO_REDIS_ADDR}
+      AGENT_CONFIG_DIR: /app/configs/agents
+      ADMIN_API_KEY: ${GO_ADMIN_API_KEY}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL}
+    ports:
+      - "8888:8888"
+    volumes:
+      - ../configs/agents:/app/configs/agents:ro
+    depends_on:
+      sa-mysql:
+        condition: service_healthy
+      sa-redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8888/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+    networks:
+      - sa-matrix-net
+
+  # ── Python 后端（:8889）──────────────────────────────────────────────
+  python-backend:
+    build:
+      context: ../python
+      dockerfile: Dockerfile
+    container_name: sa-matrix-python
+    env_file: *env_file
+    environment:
+      PORT: ${PYTHON_PORT:-8889}
+      REDIS_URL: ${PYTHON_REDIS_URL}
+      AGENTS_DIR: ${PYTHON_AGENTS_DIR:-/app/configs/agents}
+      ADMIN_API_KEY: ${PYTHON_ADMIN_API_KEY}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL}
+    ports:
+      - "8889:8889"
+    volumes:
+      - ../configs/agents:/app/configs/agents:ro
+    depends_on:
+      sa-redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8889/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    networks:
+      - sa-matrix-net
+
+  # ── Java 后端（:8890）────────────────────────────────────────────────
+  java-backend:
+    build:
+      context: ../java
+      dockerfile: Dockerfile
+    container_name: sa-matrix-java
+    env_file: *env_file
+    environment:
+      SERVER_PORT: ${JAVA_PORT:-8890}
+      SPRING_REDIS_URL: ${JAVA_REDIS_URL}
+      SUPERAGENT_AGENTS_DIR: ${JAVA_AGENTS_DIR:-/app/configs/agents}
+      SUPERAGENT_ADMIN_API_KEY: ${JAVA_ADMIN_API_KEY}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL}
+    ports:
+      - "8890:8890"
+    volumes:
+      - ../configs/agents:/app/configs/agents:ro
+    depends_on:
+      sa-redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8890/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    networks:
+      - sa-matrix-net
+
+networks:
+  sa-matrix-net:
+    name: sa-matrix-net

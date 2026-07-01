@@ -1,4 +1,4 @@
-.PHONY: debug fe server sync_db dump_db middleware web down clean python help proto-gen dev dev-middleware dev-server dev-down dev-clean test test-all build
+.PHONY: debug fe server sync_db dump_db middleware web down clean python help proto-gen dev dev-middleware dev-server dev-down dev-clean test test-all build matrix-env matrix-up matrix-down matrix-clean matrix-logs matrix-ps matrix-wait matrix-test matrix-fe-go matrix-fe-python matrix-fe-java matrix-fe
 
 # 定义脚本路径
 SCRIPTS_DIR := ./scripts
@@ -228,3 +228,66 @@ proto-gen:
 			$$service/v1/$$service.proto; \
 	done
 	@echo "Proto generation complete."
+
+# ── Matrix deployment targets ────────────────────────────────────────
+
+MATRIX_COMPOSE := docker/docker-compose-matrix.yml
+MATRIX_ENV     := docker/.env.matrix
+
+matrix-env:
+	@if [ ! -f "$(MATRIX_ENV)" ]; then \
+		echo "Creating $(MATRIX_ENV) from example..."; \
+		cp docker/.env.matrix.example $(MATRIX_ENV); \
+		echo "Edit $(MATRIX_ENV) and set your OPENAI_API_KEY before running matrix-up"; \
+	fi
+
+matrix-up: matrix-env
+	@echo "Starting matrix: Go:8888 Python:8889 Java:8890 ..."
+	@docker compose -f $(MATRIX_COMPOSE) --env-file $(MATRIX_ENV) up -d --build
+
+matrix-down:
+	@docker compose -f $(MATRIX_COMPOSE) down
+
+matrix-clean:
+	@docker compose -f $(MATRIX_COMPOSE) down -v
+	@rm -rf docker/data/matrix-mysql
+
+matrix-logs:
+	@docker compose -f $(MATRIX_COMPOSE) logs -f
+
+matrix-ps:
+	@docker compose -f $(MATRIX_COMPOSE) ps
+
+matrix-wait:
+	@echo "Waiting for all three backends to be healthy..."
+	@for port in 8888 8889 8890; do \
+		echo -n "  Waiting for :$$port "; \
+		for i in $$(seq 1 30); do \
+			if curl -sf http://localhost:$$port/health > /dev/null 2>&1 || \
+			   curl -sf http://localhost:$$port/actuator/health > /dev/null 2>&1; then \
+				echo " OK"; break; \
+			fi; \
+			echo -n "."; sleep 3; \
+		done; \
+	done
+
+matrix-test: matrix-wait
+	@echo "Running matrix tests..."
+	@cd tests/matrix && pip install -q -r requirements.txt && pytest -v --tb=short
+
+matrix-fe-go:
+	@cd web && VITE_API_BASE=http://localhost:8888 npx vite --port 3501 --mode go
+
+matrix-fe-python:
+	@cd web && VITE_API_BASE=http://localhost:8889 npx vite --port 3502 --mode python
+
+matrix-fe-java:
+	@cd web && VITE_API_BASE=http://localhost:8890 npx vite --port 3503 --mode java
+
+matrix-fe:
+	@echo "Starting 3 frontend instances (Go:3501, Python:3502, Java:3503)..."
+	@$(MAKE) matrix-fe-go & \
+	 $(MAKE) matrix-fe-python & \
+	 $(MAKE) matrix-fe-java & \
+	 wait
+
