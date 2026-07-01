@@ -41,7 +41,9 @@ func (h *AdminHandler) HandleStatus(_ context.Context, c *app.RequestContext) {
 	}
 
 	c.JSON(200, map[string]any{
+		"status":        "running",
 		"uptime_seconds": int(uptime),
+		"agents_loaded": len(agents),
 		"agent_count":    len(agents),
 		"agents":         agents,
 		"health":         "ok",

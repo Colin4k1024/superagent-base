@@ -59,12 +59,36 @@ public class HealthController {
         return Mono.just(result);
     }
 
-    @GetMapping("/metrics")
-    public Mono<Map<String, Object>> metrics() {
-        return Mono.just(Map.of(
-            "message", "Use /actuator/prometheus for Prometheus metrics",
-            "status", "stub"
-        ));
+    @GetMapping(value = "/metrics", produces = "text/plain")
+    public Mono<String> metrics() {
+        long uptimeSeconds = java.time.Duration.between(startTime, Instant.now()).getSeconds();
+        int agentCount = agentFactory.getBuiltAgents().size();
+        int modelCount = modelRegistry.listNames().size();
+        int mcpCount = mcpRegistry.listServers().size();
+        Runtime rt = Runtime.getRuntime();
+        long memUsed = rt.totalMemory() - rt.freeMemory();
+
+        String prom = """
+            # HELP superagent_up Service up indicator
+            # TYPE superagent_up gauge
+            superagent_up 1
+            # HELP superagent_uptime_seconds Uptime in seconds
+            # TYPE superagent_uptime_seconds gauge
+            superagent_uptime_seconds %d
+            # HELP superagent_agents_loaded Number of loaded agents
+            # TYPE superagent_agents_loaded gauge
+            superagent_agents_loaded %d
+            # HELP superagent_models_registered Number of registered models
+            # TYPE superagent_models_registered gauge
+            superagent_models_registered %d
+            # HELP superagent_mcp_servers Number of connected MCP servers
+            # TYPE superagent_mcp_servers gauge
+            superagent_mcp_servers %d
+            # HELP superagent_jvm_memory_used_bytes JVM memory used
+            # TYPE superagent_jvm_memory_used_bytes gauge
+            superagent_jvm_memory_used_bytes %d
+            """.formatted(uptimeSeconds, agentCount, modelCount, mcpCount, memUsed);
+        return Mono.just(prom.stripIndent());
     }
 
     private Map<String, Object> checkAgents() {
