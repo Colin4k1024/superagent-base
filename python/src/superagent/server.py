@@ -5,6 +5,7 @@ API-compatible with the Go base (superagent-base) HTTP layer.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import os
@@ -145,6 +146,35 @@ app = FastAPI(
 
 
 # ──────────────────────────────────────────────
+# ASGI v1→v2 path rewrite middleware.
+# Inserted into the ASGI stack before FastAPI's router
+# so route matching sees /api/v2/* paths.
+# ──────────────────────────────────────────────
+
+_V1_PREFIX = "/api/v1/"
+_V2_PREFIX = "/api/v2/"
+
+
+class _V1RewriteMiddleware:
+    """Rewrites /api/v1/* paths to /api/v2/* before routing."""
+    def __init__(self, app):
+        self._app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope.get("type") == "http":
+            path: str = scope.get("path", "")
+            if path.startswith(_V1_PREFIX):
+                new_path = _V2_PREFIX + path[len(_V1_PREFIX):]
+                scope = dict(scope)
+                scope["path"] = new_path
+                scope["raw_path"] = new_path.encode()
+        await self._app(scope, receive, send)
+
+
+app.add_middleware(_V1RewriteMiddleware)  # type: ignore[arg-type]
+
+
+# ──────────────────────────────────────────────
 # Pydantic models — existing
 # ──────────────────────────────────────────────
 
@@ -233,6 +263,52 @@ class WorkflowChatRequest(BaseModel):
     workflow_id: str = Field(..., description="Workflow ID")
     message: str = Field(..., description="User message")
     session_id: str | None = None
+
+
+# ──────────────────────────────────────────────
+# Passport auth stubs — compatible with Coze Studio frontend
+# Accepts any email/password; returns deterministic mock user.
+# ──────────────────────────────────────────────
+
+_FIXED_USER_ID = 7657359490462777344
+
+def _build_user_response(email: str) -> dict[str, Any]:
+    name = email.split("@")[0] if "@" in email else email
+    return {
+        "code": 0,
+        "msg": "",
+        "data": {
+            "user_id_str": str(_FIXED_USER_ID),
+            "name": name,
+            "user_unique_name": name,
+            "email": email,
+            "description": "",
+            "avatar_url": "default_icon/user_default_icon.png",
+            "screen_name": name,
+            "app_user_info": {"user_unique_name": name},
+            "locale": "zh-CN",
+            "user_create_time": int(time.time()),
+        },
+    }
+
+
+@app.post("/api/passport/web/email/register/v2/")
+async def passport_register(request: Request) -> dict[str, Any]:
+    body = await request.json()
+    email = body.get("email", "user@example.com")
+    return _build_user_response(email)
+
+
+@app.post("/api/passport/web/email/login/")
+async def passport_login(request: Request) -> dict[str, Any]:
+    body = await request.json()
+    email = body.get("email", "user@example.com")
+    return _build_user_response(email)
+
+
+@app.get("/api/passport/web/logout/")
+async def passport_logout() -> dict[str, Any]:
+    return {"code": 0, "msg": ""}
 
 
 # ──────────────────────────────────────────────
@@ -599,8 +675,9 @@ async def me() -> dict[str, Any]:
 
 @app.get("/api/v2/admin/status")
 async def admin_status() -> dict[str, Any]:
-    """System status overview."""
-    return _ok({
+    """System status overview — flat format matching Go/Java contract."""
+    return {
+        "status": "running",
         "version": "0.1.0",
         "uptime_seconds": int(time.time() - _start_time),
         "agents_loaded": len(_agents),
@@ -610,7 +687,37 @@ async def admin_status() -> dict[str, Any]:
         "conversations_count": len(_conversations),
         "files_count": len(_files),
         "memory_entries": len(_long_term_memory),
-    })
+    }
+
+
+@app.get("/api/v2/admin/agents")
+async def admin_list_agents() -> dict[str, Any]:
+    """Admin agent list — mirrors /api/v2/agents for v1 compatibility."""
+    agent_list = [
+        {"name": a.name, "type": getattr(a, "agent_type", "unknown"),
+         "description": getattr(a, "description", "")}
+        for a in _agents.values()
+    ]
+    return {"agents": agent_list, "count": len(agent_list)}
+
+
+@app.post("/api/v2/admin/agents/validate")
+async def admin_validate_agent(request: Request) -> dict[str, Any]:
+    """Validate agent YAML definition."""
+    try:
+        body = await request.json()
+        yaml_def = body.get("yaml_definition", "") or body.get("yaml", "")
+        if not yaml_def.strip():
+            return {"valid": False, "error": "yaml_definition is required"}
+        import yaml as _yaml
+        data = _yaml.safe_load(yaml_def)
+        if not data or "metadata" not in data:
+            return {"valid": False, "error": "Missing metadata section"}
+        name = data.get("metadata", {}).get("name", "")
+        agent_type = data.get("spec", {}).get("type", "")
+        return {"valid": True, "name": name, "type": agent_type}
+    except Exception as e:
+        return {"valid": False, "error": str(e)}
 
 
 # ──────────────────────────────────────────────
@@ -1007,3 +1114,99 @@ async def list_mcp_servers() -> dict[str, Any]:
             "connected": client.is_connected if client else False,
         })
     return _ok(servers)
+
+
+# ──────────────────────────────────────────────
+# Task #3: Missing endpoints
+# ──────────────────────────────────────────────
+
+@app.get("/api/v2/admin/mcp/servers")
+async def admin_list_mcp_servers() -> dict[str, Any]:
+    """Admin MCP server list — mirrors /api/v2/mcp/servers for path compatibility."""
+    servers = []
+    for name in _mcp_registry.list_servers():
+        client = _mcp_registry.get_client(name)
+        servers.append({
+            "name": name,
+            "connected": client.is_connected if client else False,
+        })
+    return _ok(servers)
+
+
+@app.get("/api/v2/admin/agents/{agent_id}")
+async def admin_get_agent(agent_id: str) -> dict[str, Any]:
+    agent = _agents.get(agent_id)
+    if agent is None:
+        raise HTTPException(status_code=404, detail=f"Agent {agent_id!r} not found")
+    return {
+        "name": agent.name,
+        "type": getattr(agent, "agent_type", "unknown"),
+        "description": getattr(agent, "description", ""),
+        "tools": getattr(agent, "tools", []),
+    }
+
+
+_log_queue: asyncio.Queue = asyncio.Queue(maxsize=100)
+
+
+@app.get("/api/v2/admin/logs")
+async def admin_logs() -> EventSourceResponse:
+    """SSE stream of structured log events."""
+    async def generator():
+        yield json.dumps({"level": "INFO", "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ"), "message": "Connected to log stream"})
+        while True:
+            try:
+                msg = await asyncio.wait_for(_log_queue.get(), timeout=30.0)
+                yield json.dumps(msg)
+            except asyncio.TimeoutError:
+                yield json.dumps({"level": "INFO", "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ"), "message": "heartbeat"})
+    return EventSourceResponse(generator())
+
+
+@app.post("/api/v2/skills/install")
+async def install_skill(request: Request) -> dict[str, Any]:
+    body = await request.json()
+    name = body.get("name", "")
+    return {"status": "ok", "name": name, "installed": True, "message": "skill install stub"}
+
+
+@app.delete("/api/v2/skills/{name}")
+async def uninstall_skill(name: str) -> dict[str, Any]:
+    return {"status": "ok", "name": name, "uninstalled": True, "message": "skill uninstall stub"}
+
+
+# ──────────────────────────────────────────────
+# Task #5: Admin CRUD stubs + MCP management stubs
+# ──────────────────────────────────────────────
+
+@app.post("/api/v2/admin/agents")
+async def admin_create_agent(request: Request) -> dict[str, Any]:
+    body = await request.json()
+    return {"status": "stub", "message": "Agent creation not yet implemented", "yaml_definition": body.get("yaml_definition", "")}
+
+
+@app.put("/api/v2/admin/agents/{agent_id}")
+async def admin_update_agent(agent_id: str, request: Request) -> dict[str, Any]:
+    return {"status": "stub", "name": agent_id, "message": "Agent update not yet implemented"}
+
+
+@app.delete("/api/v2/admin/agents/{agent_id}")
+async def admin_delete_agent(agent_id: str) -> dict[str, Any]:
+    return {"status": "stub", "name": agent_id, "message": "Agent deletion not yet implemented"}
+
+
+@app.post("/api/v2/admin/mcp/servers")
+async def admin_connect_mcp(request: Request) -> dict[str, Any]:
+    body = await request.json()
+    name = body.get("name", "")
+    return {"status": "ok", "name": name, "connected": False, "message": "MCP connect stub"}
+
+
+@app.delete("/api/v2/admin/mcp/servers/{name}")
+async def admin_disconnect_mcp(name: str) -> dict[str, Any]:
+    return {"status": "ok", "name": name, "disconnected": True}
+
+
+@app.get("/api/v2/admin/mcp/servers/{name}/tools")
+async def admin_mcp_server_tools(name: str) -> dict[str, Any]:
+    return {"server": name, "tools": [], "count": 0}

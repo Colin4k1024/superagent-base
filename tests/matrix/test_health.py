@@ -4,9 +4,9 @@ import httpx
 import pytest
 
 HEALTH_URLS = [
-    pytest.param("http://localhost:8888/health",          id="go"),
-    pytest.param("http://localhost:8889/health",          id="python"),
-    pytest.param("http://localhost:8890/actuator/health", id="java"),
+    pytest.param("http://localhost:8888/health", id="go"),
+    pytest.param("http://localhost:8889/health", id="python"),
+    pytest.param("http://localhost:8890/health", id="java"),
 ]
 
 

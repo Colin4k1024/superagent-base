@@ -64,6 +64,31 @@ public class YamlAgentLoader {
     }
 
     /**
+     * Load a single agent definition from a YAML string.
+     */
+    @SuppressWarnings("unchecked")
+    public List<AgentDefinition> loadFromString(String yamlContent) {
+        Yaml yaml = new Yaml();
+        Map<String, Object> data = yaml.load(yamlContent);
+        if (data == null) return List.of();
+
+        String apiVersion = (String) data.getOrDefault("apiVersion", "superagent/v1");
+        String kind = (String) data.getOrDefault("kind", "Agent");
+
+        Map<String, Object> meta = (Map<String, Object>) data.getOrDefault("metadata", Map.of());
+        AgentDefinition.Metadata metadata = new AgentDefinition.Metadata(
+            (String) meta.get("name"),
+            (String) meta.get("version"),
+            (Map<String, String>) meta.getOrDefault("labels", Map.of())
+        );
+
+        Map<String, Object> spec = (Map<String, Object>) data.getOrDefault("spec", Map.of());
+        AgentDefinition.Spec specRecord = parseSpec(spec);
+
+        return List.of(new AgentDefinition(apiVersion, kind, metadata, specRecord));
+    }
+
+    /**
      * Load a single agent definition from a YAML file.
      */
     @SuppressWarnings("unchecked")

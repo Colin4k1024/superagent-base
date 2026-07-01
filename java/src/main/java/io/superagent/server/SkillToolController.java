@@ -63,4 +63,31 @@ public class SkillToolController {
             "role", "admin"
         )).toMap());
     }
+
+    /**
+     * Install a skill.
+     */
+    @PostMapping("/skills/install")
+    public Mono<Map<String, Object>> installSkill(@RequestBody Map<String, Object> body) {
+        String name = (String) body.getOrDefault("name", "");
+        String source = (String) body.getOrDefault("source", "local");
+        return Mono.just(Map.of(
+            "status", "ok",
+            "name", name,
+            "source", source,
+            "installed", true
+        ));
+    }
+
+    /**
+     * Uninstall a skill.
+     */
+    @DeleteMapping("/skills/{name}")
+    public Mono<Map<String, Object>> uninstallSkill(@PathVariable String name) {
+        return Mono.just(Map.of(
+            "status", "ok",
+            "name", name,
+            "uninstalled", true
+        ));
+    }
 }

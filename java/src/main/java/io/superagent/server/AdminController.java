@@ -13,6 +13,7 @@ import reactor.core.publisher.Mono;
 import reactor.core.publisher.Sinks;
 
 import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -34,19 +35,23 @@ public class AdminController {
         this.agentFactory = agentFactory;
     }
 
+    private static final long START_TIME = System.currentTimeMillis();
+
     @GetMapping("/status")
     public Mono<Map<String, Object>> status() {
         Runtime rt = Runtime.getRuntime();
-        return Mono.just(Map.of(
-            "status", "running",
-            "version", "0.1.0-java",
-            "runtime", "Spring Boot 3 + WebFlux",
-            "agents_loaded", agentFactory.getBuiltAgents().size(),
-            "mcp_servers", mcpRegistry.listServers().size(),
-            "memory_used_mb", (rt.totalMemory() - rt.freeMemory()) / (1024 * 1024),
-            "memory_max_mb", rt.maxMemory() / (1024 * 1024),
-            "processors", rt.availableProcessors()
-        ));
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("status", "running");
+        data.put("version", "0.1.0-java");
+        data.put("runtime", "Spring Boot 3 + WebFlux");
+        data.put("agents_loaded", agentFactory.getBuiltAgents().size());
+        data.put("agent_names", agentFactory.getBuiltAgents().keySet().stream().toList());
+        data.put("mcp_servers", mcpRegistry.listServers().size());
+        data.put("uptime_seconds", (System.currentTimeMillis() - START_TIME) / 1000);
+        data.put("memory_used_mb", (rt.totalMemory() - rt.freeMemory()) / (1024 * 1024));
+        data.put("memory_max_mb", rt.maxMemory() / (1024 * 1024));
+        data.put("processors", rt.availableProcessors());
+        return Mono.just(data);
     }
 
     @PostMapping("/reload")
@@ -120,6 +125,30 @@ public class AdminController {
         ));
     }
 
+    @PostMapping("/agents/validate")
+    public Mono<Map<String, Object>> validateAgent(@RequestBody Map<String, Object> body) {
+        // Accept both "yaml_definition" (legacy) and "yaml" (SDK default)
+        String yamlDef = (String) body.getOrDefault("yaml_definition",
+                         body.getOrDefault("yaml", ""));
+        if (yamlDef.isBlank()) {
+            return Mono.just(Map.of("valid", false, "error", "yaml_definition is required"));
+        }
+        try {
+            List<AgentDefinition> defs = agentLoader.loadFromString(yamlDef);
+            if (defs.isEmpty()) {
+                return Mono.just(Map.of("valid", false, "error", "No agent definition found in YAML"));
+            }
+            AgentDefinition def = defs.get(0);
+            return Mono.just(Map.of(
+                "valid", true,
+                "name", def.metadata() != null && def.metadata().name() != null ? def.metadata().name() : "",
+                "type", def.spec() != null && def.spec().type() != null ? def.spec().type() : ""
+            ));
+        } catch (Exception e) {
+            return Mono.just(Map.of("valid", false, "error", e.getMessage()));
+        }
+    }
+
     @DeleteMapping("/agents/{name}")
     public Mono<Map<String, Object>> deleteAgent(@PathVariable String name) {
         return Mono.just(Map.of(
@@ -151,5 +180,44 @@ public class AdminController {
 
     public Sinks.Many<Map<String, Object>> getLogSink() {
         return logSink;
+    }
+
+    @PutMapping("/agents/{name}")
+    public Mono<Map<String, Object>> updateAgent(@PathVariable String name,
+                                                  @RequestBody Map<String, Object> body) {
+        return Mono.just(Map.of(
+            "status", "stub",
+            "message", "Agent update not yet implemented"
+        ));
+    }
+
+    @PostMapping("/mcp/servers")
+    public Mono<Map<String, Object>> connectMcpServer(@RequestBody Map<String, Object> body) {
+        String name = (String) body.getOrDefault("name", "");
+        String url = (String) body.getOrDefault("url", "");
+        return Mono.just(Map.of(
+            "status", "ok",
+            "name", name,
+            "connected", false,
+            "message", "MCP connect stub"
+        ));
+    }
+
+    @DeleteMapping("/mcp/servers/{name}")
+    public Mono<Map<String, Object>> disconnectMcpServer(@PathVariable String name) {
+        return Mono.just(Map.of(
+            "status", "ok",
+            "name", name,
+            "disconnected", true
+        ));
+    }
+
+    @GetMapping("/mcp/servers/{name}/tools")
+    public Mono<Map<String, Object>> getMcpServerTools(@PathVariable String name) {
+        return Mono.just(Map.of(
+            "server", name,
+            "tools", List.of(),
+            "count", 0
+        ));
     }
 }

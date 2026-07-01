@@ -1,5 +1,7 @@
 package io.superagent.server;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.agentscope.core.agent.Event;
 import io.agentscope.core.agent.EventType;
 import io.agentscope.core.agent.RuntimeContext;
@@ -11,6 +13,7 @@ import io.superagent.mcp.MCPRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.MediaType;
+import org.springframework.http.codec.ServerSentEvent;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -38,6 +41,7 @@ public class ChatController {
     private final AgentBuilderFactory agentFactory;
     private final YamlAgentLoader agentLoader;
     private final MCPRegistry mcpRegistry;
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     public ChatController(AgentBuilderFactory agentFactory, YamlAgentLoader agentLoader,
                           MCPRegistry mcpRegistry) {
@@ -86,24 +90,21 @@ public class ChatController {
     }
 
     /**
-     * Streaming chat endpoint (SSE).
+     * Streaming chat endpoint (SSE) — A2UI protocol.
      *
-     * <p>Returns a stream of Server-Sent Events following the A2UI protocol.
-     * Events are typed via {@link EventType} and encoded as JSON.</p>
-     *
-     * @param request chat request body
-     * @return SSE event stream
+     * <p>Each event is: {@code data: {"type":"<t>","data":"<content>"}\n\n}
+     * matching the Go/Python A2UI contract expected by the frontend.</p>
      */
     @PostMapping(value = "/chat/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public Flux<Map<String, Object>> chatStream(@RequestBody Map<String, Object> request) {
+    public Flux<ServerSentEvent<String>> chatStream(@RequestBody Map<String, Object> request) {
         String agentId = (String) request.getOrDefault("agent_id", "default");
         String sessionId = (String) request.getOrDefault("session_id", "default");
 
         BaseAgent agent = resolveAgent(agentId);
         if (agent == null) {
             return Flux.just(
-                Map.<String, Object>of("event", "error", "data", "Agent not found: " + agentId),
-                Map.<String, Object>of("event", "done", "data", "")
+                sseEvent("error", "Agent not found: " + agentId),
+                sseEvent("done", "")
             );
         }
 
@@ -112,12 +113,12 @@ public class ChatController {
             .build();
 
         return agent.callStream(request, context)
-            .map(this::eventToSseMap)
+            .map(this::eventToSse)
             .onErrorResume(e -> {
                 log.error("Stream error for agent {}: {}", agentId, e.getMessage());
                 return Flux.just(
-                    Map.<String, Object>of("event", "error", "data", e.getMessage()),
-                    Map.<String, Object>of("event", "done", "data", "")
+                    sseEvent("error", e.getMessage()),
+                    sseEvent("done", "")
                 );
             });
     }
@@ -231,29 +232,35 @@ public class ChatController {
     }
 
     /**
-     * Convert an Event to an SSE-compatible map.
+     * Convert an AgentScope Event to an A2UI ServerSentEvent.
+     * Output format: data: {"type":"<t>","data":"<content>"}\n\n
      */
-    private Map<String, Object> eventToSseMap(Event event) {
-        Map<String, Object> sse = new LinkedHashMap<>();
-        sse.put("event", event.getType().name().toLowerCase());
-        sse.put("last", event.isLast());
-
-        Msg msg = event.getMessage();
-        if (msg != null) {
-            sse.put("data", msg.getTextContent());
-        }
-
-        // Map AgentScope event types to A2UI-style names
-        String eventName = switch (event.getType()) {
+    private ServerSentEvent<String> eventToSse(Event event) {
+        String eventType = switch (event.getType()) {
             case REASONING -> "thinking";
             case TOOL_RESULT -> "tool_result";
             case HINT -> "progress";
             case AGENT_RESULT -> "done";
-            case SUMMARY -> "summary";
-            case ALL -> "all";
+            case SUMMARY -> "text";
+            case ALL -> "text";
         };
-        sse.put("event", eventName);
 
-        return sse;
+        Msg msg = event.getMessage();
+        String content = (msg != null) ? msg.getTextContent() : "";
+        return sseEvent(eventType, content);
+    }
+
+    /** Build a properly-formatted A2UI SSE data frame. */
+    private ServerSentEvent<String> sseEvent(String type, String data) {
+        try {
+            String json = objectMapper.writeValueAsString(
+                Map.of("type", type, "data", data == null ? "" : data)
+            );
+            return ServerSentEvent.<String>builder().data(json).build();
+        } catch (JsonProcessingException e) {
+            return ServerSentEvent.<String>builder()
+                .data("{\"type\":\"error\",\"data\":\"json serialization failed\"}")
+                .build();
+        }
     }
 }

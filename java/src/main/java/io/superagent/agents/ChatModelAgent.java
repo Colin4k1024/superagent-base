@@ -11,6 +11,8 @@ import io.agentscope.core.model.Model;
 import io.agentscope.core.model.OpenAIChatModel;
 import io.agentscope.core.tool.Toolkit;
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 
 import java.util.List;
 import java.util.Map;
@@ -54,33 +56,40 @@ public class ChatModelAgent extends BaseAgent {
 
     @Override
     public Map<String, Object> run(Map<String, Object> input) {
-        RuntimeContext context = RuntimeContext.builder()
-            .sessionId(input.getOrDefault("session_id", "default").toString())
-            .build();
-
-        String userMessage = input.getOrDefault("message", "").toString();
-        Msg userMsg = Msg.builder()
-            .role(MsgRole.USER)
-            .textContent(userMessage)
-            .build();
-
-        // Call the ReActAgent (blocking)
-        Msg result = reactAgent.call(List.of(userMsg), context).block();
-
-        String content = result != null ? result.getTextContent() : "";
-
-        // Merge agent metadata into result
-        return new java.util.LinkedHashMap<>(Map.of(
-            "agent", getName(),
-            "type", getAgentType(),
-            "model", modelName,
-            "content", content
-        ));
+        return runReactive(input).block();
     }
 
-    @SuppressWarnings("removal") // stream(List,StreamOptions,RuntimeContext) is the only public API
-    // for per-call RuntimeContext binding via composition; withRuntimeContext is protected on ReActAgent.
-    // Migrate when AgentScope exposes a public context-binding alternative.
+    /**
+     * Reactive version of run() that offloads blocking LLM calls to boundedElastic scheduler.
+     */
+    public Mono<Map<String, Object>> runReactive(Map<String, Object> input) {
+        return Mono.<Map<String, Object>>fromCallable(() -> {
+            RuntimeContext context = RuntimeContext.builder()
+                .sessionId(input.getOrDefault("session_id", "default").toString())
+                .build();
+
+            String userMessage = input.getOrDefault("message", "").toString();
+            Msg userMsg = Msg.builder()
+                .role(MsgRole.USER)
+                .textContent(userMessage)
+                .build();
+
+            // Call the ReActAgent - safe on boundedElastic thread
+            Msg result = reactAgent.call(List.of(userMsg), context).block();
+
+            String content = result != null ? result.getTextContent() : "";
+
+            Map<String, Object> response = new java.util.LinkedHashMap<>();
+            response.put("agent", getName());
+            response.put("type", getAgentType());
+            response.put("model", modelName);
+            response.put("content", content);
+
+            return response;
+        }).subscribeOn(Schedulers.boundedElastic());
+    }
+
+    @SuppressWarnings("removal")
     @Override
     public Flux<Event> callStream(Map<String, Object> input, RuntimeContext context) {
         String userMessage = input.getOrDefault("message", "").toString();
@@ -89,11 +98,11 @@ public class ChatModelAgent extends BaseAgent {
             .textContent(userMessage)
             .build();
 
-        return reactAgent.stream(
+        return Flux.defer(() -> reactAgent.stream(
             List.of(userMsg),
             io.agentscope.core.agent.StreamOptions.defaults(),
             context
-        );
+        )).subscribeOn(Schedulers.boundedElastic());
     }
 
     @Override
