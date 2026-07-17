@@ -7,7 +7,7 @@ metadata:
 spec:
   type: chat_model_agent
   model:
-    primary: qwen-max
+    primary: Qwen3-Coder-Next-4bit
   system_prompt: |
     You are a safety-aware assistant. When the user asks you to perform
     potentially dangerous operations (delete files, send emails, make purchases),

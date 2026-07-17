@@ -1,0 +1,47 @@
+server:
+  port: 8890
+
+spring:
+  application:
+    name: superagent-base-java
+  redis:
+    url: redis://localhost:6379
+  jackson:
+    default-property-inclusion: non_null
+    serialization:
+      write-dates-as-timestamps: false
+
+# Superagent-specific configuration
+superagent:
+  agents-dir: configs/agents
+  version: "0.1.0"
+
+  # Agent runtime defaults
+  agent:
+    max-steps: 10
+    timeout-seconds: 120
+
+  # Model routing defaults
+  models:
+    default-provider: openai
+    fallback-enabled: true
+
+# Actuator / Observability
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,metrics
+  endpoint:
+    health:
+      show-details: when_authorized
+  metrics:
+    tags:
+      application: ${spring.application.name}
+
+logging:
+  level:
+    io.superagent: INFO
+    io.agentscope: INFO
+  pattern:
+    console: "%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
