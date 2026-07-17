@@ -56,6 +56,7 @@ import (
 	"github.com/superagent-ai/superagent-base/backend/pkg/skill"
 	skillbuiltin "github.com/superagent-ai/superagent-base/backend/pkg/skill/builtin"
 	"github.com/superagent-ai/superagent-base/backend/pkg/tool"
+	toolbuiltin "github.com/superagent-ai/superagent-base/backend/pkg/tool/builtin"
 	"github.com/superagent-ai/superagent-base/backend/pkg/webhook"
 	"github.com/superagent-ai/superagent-base/backend/types/consts"
 )
@@ -174,6 +175,10 @@ func main() {
 	}
 
 	// Build the ToolManager and register all built-in tools.
+	// Wire skill manager into builtin tools via the bridge adapter so that
+	// invoke_skill, list_skills, and install_skill can access skills at runtime.
+	toolbuiltin.InitSkillBridge(skill.NewBridgeAdapter(skillMgr))
+
 	// Shared between the AgentBuilder (resolves builtin:// refs in YAML) and
 	// the gRPC ToolService (exposes registered tools via ListTools/GetTool/InvokeTool).
 	toolMgr := tool.NewManager()

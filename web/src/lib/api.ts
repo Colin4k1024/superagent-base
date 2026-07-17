@@ -582,6 +582,21 @@ export const chatApi = {
     run()
     return controller
   },
+
+  /**
+   * Check if a session has a pending interrupt.
+   */
+  async interruptState(agentId: string, sessionId: string): Promise<{ interrupted: boolean; state?: unknown }> {
+    try {
+      const res = await fetch(`${API_BASE}/chat/interrupt_state?agent_id=${encodeURIComponent(agentId)}&session_id=${encodeURIComponent(sessionId)}`, {
+        headers: authHeaders(),
+      })
+      if (!res.ok) return { interrupted: false }
+      return res.json()
+    } catch {
+      return { interrupted: false }
+    }
+  },
 }
 
 // Evolution API

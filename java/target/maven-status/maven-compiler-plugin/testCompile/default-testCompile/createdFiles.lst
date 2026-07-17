@@ -1,0 +1,10 @@
+io/superagent/agents/ParallelAgentTest$StubChild.class
+io/superagent/agents/ParallelAgentTest.class
+io/superagent/agents/SequentialAgentTest.class
+io/superagent/agents/WorkflowAgentTest.class
+io/superagent/server/ChatControllerTest.class
+io/superagent/agents/SequentialAgentTest$StubStep.class
+io/superagent/agents/BaseAgentTest.class
+io/superagent/tools/CodeExecuteToolTest.class
+io/superagent/server/ChatControllerTest$TestBeans.class
+io/superagent/agents/BaseAgentTest$StubAgent.class

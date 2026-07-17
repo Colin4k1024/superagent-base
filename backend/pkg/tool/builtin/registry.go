@@ -34,5 +34,15 @@ func GetAllBuiltinTools() []tool.InvokableTool {
 	if t := newHiAgentRAGTool(); t != nil {
 		tools = append(tools, t)
 	}
+	// Dynamic skill bridge tools (nil when InitSkillBridge not called).
+	if t := newInvokeSkillTool(); t != nil {
+		tools = append(tools, t)
+	}
+	if t := newListSkillsTool(); t != nil {
+		tools = append(tools, t)
+	}
+	if t := newInstallSkillTool(); t != nil {
+		tools = append(tools, t)
+	}
 	return tools
 }

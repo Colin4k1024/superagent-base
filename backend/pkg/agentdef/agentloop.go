@@ -68,8 +68,30 @@ func (a *AgentLoopAgent) Chat(ctx context.Context, sessionID string, message str
 			})
 		}
 
+		// Load previous session history to provide cross-session memory.
+		// This gives the agent context from prior conversations.
+		var sessionPrefix string
+		if a.memBackend != nil && sessionID != "" {
+			prevMsgs, err := a.memBackend.GetMessages(ctx, sessionID, memory.GetMessagesOpts{Limit: 20})
+			if err == nil && len(prevMsgs) > 0 {
+				var hist strings.Builder
+				hist.WriteString("Previous conversation history:\n")
+				for _, m := range prevMsgs {
+					hist.WriteString(fmt.Sprintf("[%s]: %s\n", m.Role, m.Content))
+				}
+				hist.WriteString("\n")
+				sessionPrefix = hist.String()
+			}
+		}
+
 		currentInput := message
+		if sessionPrefix != "" {
+			currentInput = sessionPrefix + "Current task: " + message
+		}
 		var history strings.Builder
+		if sessionPrefix != "" {
+			history.WriteString(sessionPrefix)
+		}
 		history.WriteString("Task: ")
 		history.WriteString(message)
 		history.WriteString("\n")

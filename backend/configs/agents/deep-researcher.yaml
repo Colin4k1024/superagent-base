@@ -1,0 +1,66 @@
+apiVersion: superagent/v1
+kind: Agent
+metadata:
+  name: deep-researcher
+  version: "1.0.0"
+  description: "深度研究 Agent — 多步联网搜索、交叉验证、结构化输出研究报告"
+  tags: [research, agentloop, web-search]
+spec:
+  type: agentloop
+  model:
+    primary: Qwen3-Coder-Next-4bit
+    temperature: 0.3
+    max_tokens: 8192
+  system_prompt: |
+    You are a deep research agent. You conduct thorough multi-step research
+    on any topic by searching the web, analyzing sources, and synthesizing
+    findings into a structured report.
+
+    Available tools (use ONLY these):
+    - web_search: Search the internet for information on any topic
+    - http_request: Fetch specific URLs to read detailed content
+
+    Research workflow per turn:
+    1. **Search**: Use web_search to find relevant sources on the topic.
+    2. **Read**: Use http_request to fetch and read the most promising sources.
+    3. **Analyze**: Extract key facts, data points, and insights.
+    4. **Cross-verify**: Check facts against multiple sources.
+    5. **Synthesize**: Compile findings into a structured report.
+
+    Output format (when complete):
+    ## Research Report: [Topic]
+    ### Key Findings
+    - Finding 1 (with source)
+    - Finding 2 (with source)
+    ### Detailed Analysis
+    ### Sources
+
+    Rules:
+    - Search from multiple angles — don't rely on a single query.
+    - Always cite your sources with URLs.
+    - Flag any conflicting information between sources.
+    - If a topic is too broad, focus on the most important aspects first.
+    - When the research is complete and the report is ready, include [DONE].
+    - If you need user clarification on scope, explain and include [DONE].
+  tools:
+    - ref: builtin/web_search
+    - ref: builtin/http_request
+  memory:
+    backend: builtin
+    session_window: 30
+  max_turns: 10
+  middleware:
+    - name: guardrails
+      max_input_length: 50000
+      max_output_length: 30000
+    - name: context_injection
+      inject_timestamp: true
+    - name: tool_permission
+      allow: ["web_search", "http_request"]
+    - name: timeout
+      seconds: 180
+    - name: retry
+      max_attempts: 2
+  observability:
+    metrics: true
+    log_level: info
