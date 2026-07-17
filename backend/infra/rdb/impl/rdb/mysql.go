@@ -46,9 +46,19 @@ func (m *mysqlService) CreateTable(ctx context.Context, req *rdb.CreateTableRequ
 		return nil, fmt.Errorf("invalid request")
 	}
 
+	// Validate table name
+	if req.Table.Name != "" {
+		if err := ValidateIdentifier(req.Table.Name); err != nil {
+			return nil, fmt.Errorf("invalid table name: %w", err)
+		}
+	}
+
 	// build column definitions
 	columnDefs := make([]string, 0, len(req.Table.Columns))
 	for _, col := range req.Table.Columns {
+		if err := ValidateIdentifier(col.Name); err != nil {
+			return nil, fmt.Errorf("invalid column name: %w", err)
+		}
 		colDef := fmt.Sprintf("`%s` %s", col.Name, col.DataType)
 
 		if col.Length != nil {
@@ -81,6 +91,14 @@ func (m *mysqlService) CreateTable(ctx context.Context, req *rdb.CreateTableRequ
 
 	// build index definitions
 	for _, idx := range req.Table.Indexes {
+		if err := ValidateFieldList(idx.Columns); err != nil {
+			return nil, fmt.Errorf("invalid index columns: %w", err)
+		}
+		if idx.Name != "" {
+			if err := ValidateIdentifier(idx.Name); err != nil {
+				return nil, fmt.Errorf("invalid index name: %w", err)
+			}
+		}
 		var idxDef string
 		switch idx.Type {
 		case entity.PrimaryKey:
@@ -140,6 +158,10 @@ func (m *mysqlService) AlterTable(ctx context.Context, req *rdb.AlterTableReques
 		return nil, fmt.Errorf("invalid request")
 	}
 
+	if err := ValidateIdentifier(req.TableName); err != nil {
+		return nil, fmt.Errorf("invalid table name: %w", err)
+	}
+
 	alterSQL := fmt.Sprintf("ALTER TABLE `%s`", req.TableName)
 	operations := make([]string, 0, len(req.Operations))
 
@@ -148,6 +170,9 @@ func (m *mysqlService) AlterTable(ctx context.Context, req *rdb.AlterTableReques
 		case entity.AddColumn:
 			if op.Column == nil {
 				return nil, fmt.Errorf("column is required for ADD COLUMN operation")
+			}
+			if err := ValidateIdentifier(op.Column.Name); err != nil {
+				return nil, fmt.Errorf("invalid column name: %w", err)
 			}
 			colDef := fmt.Sprintf("ADD COLUMN `%s` %s", op.Column.Name, op.Column.DataType)
 			if op.Column.Length != nil {
@@ -174,11 +199,17 @@ func (m *mysqlService) AlterTable(ctx context.Context, req *rdb.AlterTableReques
 			if op.Column == nil {
 				return nil, fmt.Errorf("column is required for DROP COLUMN operation")
 			}
+			if err := ValidateIdentifier(op.Column.Name); err != nil {
+				return nil, fmt.Errorf("invalid column name: %w", err)
+			}
 			operations = append(operations, fmt.Sprintf("DROP COLUMN `%s`", op.Column.Name))
 
 		case entity.ModifyColumn:
 			if op.Column == nil {
 				return nil, fmt.Errorf("column is required for MODIFY COLUMN operation")
+			}
+			if err := ValidateIdentifier(op.Column.Name); err != nil {
+				return nil, fmt.Errorf("invalid column name: %w", err)
 			}
 			colDef := fmt.Sprintf("MODIFY COLUMN `%s` %s", op.Column.Name, op.Column.DataType)
 			if op.Column.Length != nil {
@@ -192,11 +223,22 @@ func (m *mysqlService) AlterTable(ctx context.Context, req *rdb.AlterTableReques
 			if op.Column == nil || op.OldName == nil {
 				return nil, fmt.Errorf("column and old name are required for RENAME COLUMN operation")
 			}
+			if err := ValidateIdentifiers(*op.OldName, op.Column.Name); err != nil {
+				return nil, fmt.Errorf("invalid column name: %w", err)
+			}
 			operations = append(operations, fmt.Sprintf("RENAME COLUMN `%s` TO `%s`", *op.OldName, op.Column.Name))
 
 		case entity.AddIndex:
 			if op.Index == nil {
 				return nil, fmt.Errorf("index is required for ADD INDEX operation")
+			}
+			if err := ValidateFieldList(op.Index.Columns); err != nil {
+				return nil, fmt.Errorf("invalid index columns: %w", err)
+			}
+			if op.Index.Name != "" {
+				if err := ValidateIdentifier(op.Index.Name); err != nil {
+					return nil, fmt.Errorf("invalid index name: %w", err)
+				}
 			}
 			var idxDef string
 			switch op.Index.Type {
@@ -234,6 +276,10 @@ func (m *mysqlService) DropTable(ctx context.Context, req *rdb.DropTableRequest)
 		return nil, fmt.Errorf("invalid request")
 	}
 
+	if err := ValidateIdentifier(req.TableName); err != nil {
+		return nil, fmt.Errorf("invalid table name: %w", err)
+	}
+
 	dropSQL := "DROP TABLE"
 	if req.IfExists {
 		dropSQL += " IF EXISTS"
@@ -256,6 +302,10 @@ func (m *mysqlService) GetTable(ctx context.Context, req *rdb.GetTableRequest) (
 		return nil, fmt.Errorf("invalid request")
 	}
 
+	if err := ValidateIdentifier(req.TableName); err != nil {
+		return nil, fmt.Errorf("invalid table name: %w", err)
+	}
+
 	table, err := m.getTableInfo(ctx, req.TableName)
 	if err != nil {
 		return nil, err
@@ -269,9 +319,17 @@ func (m *mysqlService) InsertData(ctx context.Context, req *rdb.InsertDataReques
 		return nil, fmt.Errorf("invalid request")
 	}
 
+	if err := ValidateIdentifier(req.TableName); err != nil {
+		return nil, fmt.Errorf("invalid table name: %w", err)
+	}
+
 	fields := make([]string, 0)
 	for field := range req.Data[0] {
 		fields = append(fields, field)
+	}
+
+	if err := ValidateFieldList(fields); err != nil {
+		return nil, fmt.Errorf("invalid field names: %w", err)
 	}
 
 	const batchSize = 1000
@@ -326,6 +384,19 @@ func (m *mysqlService) UpdateData(ctx context.Context, req *rdb.UpdateDataReques
 		return nil, fmt.Errorf("invalid request")
 	}
 
+	if err := ValidateIdentifier(req.TableName); err != nil {
+		return nil, fmt.Errorf("invalid table name: %w", err)
+	}
+
+	// Validate field names in data map
+	dataFields := make([]string, 0, len(req.Data))
+	for field := range req.Data {
+		dataFields = append(dataFields, field)
+	}
+	if err := ValidateFieldList(dataFields); err != nil {
+		return nil, fmt.Errorf("invalid field names: %w", err)
+	}
+
 	setClauses := make([]string, 0)
 	values := make([]interface{}, 0)
 	for field, value := range req.Data {
@@ -369,6 +440,10 @@ func (m *mysqlService) DeleteData(ctx context.Context, req *rdb.DeleteDataReques
 		return nil, fmt.Errorf("invalid request")
 	}
 
+	if err := ValidateIdentifier(req.TableName); err != nil {
+		return nil, fmt.Errorf("invalid table name: %w", err)
+	}
+
 	whereClause, whereValues, err := m.buildWhereClause(req.Where)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build where clause: %v", err)
@@ -403,8 +478,15 @@ func (m *mysqlService) SelectData(ctx context.Context, req *rdb.SelectDataReques
 		return nil, fmt.Errorf("invalid request")
 	}
 
+	if err := ValidateIdentifier(req.TableName); err != nil {
+		return nil, fmt.Errorf("invalid table name: %w", err)
+	}
+
 	fields := "*"
 	if len(req.Fields) > 0 {
+		if err := ValidateFieldList(req.Fields); err != nil {
+			return nil, fmt.Errorf("invalid field names: %w", err)
+		}
 		fields = strings.Join(req.Fields, ", ")
 	}
 
@@ -423,7 +505,10 @@ func (m *mysqlService) SelectData(ctx context.Context, req *rdb.SelectDataReques
 	if len(req.OrderBy) > 0 {
 		orders := make([]string, len(req.OrderBy))
 		for i, order := range req.OrderBy {
-			orders[i] = fmt.Sprintf("%s %s", order.Field, order.Direction)
+			if err := ValidateIdentifier(order.Field); err != nil {
+				return nil, fmt.Errorf("invalid order by field: %w", err)
+			}
+			orders[i] = fmt.Sprintf("`%s` %s", order.Field, order.Direction)
 		}
 		orderByClause = " ORDER BY " + strings.Join(orders, ", ")
 	}
@@ -504,6 +589,10 @@ func (m *mysqlService) UpsertData(ctx context.Context, req *rdb.UpsertDataReques
 		return nil, fmt.Errorf("invalid request: empty data")
 	}
 
+	if err := ValidateIdentifier(req.TableName); err != nil {
+		return nil, fmt.Errorf("invalid table name: %w", err)
+	}
+
 	keys := req.Keys
 	if len(keys) == 0 {
 		primaryKeys, err := m.getTablePrimaryKeys(ctx, req.TableName)
@@ -521,6 +610,13 @@ func (m *mysqlService) UpsertData(ctx context.Context, req *rdb.UpsertDataReques
 	fields := make([]string, 0)
 	for field := range req.Data[0] {
 		fields = append(fields, field)
+	}
+
+	if err := ValidateFieldList(fields); err != nil {
+		return nil, fmt.Errorf("invalid field names: %w", err)
+	}
+	if err := ValidateFieldList(keys); err != nil {
+		return nil, fmt.Errorf("invalid key names: %w", err)
 	}
 
 	const batchSize = 1000
@@ -634,9 +730,24 @@ func calculateInsertedUpdated(affectedRows int64, batchSize int) (int64, int64, 
 }
 
 // ExecuteSQL Execute SQL
+// WARNING: This method accepts raw SQL and is inherently dangerous.
+// Callers MUST ensure the SQL is trusted and not derived from user input.
+// For user-facing queries, use SelectData/InsertData/UpdateData/DeleteData instead.
 func (m *mysqlService) ExecuteSQL(ctx context.Context, req *rdb.ExecuteSQLRequest) (*rdb.ExecuteSQLResponse, error) {
 	if req == nil {
 		return nil, fmt.Errorf("invalid request")
+	}
+
+	// Reject obviously dangerous statements from non-raw mode
+	if req.SQLType != entity.SQLType_Raw {
+		upperSQL := strings.TrimSpace(strings.ToUpper(req.SQL))
+		if strings.HasPrefix(upperSQL, "DROP ") ||
+			strings.HasPrefix(upperSQL, "ALTER ") ||
+			strings.HasPrefix(upperSQL, "TRUNCATE ") ||
+			strings.HasPrefix(upperSQL, "GRANT ") ||
+			strings.HasPrefix(upperSQL, "REVOKE ") {
+			return nil, fmt.Errorf("ExecuteSQL: dangerous statement type rejected for non-raw mode")
+		}
 	}
 
 	logs.CtxInfof(ctx, "[ExecuteSQL] req is %v", req)
@@ -947,6 +1058,9 @@ func (m *mysqlService) buildWhereCondition(condition *rdb.ComplexCondition) (str
 	var whereClause strings.Builder
 	values := make([]interface{}, 0)
 	for i, cond := range condition.Conditions {
+		if err := ValidateIdentifier(cond.Field); err != nil {
+			return "", nil, fmt.Errorf("invalid where field %q: %w", cond.Field, err)
+		}
 		if i > 0 {
 			whereClause.WriteString(fmt.Sprintf(" %s ", condition.Operator))
 		}

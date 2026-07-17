@@ -1,0 +1,8 @@
+apiVersion: superagent/v1
+kind: Agent
+metadata:
+  name: new-test-agent
+spec:
+  type: chat_model_agent
+  model:
+    primary: gpt-4o

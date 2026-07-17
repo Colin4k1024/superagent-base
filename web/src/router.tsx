@@ -2,6 +2,7 @@ import { createBrowserRouter, Navigate } from 'react-router-dom'
 import Layout from './components/Layout'
 import { AuthGuard } from './components/AuthGuard'
 import LoginPage from './pages/LoginPage'
+import DashboardPage from './pages/DashboardPage'
 import AgentsPage from './pages/AgentsPage'
 import AgentEditPage from './pages/AgentEditPage'
 import WorkflowEditorPage from './pages/WorkflowEditorPage'
@@ -22,7 +23,7 @@ export const router = createBrowserRouter([
         path: '/',
         element: <Layout />,
         children: [
-          { index: true, element: <Navigate to="/agents" replace /> },
+          { index: true, element: <DashboardPage /> },
           { path: 'agents', element: <AgentsPage /> },
           { path: 'agents/new', element: <AgentEditPage /> },
           { path: 'agents/:name/edit', element: <AgentEditPage /> },

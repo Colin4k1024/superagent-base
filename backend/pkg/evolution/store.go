@@ -207,6 +207,56 @@ func (s *LocalGeneStore) Stats(_ context.Context) (StoreStats, error) {
 	return stats, nil
 }
 
+// ListAll returns all genes in the store.
+func (s *LocalGeneStore) ListAll(_ context.Context) ([]*Gene, error) {
+	if s == nil || s.db == nil {
+		return nil, nil
+	}
+	var genes []*Gene
+	if err := s.db.Find(&genes).Error; err != nil {
+		return nil, fmt.Errorf("evolution store: list all: %w", err)
+	}
+	return genes, nil
+}
+
+// UpdateConfidence updates the confidence of a specific gene.
+func (s *LocalGeneStore) UpdateConfidence(_ context.Context, id string, confidence float64) error {
+	if s == nil || s.db == nil {
+		return fmt.Errorf("store is nil")
+	}
+	return s.db.Model(&Gene{}).Where("id = ?", id).Updates(map[string]interface{}{
+		"confidence": confidence,
+		"updated_at": time.Now(),
+	}).Error
+}
+
+// UpdateGene updates a gene record.
+func (s *LocalGeneStore) UpdateGene(_ context.Context, gene *Gene) error {
+	if s == nil || s.db == nil {
+		return fmt.Errorf("store is nil")
+	}
+	gene.UpdatedAt = time.Now()
+	return s.db.Save(gene).Error
+}
+
+// DeleteGene deletes a gene by ID.
+func (s *LocalGeneStore) DeleteGene(_ context.Context, id string) error {
+	if s == nil || s.db == nil {
+		return fmt.Errorf("store is nil")
+	}
+	return s.db.Delete(&Gene{}, "id = ?", id).Error
+}
+
+// DeleteLowConfidence deletes genes with confidence below the threshold
+// that were last updated before the cutoff time.
+func (s *LocalGeneStore) DeleteLowConfidence(_ context.Context, minConfidence float64, before time.Time) (int64, error) {
+	if s == nil || s.db == nil {
+		return 0, fmt.Errorf("store is nil")
+	}
+	result := s.db.Delete(&Gene{}, "confidence < ? AND updated_at < ?", minConfidence, before)
+	return result.RowsAffected, result.Error
+}
+
 // IncrementUse bumps use_count and optionally success_count for a gene.
 func (s *LocalGeneStore) IncrementUse(_ context.Context, geneID string, success bool) error {
 	if s == nil || s.db == nil {
