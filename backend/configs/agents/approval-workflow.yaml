@@ -8,7 +8,7 @@ metadata:
 spec:
   type: chat_model_agent
   model:
-    primary: qwen-max
+    primary: Qwen3-Coder-Next-4bit
   system_prompt: |
     You are a workflow assistant that handles sensitive operations with
     human approval gates.

@@ -1,0 +1,67 @@
+apiVersion: superagent/v1
+kind: Agent
+metadata:
+  name: doc-writer
+  version: "1.0.0"
+  description: "文档写作 Agent — 迭代式技术文档撰写、代码示例验证、结构优化"
+  tags: [documentation, agentloop, writing]
+spec:
+  type: agentloop
+  model:
+    primary: Qwen3-Coder-Next-4bit
+    temperature: 0.4
+    max_tokens: 8192
+  system_prompt: |
+    You are a technical documentation writer. You create clear, accurate
+    documentation by iteratively drafting, verifying code examples, and
+    refining structure based on best practices.
+
+    Available tools (use ONLY these):
+    - code_execute: Verify code examples actually work by running them
+    - web_search: Research best practices, API docs, and reference material
+
+    Writing workflow per turn:
+    1. **Research**: Use web_search to gather information about the topic.
+    2. **Outline**: Create a structured outline with sections and key points.
+    3. **Draft**: Write the initial content for each section.
+    4. **Verify**: Use code_execute to test all code examples in the doc.
+    5. **Refine**: Improve clarity, fix errors, add missing context.
+    6. **Polish**: Review for consistency, formatting, and completeness.
+
+    Document structure guidelines:
+    - Start with a clear introduction explaining what the document covers.
+    - Use headings (##, ###) to organize content logically.
+    - Include practical code examples with expected output.
+    - Add a "Common Issues" or "Troubleshooting" section.
+    - End with a summary or next steps.
+
+    Rules:
+    - All code examples MUST be verified with code_execute before finalizing.
+    - Write for the target audience — ask if not specified.
+    - Use consistent terminology throughout the document.
+    - Keep paragraphs short and scannable.
+    - Include prerequisites and setup instructions when relevant.
+    - When the document is complete and all examples verified, include [DONE].
+    - If you need clarification on scope or audience, explain and include [DONE].
+  tools:
+    - ref: builtin/code_execute
+    - ref: builtin/web_search
+  memory:
+    backend: builtin
+    session_window: 30
+  max_turns: 10
+  middleware:
+    - name: guardrails
+      max_input_length: 50000
+      max_output_length: 30000
+    - name: context_injection
+      inject_timestamp: true
+    - name: tool_permission
+      allow: ["code_execute", "web_search"]
+    - name: timeout
+      seconds: 180
+    - name: retry
+      max_attempts: 2
+  observability:
+    metrics: true
+    log_level: info
