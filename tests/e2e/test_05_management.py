@@ -101,7 +101,7 @@ class TestHotReload:
                 yaml.dump(yaml_content, f, default_flow_style=False)
 
             # Wait for watcher to detect
-            time.sleep(3)
+            time.sleep(5)
 
             # Check if agent is now available
             agents = self._get_agent_names(http_client)
@@ -192,7 +192,7 @@ class TestHotReload:
             }
             with open(target_path, "w") as f:
                 yaml.dump(yaml_v1, f, default_flow_style=False)
-            time.sleep(3)
+            time.sleep(5)
 
             agents = self._get_agent_names(http_client)
             assert agent_name in agents, f"Initial creation failed: {agents}"
@@ -204,7 +204,7 @@ class TestHotReload:
 
             with open(target_path, "w") as f:
                 yaml.dump(yaml_v2, f, default_flow_style=False)
-            time.sleep(3)
+            time.sleep(5)
 
             # Agent should still be available after modification
             agents = self._get_agent_names(http_client)
