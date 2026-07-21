@@ -29,6 +29,7 @@ import (
 	agentv1 "github.com/superagent-ai/superagent-base/backend/api/grpc/gen/agent/v1"
 	"github.com/superagent-ai/superagent-base/backend/application/singleagent"
 	"github.com/superagent-ai/superagent-base/backend/pkg/agentdef"
+	"github.com/superagent-ai/superagent-base/backend/pkg/logs"
 )
 
 // AgentHandler implements agentv1.AgentServiceServer by delegating to
@@ -38,14 +39,16 @@ type AgentHandler struct {
 	svc       *singleagent.SingleAgentApplicationService
 	runtime   *agentdef.AgentRuntime
 	configDir string // path to configs/agents/
+	store     *agentdef.AgentDefinitionStore
 }
 
 // NewAgentHandler creates an AgentHandler.
 // svc may be nil during startup; the handler returns Unavailable in that case.
 // rt may be nil; YAML-based agent operations degrade gracefully.
 // configDir is the path to the agents YAML directory (e.g. "configs/agents").
-func NewAgentHandler(svc *singleagent.SingleAgentApplicationService, rt *agentdef.AgentRuntime, configDir string) *AgentHandler {
-	return &AgentHandler{svc: svc, runtime: rt, configDir: configDir}
+// store may be nil; DB operations degrade gracefully without it.
+func NewAgentHandler(svc *singleagent.SingleAgentApplicationService, rt *agentdef.AgentRuntime, configDir string, store *agentdef.AgentDefinitionStore) *AgentHandler {
+	return &AgentHandler{svc: svc, runtime: rt, configDir: configDir, store: store}
 }
 
 // CreateAgent creates a new agent.
@@ -58,14 +61,17 @@ func (h *AgentHandler) CreateAgent(_ context.Context, req *agentv1.CreateAgentRe
 			"CreateAgent requires a database-backed service; use LoadAgentFromYAML for YAML-based creation")
 	}
 	// TODO: delegate to h.svc once the domain method signatures are mapped.
-	return &agentv1.CreateAgentResponse{
-		Agent: &agentv1.Agent{
-			Name:        req.Name,
-			Description: req.Description,
-			SpaceId:     req.SpaceId,
-			IconUrl:     req.IconUrl,
-		},
-	}, nil
+	agent := &agentv1.Agent{
+		Name:        req.Name,
+		Description: req.Description,
+		SpaceId:     req.SpaceId,
+		IconUrl:     req.IconUrl,
+	}
+	// DB双写：保存元数据到数据库，失败不阻塞主流程。
+	if saveErr := h.store.Save(req.Name, "", req.Description, ""); saveErr != nil {
+		logs.Warnf("agentdef store: CreateAgent %q failed (non-fatal): %v", req.Name, saveErr)
+	}
+	return &agentv1.CreateAgentResponse{Agent: agent}, nil
 }
 
 // GetAgent retrieves an agent by ID.
@@ -81,7 +87,7 @@ func (h *AgentHandler) GetAgent(_ context.Context, req *agentv1.GetAgentRequest)
 }
 
 // ListAgents lists agents from the AgentRuntime (YAML-defined) when available,
-// otherwise falls back to the database-backed singleagent service.
+// otherwise falls back to the DB store, then the database-backed singleagent service.
 func (h *AgentHandler) ListAgents(_ context.Context, _ *agentv1.ListAgentsRequest) (*agentv1.ListAgentsResponse, error) {
 	if h.runtime != nil {
 		names := h.runtime.ListAgents()
@@ -102,6 +108,26 @@ func (h *AgentHandler) ListAgents(_ context.Context, _ *agentv1.ListAgentsReques
 			Total:  int32(len(agents)),
 		}, nil
 	}
+
+	// 降级：从 DB store 读取列表。
+	if h.store != nil {
+		records, err := h.store.List()
+		if err == nil && len(records) > 0 {
+			agents := make([]*agentv1.Agent, 0, len(records))
+			for _, r := range records {
+				agents = append(agents, &agentv1.Agent{
+					Name:        r.Name,
+					Description: r.Description,
+					Status:      r.Status,
+				})
+			}
+			return &agentv1.ListAgentsResponse{
+				Agents: agents,
+				Total:  int32(len(agents)),
+			}, nil
+		}
+	}
+
 	if h.svc == nil {
 		return nil, status.Error(codes.Unavailable, "agent service not initialised")
 	}
@@ -117,6 +143,10 @@ func (h *AgentHandler) UpdateAgent(_ context.Context, req *agentv1.UpdateAgentRe
 			"UpdateAgent requires a database-backed service; use LoadAgentFromYAML for YAML-based updates")
 	}
 	// TODO: delegate to h.svc once the domain method signatures are mapped.
+	// DB双写：更新数据库中的元数据，失败不阻塞主流程。
+	if saveErr := h.store.Save(req.Name, "", req.Description, ""); saveErr != nil {
+		logs.Warnf("agentdef store: UpdateAgent %q failed (non-fatal): %v", req.Name, saveErr)
+	}
 	return &agentv1.UpdateAgentResponse{
 		Agent: &agentv1.Agent{Id: req.AgentId, Name: req.Name},
 	}, nil
@@ -137,6 +167,9 @@ func (h *AgentHandler) DeleteAgent(ctx context.Context, req *agentv1.DeleteAgent
 		return nil, status.Error(codes.Unavailable, "agent service not initialised")
 	}
 	// TODO: delegate to h.svc once the domain method signatures are mapped.
+	// NOTE: DeleteAgentRequest only carries AgentId (int64); without a name we cannot
+	// identify the YAML-backed record in the AgentDefinitionStore. Soft-delete is
+	// only available through the HTTP DELETE /api/v1/admin/agents/:name endpoint.
 	return &agentv1.DeleteAgentResponse{Success: true}, nil
 }
 
@@ -170,6 +203,11 @@ func (h *AgentHandler) LoadAgentFromYAML(ctx context.Context, req *agentv1.LoadA
 
 	if err := os.WriteFile(destPath, []byte(req.YamlContent), 0o644); err != nil {
 		return nil, status.Errorf(codes.Internal, "write agent file: %v", err)
+	}
+
+	// DB双写：写文件成功后同步到数据库，失败不阻塞主流程。
+	if saveErr := h.store.Save(def.Metadata.Name, def.Spec.Type, def.Spec.SystemPrompt, req.YamlContent); saveErr != nil {
+		logs.Warnf("agentdef store: LoadAgentFromYAML %q failed (non-fatal): %v", def.Metadata.Name, saveErr)
 	}
 
 	if h.runtime != nil {
