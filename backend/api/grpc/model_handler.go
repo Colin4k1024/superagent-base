@@ -20,15 +20,20 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"time"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
 	modelv1 "github.com/superagent-ai/superagent-base/backend/api/grpc/gen/model/v1"
+	adminconfig "github.com/superagent-ai/superagent-base/backend/api/model/admin/config"
+	"github.com/superagent-ai/superagent-base/backend/api/model/app/developer_api"
 	"github.com/superagent-ai/superagent-base/backend/application/modelmgr"
 	"github.com/superagent-ai/superagent-base/backend/bizpkg/config"
 	bizmgr "github.com/superagent-ai/superagent-base/backend/bizpkg/config/modelmgr"
+	"github.com/superagent-ai/superagent-base/backend/bizpkg/llm/modelbuilder"
 	"github.com/superagent-ai/superagent-base/backend/pkg/logs"
+	"github.com/cloudwego/eino/schema"
 )
 
 // ModelHandler implements modelv1.ModelServiceServer by delegating to
@@ -173,36 +178,135 @@ func (h *ModelHandler) GetModel(ctx context.Context, req *modelv1.GetModelReques
 	return &modelv1.GetModelResponse{Model: modelDoToProto(m)}, nil
 }
 
-// CreateModel registers a new model configuration.
-// Full persistence is not yet implemented; the handler validates inputs and
-// returns a preview of the model that would be created.
-func (h *ModelHandler) CreateModel(_ context.Context, req *modelv1.CreateModelRequest) (*modelv1.CreateModelResponse, error) {
+// CreateModel registers a new model configuration and persists it to the DB.
+// It mirrors the HTTP CreateModel handler in config_service.go:
+//  1. Validate inputs and map proto fields to internal types.
+//  2. Build a transient LLM client and verify connectivity with a test prompt.
+//  3. Persist via ModelConfig.CreateModel and return the saved record.
+func (h *ModelHandler) CreateModel(ctx context.Context, req *modelv1.CreateModelRequest) (*modelv1.CreateModelResponse, error) {
 	if req.Name == "" {
 		return nil, status.Error(codes.InvalidArgument, "name is required")
 	}
-	// Persistence via modelmgr is not yet wired; return a preview.
-	return &modelv1.CreateModelResponse{
-		Model: &modelv1.Model{
-			Name:          req.Name,
-			Provider:      req.Provider,
-			Description:   req.Description,
-			Capabilities:  req.Capabilities,
-			ContextLength: req.ContextLength,
-			Enabled:       true,
-		},
-	}, nil
+	if req.Provider == "" {
+		return nil, status.Error(codes.InvalidArgument, "provider is required")
+	}
+
+	// Map provider string → ModelClass.
+	modelClass, err := developer_api.ModelClassFromString(req.Provider)
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "unsupported provider %q: %v", req.Provider, err)
+	}
+
+	// Build a Connection from the optional Config struct.
+	conn := &adminconfig.Connection{
+		BaseConnInfo: &adminconfig.BaseConnectionInfo{},
+	}
+	if req.Config != nil {
+		fields := req.Config.GetFields()
+		if v, ok := fields["base_url"]; ok {
+			conn.BaseConnInfo.BaseURL = v.GetStringValue()
+		}
+		if v, ok := fields["api_key"]; ok {
+			conn.BaseConnInfo.APIKey = v.GetStringValue()
+		}
+		if v, ok := fields["model"]; ok {
+			conn.BaseConnInfo.Model = v.GetStringValue()
+		}
+	}
+
+	// Verify connectivity: build a transient LLM client and run a trivial prompt.
+	builder, err := modelbuilder.NewModelBuilder(modelClass, &adminconfig.Model{Connection: conn})
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "build model builder failed: %v", err)
+	}
+	chatModel, err := builder.Build(ctx, nil)
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "build model failed: %v", err)
+	}
+	if _, err = chatModel.Generate(ctx, []*schema.Message{
+		schema.SystemMessage("1+1=?,Just answer with a number, no explanation."),
+	}); err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "model connectivity check failed: %v", err)
+	}
+
+	// Persist.
+	mc := modelConf()
+	if mc == nil {
+		return nil, status.Error(codes.Unavailable, "model config not yet initialised")
+	}
+	id, err := mc.CreateModel(ctx, modelClass, req.Name, conn, &bizmgr.ModelExtra{})
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "persist model failed: %v", err)
+	}
+
+	// Fetch the newly created record so we can return a fully populated proto.
+	saved, err := mc.GetModelByID(ctx, id)
+	if err != nil {
+		logs.CtxWarnf(ctx, "model created (id=%d) but re-fetch failed: %v", id, err)
+		// Return a minimal proto rather than failing the whole call.
+		return &modelv1.CreateModelResponse{
+			Model: &modelv1.Model{
+				Id:            fmt.Sprintf("%d", id),
+				Name:          req.Name,
+				Provider:      req.Provider,
+				Description:   req.Description,
+				Capabilities:  req.Capabilities,
+				ContextLength: req.ContextLength,
+				Enabled:       true,
+			},
+		}, nil
+	}
+
+	return &modelv1.CreateModelResponse{Model: modelDoToProto(saved)}, nil
 }
 
-// TestModel tests connectivity to a model endpoint.
-// Actual invocation is not yet implemented.
-func (h *ModelHandler) TestModel(_ context.Context, req *modelv1.TestModelRequest) (*modelv1.TestModelResponse, error) {
+// TestModel tests connectivity to a model by sending a short prompt and
+// measuring the round-trip latency. The method always returns a non-error
+// gRPC response; failures are reported via success=false + error string.
+func (h *ModelHandler) TestModel(ctx context.Context, req *modelv1.TestModelRequest) (*modelv1.TestModelResponse, error) {
 	if req.ModelId == "" {
 		return nil, status.Error(codes.InvalidArgument, "model_id is required")
 	}
-	// TODO: invoke model and measure latency.
+
+	modelID, err := strconv.ParseInt(req.ModelId, 10, 64)
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "model_id must be numeric, got %q", req.ModelId)
+	}
+
+	// Build model from persisted config.
+	chatModel, _, err := modelbuilder.BuildModelByID(ctx, modelID, nil)
+	if err != nil {
+		return &modelv1.TestModelResponse{
+			Success: false,
+			Error:   fmt.Sprintf("build model failed: %v", err),
+		}, nil
+	}
+
+	prompt := req.Prompt
+	if prompt == "" {
+		prompt = "1+1=?,Just answer with a number, no explanation."
+	}
+
+	start := time.Now()
+	resp, err := chatModel.Generate(ctx, []*schema.Message{schema.SystemMessage(prompt)})
+	latencyMs := time.Since(start).Milliseconds()
+
+	if err != nil {
+		return &modelv1.TestModelResponse{
+			Success:   false,
+			LatencyMs: latencyMs,
+			Error:     err.Error(),
+		}, nil
+	}
+
+	responseText := ""
+	if resp != nil {
+		responseText = resp.Content
+	}
+
 	return &modelv1.TestModelResponse{
 		Success:   true,
-		Response:  "[placeholder]",
-		LatencyMs: 0,
+		Response:  responseText,
+		LatencyMs: latencyMs,
 	}, nil
 }
