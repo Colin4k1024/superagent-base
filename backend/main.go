@@ -305,15 +305,12 @@ func main() {
 	}
 
 	// WHK-001: Initialise webhook dispatcher and register global accessor.
-	// WHK-002: Use Redis-backed store when Redis is available so subscriptions survive
-	// pod restarts and are visible across all replicas. Falls back to MySQL-backed store
-	// when MYSQL_DSN is set, and finally to the in-memory store as a last resort.
+	// WHK-002: Use MySQL-backed store as primary persistence so subscriptions survive
+	// restarts and are queryable via DB. Falls back to Redis when MySQL unavailable,
+	// and finally to the in-memory store as a last resort.
 	webhookWorkers := int(conv.StrToInt64D(getEnv("WEBHOOK_WORKERS", "4"), 4))
 	var webhookStore webhook.Store
-	if redisClient != nil {
-		webhookStore = webhook.NewRedisStore(redisClient)
-		logs.Infof("webhook store: using Redis backend")
-	} else if mysqlStore, mysqlErr := func() (webhook.Store, error) {
+	if mysqlStore, mysqlErr := func() (webhook.Store, error) {
 		db, err := mysqlpkg.New()
 		if err != nil {
 			return nil, err
@@ -322,8 +319,12 @@ func main() {
 	}(); mysqlErr == nil {
 		webhookStore = mysqlStore
 		logs.Infof("webhook store: using MySQL backend")
+	} else if redisClient != nil {
+		logs.Warnf("webhook store: MySQL unavailable (%v), falling back to Redis", mysqlErr)
+		webhookStore = webhook.NewRedisStore(redisClient)
+		logs.Infof("webhook store: using Redis backend")
 	} else {
-		logs.Warnf("webhook store: MySQL unavailable (%v), falling back to in-memory backend", mysqlErr)
+		logs.Warnf("webhook store: MySQL and Redis both unavailable, falling back to in-memory backend")
 		webhookStore = webhook.NewMemoryStore()
 		logs.Infof("webhook store: using in-memory backend")
 	}
