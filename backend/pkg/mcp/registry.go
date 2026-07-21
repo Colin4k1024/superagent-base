@@ -20,6 +20,8 @@ import (
 	"context"
 	"fmt"
 	"sync"
+
+	"gorm.io/gorm"
 )
 
 // ServerConfig holds configuration for a single MCP server.
@@ -36,17 +38,29 @@ type ServerConfig struct {
 
 // Registry manages a pool of named MCP clients.
 type Registry struct {
-	mu      sync.RWMutex
-	clients map[string]*Client
+	mu          sync.RWMutex
+	clients     map[string]*Client
+	configStore *ConfigStore // nil → pure-memory mode (no persistence)
 }
 
 // NewRegistry returns an empty Registry.
-func NewRegistry() *Registry {
-	return &Registry{clients: make(map[string]*Client)}
+// Pass a non-nil *gorm.DB to enable configuration persistence across restarts.
+// Pass nil to run in pure-memory mode.
+func NewRegistry(db *gorm.DB) *Registry {
+	r := &Registry{clients: make(map[string]*Client)}
+	if db != nil {
+		cs, err := NewConfigStore(db)
+		if err == nil {
+			r.configStore = cs
+		}
+	}
+	return r
 }
 
 // Connect creates a transport from cfg, initializes a Client, and registers it
 // under cfg.Name. An existing client with the same name is disconnected first.
+// If a ConfigStore is attached the configuration is persisted after a successful
+// connection so it can be restored on the next startup.
 func (r *Registry) Connect(ctx context.Context, cfg ServerConfig) error {
 	transport, err := buildTransport(cfg)
 	if err != nil {
@@ -65,6 +79,14 @@ func (r *Registry) Connect(ctx context.Context, cfg ServerConfig) error {
 	}
 	r.clients[cfg.Name] = client
 	r.mu.Unlock()
+
+	// Persist configuration so it survives restarts.
+	if r.configStore != nil {
+		if saveErr := r.configStore.Save(cfg); saveErr != nil {
+			// Non-fatal: connection is live, only persistence failed.
+			_ = saveErr
+		}
+	}
 
 	return nil
 }
@@ -89,7 +111,8 @@ func (r *Registry) ListServers() []string {
 }
 
 // Disconnect closes and removes the named client. It is a no-op if the name
-// is not registered.
+// is not registered. If a ConfigStore is attached the persisted configuration
+// is soft-deleted so the server is not reconnected on the next startup.
 func (r *Registry) Disconnect(name string) error {
 	r.mu.Lock()
 	client, ok := r.clients[name]
@@ -98,8 +121,49 @@ func (r *Registry) Disconnect(name string) error {
 	}
 	r.mu.Unlock()
 
+	var closeErr error
 	if ok {
-		return client.Close()
+		closeErr = client.Close()
+	}
+
+	// Remove from persistent store regardless of close error.
+	if r.configStore != nil {
+		if delErr := r.configStore.Delete(name); delErr != nil {
+			// Non-fatal: connection is closed, only persistence cleanup failed.
+			_ = delErr
+		}
+	}
+
+	return closeErr
+}
+
+// ReconnectAll loads all enabled server configurations from the persistent
+// store and attempts to reconnect each one. Errors for individual servers are
+// logged but do not abort the reconnection of subsequent servers.
+// This should be called once after all services have initialised.
+func (r *Registry) ReconnectAll(ctx context.Context) error {
+	if r.configStore == nil {
+		return nil
+	}
+
+	cfgs, err := r.configStore.ListEnabled()
+	if err != nil {
+		return fmt.Errorf("mcp registry: reload configs: %w", err)
+	}
+
+	for _, cfg := range cfgs {
+		// Skip servers that are already connected (e.g. connected during this session).
+		r.mu.RLock()
+		_, already := r.clients[cfg.Name]
+		r.mu.RUnlock()
+		if already {
+			continue
+		}
+
+		if connErr := r.Connect(ctx, cfg); connErr != nil {
+			// Non-fatal per-server failure: continue with remaining configs.
+			_ = connErr
+		}
 	}
 	return nil
 }
