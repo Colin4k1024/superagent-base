@@ -249,8 +249,19 @@ func main() {
 		}
 	}()
 
-	// Initialize RBAC UserStore and seed a default admin user from ADMIN_API_KEY (if set).
-	userStore := rbac.NewUserStore()
+	// Initialize RBAC user store — prefer DB-backed store when MySQL is available.
+	// Falls back to in-memory store so the server can start without a DB.
+	var userStore rbac.UserStorer
+	if adminDB, dbErr := mysqlpkg.New(); dbErr != nil {
+		logs.Warnf("admin user store: cannot open MySQL (%v) — using in-memory store", dbErr)
+		userStore = rbac.NewUserStore()
+	} else if dbStore, migrateErr := rbac.NewDBUserStore(adminDB); migrateErr != nil {
+		logs.Warnf("admin user store: DB migration failed (%v) — using in-memory store", migrateErr)
+		userStore = rbac.NewUserStore()
+	} else {
+		logs.Infof("admin user store: using MySQL backend (admin_user table)")
+		userStore = dbStore
+	}
 	if adminKey := os.Getenv("ADMIN_API_KEY"); adminKey != "" {
 		userStore.Register(&rbac.User{
 			ID:        "admin",
@@ -281,7 +292,7 @@ func main() {
 	startHttpServer(agentRT, skillMgr, toolMgr, mcpRegistry, userStore, evoEngine, sharedMemory)
 }
 
-func startHttpServer(agentRT *agentdef.AgentRuntime, skillMgr *skill.Manager, toolMgr *tool.Manager, mcpRegistry *mcp.Registry, userStore *rbac.UserStore, evoEngine *evolution.Engine, sharedMem memory.Backend) {
+func startHttpServer(agentRT *agentdef.AgentRuntime, skillMgr *skill.Manager, toolMgr *tool.Manager, mcpRegistry *mcp.Registry, userStore rbac.UserStorer, evoEngine *evolution.Engine, sharedMem memory.Backend) {
 	maxRequestBodySize := os.Getenv("MAX_REQUEST_BODY_SIZE")
 	maxSize := conv.StrToInt64D(maxRequestBodySize, 1024*1024*200)
 	addr := getEnv("LISTEN_ADDR", ":8888")
@@ -453,7 +464,7 @@ func registerV2Routes(
 	skillMgr *skill.Manager,
 	toolMgr *tool.Manager,
 	memH *cozehandler.MemoryHandler,
-	userStore *rbac.UserStore,
+	userStore rbac.UserStorer,
 ) {
 	// Chat endpoints.
 	s.POST("/api/v2/chat/stream", chatSSE.HandleChatStream)
@@ -562,7 +573,7 @@ func registerV2Routes(
 	s.GET("/api/v2/workflows/:workflow_id", cozehandler.OpenAPIGetWorkflowInfo)
 }
 
-func registerSkillV2Routes(s *server.Hertz, mgr *skill.Manager, userStore *rbac.UserStore) {
+func registerSkillV2Routes(s *server.Hertz, mgr *skill.Manager, userStore rbac.UserStorer) {
 	if mgr == nil {
 		return
 	}
@@ -632,7 +643,7 @@ func registerSkillV2Routes(s *server.Hertz, mgr *skill.Manager, userStore *rbac.
 	})
 }
 
-func registerSkillRoutes(s *server.Hertz, mgr *skill.Manager, userStore *rbac.UserStore) {
+func registerSkillRoutes(s *server.Hertz, mgr *skill.Manager, userStore rbac.UserStorer) {
 	if mgr == nil {
 		return
 	}
