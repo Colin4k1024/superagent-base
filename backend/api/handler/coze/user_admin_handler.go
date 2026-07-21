@@ -10,13 +10,13 @@ import (
 	"github.com/superagent-ai/superagent-base/backend/pkg/rbac"
 )
 
-// UserAdminHandler provides CRUD operations for the in-memory UserStore.
+// UserAdminHandler provides CRUD operations for the admin user store.
 type UserAdminHandler struct {
-	store *rbac.UserStore
+	store rbac.UserStorer
 }
 
 // NewUserAdminHandler creates a UserAdminHandler backed by the given store.
-func NewUserAdminHandler(store *rbac.UserStore) *UserAdminHandler {
+func NewUserAdminHandler(store rbac.UserStorer) *UserAdminHandler {
 	return &UserAdminHandler{store: store}
 }
 

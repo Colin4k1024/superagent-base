@@ -144,7 +144,7 @@ func allowRequest(ip string) bool {
 //   - Key matches neither → 403
 //   - No key configured + dev mode → pass-through with synthetic admin user
 //   - No key configured + non-dev mode → 403
-func APIKeyAdminAuthMW(store *rbac.UserStore) app.HandlerFunc {
+func APIKeyAdminAuthMW(store rbac.UserStorer) app.HandlerFunc {
 	apiKey := os.Getenv("ADMIN_API_KEY")
 	dev := isDevMode()
 
