@@ -25,23 +25,25 @@ import (
 
 // ── Enhanced RBAC Models ────────────────────────────────────────────────────
 
-// Permission defines a granular action on a specific resource or resource pattern.
-type Permission struct {
+// PermSpec defines a granular action on a specific resource or resource pattern.
+// Renamed from Permission to avoid conflict with models.go's Permission type.
+type PermSpec struct {
 	ID       string `json:"id"`       // Unique permission identifier
 	Resource string `json:"resource"` // Resource type pattern (e.g., "agents", "agents:*", "agents:knowledge")
 	Action   string `json:"action"`   // Action pattern (e.g., "read", "write", "execute", "*")
 	Scope    string `json:"scope"`    // Scope: "global", "tenant", "own" (default: "tenant")
 }
 
-// Role defines a named collection of permissions.
-type Role struct {
-	ID          string       `json:"id"`
-	Name        string       `json:"name"`
-	Description string       `json:"description,omitempty"`
-	Permissions []Permission `json:"permissions"`
-	IsSystem    bool         `json:"is_system"` // System roles cannot be deleted
-	CreatedAt   time.Time    `json:"created_at"`
-	UpdatedAt   time.Time    `json:"updated_at"`
+// RoleSpec defines a named collection of permissions.
+// Renamed from Role to avoid conflict with models.go's Role string type.
+type RoleSpec struct {
+	ID          string     `json:"id"`
+	Name        string     `json:"name"`
+	Description string     `json:"description,omitempty"`
+	Permissions []PermSpec `json:"permissions"`
+	IsSystem    bool       `json:"is_system"` // System roles cannot be deleted
+	CreatedAt   time.Time  `json:"created_at"`
+	UpdatedAt   time.Time  `json:"updated_at"`
 }
 
 // UserWithRoles extends the basic User with role assignments.
@@ -65,10 +67,10 @@ type ResourcePermission struct {
 // For production, implement with a database; for testing, use MemoryStore.
 type PermissionStore interface {
 	// Role CRUD
-	CreateRole(ctx context.Context, role *Role) error
-	GetRole(ctx context.Context, roleID string) (*Role, error)
-	ListRoles(ctx context.Context) ([]*Role, error)
-	UpdateRole(ctx context.Context, role *Role) error
+	CreateRole(ctx context.Context, role *RoleSpec) error
+	GetRole(ctx context.Context, roleID string) (*RoleSpec, error)
+	ListRoles(ctx context.Context) ([]*RoleSpec, error)
+	UpdateRole(ctx context.Context, role *RoleSpec) error
 	DeleteRole(ctx context.Context, roleID string) error
 
 	// User-Role assignments
@@ -84,7 +86,7 @@ type PermissionStore interface {
 // NOT safe for production multi-instance deployments.
 type MemoryStore struct {
 	mu    sync.RWMutex
-	roles map[string]*Role
+	roles map[string]*RoleSpec
 	// userAssignments maps "tenantID:userID" → set of role IDs
 	userAssignments map[string]map[string]struct{}
 }
@@ -92,12 +94,12 @@ type MemoryStore struct {
 // NewMemoryStore creates a new in-memory permission store.
 func NewMemoryStore() *MemoryStore {
 	return &MemoryStore{
-		roles:           make(map[string]*Role),
+		roles:           make(map[string]*RoleSpec),
 		userAssignments: make(map[string]map[string]struct{}),
 	}
 }
 
-func (s *MemoryStore) CreateRole(_ context.Context, role *Role) error {
+func (s *MemoryStore) CreateRole(_ context.Context, role *RoleSpec) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if _, exists := s.roles[role.ID]; exists {
@@ -107,7 +109,7 @@ func (s *MemoryStore) CreateRole(_ context.Context, role *Role) error {
 	return nil
 }
 
-func (s *MemoryStore) GetRole(_ context.Context, roleID string) (*Role, error) {
+func (s *MemoryStore) GetRole(_ context.Context, roleID string) (*RoleSpec, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	role, ok := s.roles[roleID]
@@ -117,17 +119,17 @@ func (s *MemoryStore) GetRole(_ context.Context, roleID string) (*Role, error) {
 	return role, nil
 }
 
-func (s *MemoryStore) ListRoles(_ context.Context) ([]*Role, error) {
+func (s *MemoryStore) ListRoles(_ context.Context) ([]*RoleSpec, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	roles := make([]*Role, 0, len(s.roles))
+	roles := make([]*RoleSpec, 0, len(s.roles))
 	for _, r := range s.roles {
 		roles = append(roles, r)
 	}
 	return roles, nil
 }
 
-func (s *MemoryStore) UpdateRole(_ context.Context, role *Role) error {
+func (s *MemoryStore) UpdateRole(_ context.Context, role *RoleSpec) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if _, exists := s.roles[role.ID]; !exists {
@@ -178,10 +180,27 @@ func (s *MemoryStore) RevokeRole(_ context.Context, userID, tenantID, roleID str
 func (s *MemoryStore) GetUserRoles(_ context.Context, userID, tenantID string) ([]string, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	key := tenantID + ":" + userID
 	roles := make([]string, 0)
-	for roleID := range s.userAssignments[key] {
-		roles = append(roles, roleID)
+	if tenantID != "" {
+		// Exact tenant lookup.
+		key := tenantID + ":" + userID
+		for roleID := range s.userAssignments[key] {
+			roles = append(roles, roleID)
+		}
+		return roles, nil
+	}
+	// tenantID is empty: collect roles for this user across all tenants.
+	suffix := ":" + userID
+	seen := make(map[string]struct{})
+	for key, roleSet := range s.userAssignments {
+		if len(key) >= len(suffix) && key[len(key)-len(suffix):] == suffix {
+			for roleID := range roleSet {
+				if _, ok := seen[roleID]; !ok {
+					seen[roleID] = struct{}{}
+					roles = append(roles, roleID)
+				}
+			}
+		}
 	}
 	return roles, nil
 }
@@ -206,7 +225,7 @@ func (s *MemoryStore) ListUsersWithRole(_ context.Context, tenantID, roleID stri
 // Engine is the production RBAC engine with dynamic role support.
 type Engine struct {
 	store         PermissionStore
-	builtinRoles  map[string]*Role
+	builtinRoles  map[string]*RoleSpec
 	defaultRoleID string
 }
 
@@ -214,7 +233,7 @@ type Engine struct {
 func NewEngine(store PermissionStore, defaultRoleID string) *Engine {
 	e := &Engine{
 		store:         store,
-		builtinRoles:  make(map[string]*Role),
+		builtinRoles:  make(map[string]*RoleSpec),
 		defaultRoleID: defaultRoleID,
 	}
 	e.registerBuiltinRoles()
@@ -223,18 +242,18 @@ func NewEngine(store PermissionStore, defaultRoleID string) *Engine {
 
 // registerBuiltinRoles creates the default system roles if they don't exist.
 func (e *Engine) registerBuiltinRoles() {
-	builtin := []*Role{
+	builtin := []*RoleSpec{
 		{
 			ID: "admin", Name: "Administrator", IsSystem: true,
 			Description: "Full access to all resources",
-			Permissions: []Permission{
+			Permissions: []PermSpec{
 				{ID: "admin:*", Resource: "*", Action: "*", Scope: "global"},
 			},
 		},
 		{
 			ID: "editor", Name: "Editor", IsSystem: true,
 			Description: "Can create, edit, and delete agents and configurations",
-			Permissions: []Permission{
+			Permissions: []PermSpec{
 				{ID: "agents:read", Resource: "agents", Action: "read", Scope: "tenant"},
 				{ID: "agents:write", Resource: "agents", Action: "write", Scope: "tenant"},
 				{ID: "agents:delete", Resource: "agents", Action: "delete", Scope: "tenant"},
@@ -251,7 +270,7 @@ func (e *Engine) registerBuiltinRoles() {
 		{
 			ID: "viewer", Name: "Viewer", IsSystem: true,
 			Description: "Read-only access to agents and chat",
-			Permissions: []Permission{
+			Permissions: []PermSpec{
 				{ID: "agents:read", Resource: "agents", Action: "read", Scope: "tenant"},
 				{ID: "agents:execute", Resource: "agents", Action: "execute", Scope: "tenant"},
 				{ID: "models:read", Resource: "models", Action: "read", Scope: "tenant"},
@@ -261,7 +280,7 @@ func (e *Engine) registerBuiltinRoles() {
 		{
 			ID: "operator", Name: "Operator", IsSystem: true,
 			Description: "Can reload, monitor, but not edit agents",
-			Permissions: []Permission{
+			Permissions: []PermSpec{
 				{ID: "agents:read", Resource: "agents", Action: "read", Scope: "tenant"},
 				{ID: "config:read", Resource: "config", Action: "read", Scope: "tenant"},
 				{ID: "monitor:read", Resource: "monitor", Action: "read", Scope: "tenant"},
@@ -304,7 +323,7 @@ func (e *Engine) CheckPermission(ctx context.Context, user *User, req ResourcePe
 }
 
 // resolveRole looks up a role by ID, checking builtins first, then the store.
-func (e *Engine) resolveRole(roleID string) *Role {
+func (e *Engine) resolveRole(roleID string) *RoleSpec {
 	if role, ok := e.builtinRoles[roleID]; ok {
 		return role
 	}
@@ -313,7 +332,7 @@ func (e *Engine) resolveRole(roleID string) *Role {
 }
 
 // roleMatchesPermission checks if a role grants the requested permission.
-func (e *Engine) roleMatchesPermission(role *Role, req ResourcePermission) bool {
+func (e *Engine) roleMatchesPermission(role *RoleSpec, req ResourcePermission) bool {
 	for _, perm := range role.Permissions {
 		if perm.Resource == "*" || perm.Resource == req.ResourceType {
 			if perm.Action == "*" || perm.Action == req.Action {
@@ -336,7 +355,7 @@ func (e *Engine) AssignRoleToUser(ctx context.Context, userID, tenantID, roleID 
 }
 
 // GetUserPermissions returns all effective permissions for a user.
-func (e *Engine) GetUserPermissions(ctx context.Context, user *User) ([]Permission, error) {
+func (e *Engine) GetUserPermissions(ctx context.Context, user *User) ([]PermSpec, error) {
 	if user == nil {
 		return nil, fmt.Errorf("user is nil")
 	}
@@ -350,7 +369,7 @@ func (e *Engine) GetUserPermissions(ctx context.Context, user *User) ([]Permissi
 	}
 
 	seen := make(map[string]struct{})
-	var perms []Permission
+	var perms []PermSpec
 	for _, roleID := range roleIDs {
 		role := e.resolveRole(roleID)
 		if role == nil {
