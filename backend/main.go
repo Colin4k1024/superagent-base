@@ -188,7 +188,17 @@ func main() {
 
 	// MCP registry must be created before the AgentBuilder so agents can
 	// resolve mcp:// tool references at build time.
-	mcpRegistry := mcp.NewRegistry()
+	// A separate MySQL connection is opened for MCP config persistence so that
+	// connection configurations survive server restarts. If the connection
+	// cannot be opened the registry falls back to pure-memory mode.
+	mcpRegistry := func() *mcp.Registry {
+		db, dbErr := mysqlpkg.New()
+		if dbErr != nil {
+			logs.Warnf("mcp registry: cannot open MySQL for config persistence (pure-memory mode): %v", dbErr)
+			return mcp.NewRegistry(nil)
+		}
+		return mcp.NewRegistry(db)
+	}()
 
 	// Shared Redis client — used by memory backend, interrupt checkpoint store, and webhook store.
 	// Created once at startup so all subsystems share the same connection pool.
@@ -238,6 +248,13 @@ func main() {
 	if err := agentRT.Start(ctx); err != nil {
 		logs.Warnf("agent runtime start failed (agents unavailable): %v", err)
 		agentRT = nil
+	}
+
+	// MCP-PERSIST-001: Restore MCP server connections that were active in the
+	// previous session. Called after all services have initialised so that any
+	// dependent infrastructure (MySQL, Redis) is ready.
+	if reconnErr := mcpRegistry.ReconnectAll(ctx); reconnErr != nil {
+		logs.Warnf("mcp registry: reconnect all failed: %v", reconnErr)
 	}
 
 	// Start gRPC server in background goroutine on port 50051.
