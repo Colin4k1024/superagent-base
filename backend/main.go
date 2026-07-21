@@ -257,11 +257,26 @@ func main() {
 		logs.Warnf("mcp registry: reconnect all failed: %v", reconnErr)
 	}
 
+	// AGT-DB-001: 构造 AgentDefinitionStore 实现 Agent 定义 DB 双写。
+	// DB 不可用时 store 为 nil，所有操作降级为纯文件模式。
+	var agentDefStore *agentdef.AgentDefinitionStore
+	if agentDefDB, agentDefDBErr := mysqlpkg.New(); agentDefDBErr != nil {
+		logs.Warnf("agentdef store: cannot open MySQL (DB persistence disabled): %v", agentDefDBErr)
+	} else {
+		s, storeErr := agentdef.NewAgentDefinitionStore(agentDefDB)
+		if storeErr != nil {
+			logs.Warnf("agentdef store: init failed (DB persistence disabled): %v", storeErr)
+		} else {
+			agentDefStore = s
+			logs.Infof("agentdef store: DB persistence enabled")
+		}
+	}
+
 	// Start gRPC server in background goroutine on port 50051.
 	grpcAddr := getEnv("GRPC_LISTEN_ADDR", ":50051")
 	agentConfigDir := getEnv("AGENT_CONFIG_DIR", "configs/agents")
 	go func() {
-		if err := grpcserver.ListenAndServe(grpcAddr, agentRT, toolMgr, agentConfigDir); err != nil {
+		if err := grpcserver.ListenAndServe(grpcAddr, agentRT, toolMgr, agentConfigDir, agentDefStore); err != nil {
 			logs.Errorf("gRPC server stopped: %v", err)
 		}
 	}()
@@ -317,10 +332,10 @@ func main() {
 	webhook.InitGlobalDispatcher(webhookDispatcher)
 	logs.Infof("webhook dispatcher started (workers=%d)", webhookWorkers)
 
-	startHttpServer(agentRT, skillMgr, toolMgr, mcpRegistry, userStore, evoEngine, sharedMemory)
+	startHttpServer(agentRT, skillMgr, toolMgr, mcpRegistry, userStore, evoEngine, sharedMemory, agentDefStore)
 }
 
-func startHttpServer(agentRT *agentdef.AgentRuntime, skillMgr *skill.Manager, toolMgr *tool.Manager, mcpRegistry *mcp.Registry, userStore rbac.UserStorer, evoEngine *evolution.Engine, sharedMem memory.Backend) {
+func startHttpServer(agentRT *agentdef.AgentRuntime, skillMgr *skill.Manager, toolMgr *tool.Manager, mcpRegistry *mcp.Registry, userStore rbac.UserStorer, evoEngine *evolution.Engine, sharedMem memory.Backend, agentDefStore *agentdef.AgentDefinitionStore) {
 	maxRequestBodySize := os.Getenv("MAX_REQUEST_BODY_SIZE")
 	maxSize := conv.StrToInt64D(maxRequestBodySize, 1024*1024*200)
 	addr := getEnv("LISTEN_ADDR", ":8888")
@@ -398,7 +413,7 @@ func startHttpServer(agentRT *agentdef.AgentRuntime, skillMgr *skill.Manager, to
 	adminGroup.GET("/logs", adminH.HandleLogStream)
 
 	// Agent CRUD endpoints — read requires agents:read, mutations require agents:write/delete.
-	agentAdmin := cozehandler.NewAgentAdminHandler(agentRT, getEnv("AGENT_CONFIG_DIR", "configs/agents"))
+	agentAdmin := cozehandler.NewAgentAdminHandler(agentRT, getEnv("AGENT_CONFIG_DIR", "configs/agents"), agentDefStore)
 	adminGroup.GET("/agents", middleware.RequirePermission("agents", "read"), agentAdmin.HandleList)
 	adminGroup.POST("/agents/validate", middleware.RequirePermission("agents", "read"), agentAdmin.HandleValidate)
 	adminGroup.GET("/agents/:name", middleware.RequirePermission("agents", "read"), agentAdmin.HandleGet)
