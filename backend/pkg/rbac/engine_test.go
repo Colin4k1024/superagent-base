@@ -76,11 +76,11 @@ func TestEngine_DynamicRole(t *testing.T) {
 	engine := NewEngine(store, "viewer")
 
 	// Create a custom role
-	customRole := &Role{
+	customRole := &RoleSpec{
 		ID:       "data-analyst",
 		Name:     "Data Analyst",
 		IsSystem: false,
-		Permissions: []Permission{
+		Permissions: []PermSpec{
 			{ID: "data:read", Resource: "data", Action: "read", Scope: "tenant"},
 			{ID: "data:query", Resource: "data", Action: "query", Scope: "tenant"},
 		},
@@ -137,7 +137,7 @@ func TestEngine_ProtectedSystemRoles(t *testing.T) {
 	}
 
 	// Try to update a system role
-	err = store.UpdateRole(context.Background(), &Role{ID: "admin", Name: "Hacked Admin"})
+	err = store.UpdateRole(context.Background(), &RoleSpec{ID: "admin", Name: "Hacked Admin"})
 	if err == nil {
 		t.Error("should not be able to update system role")
 	}
