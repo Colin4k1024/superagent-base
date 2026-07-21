@@ -10,17 +10,20 @@ import (
 	"github.com/cloudwego/hertz/pkg/app"
 
 	"github.com/superagent-ai/superagent-base/backend/pkg/agentdef"
+	"github.com/superagent-ai/superagent-base/backend/pkg/logs"
 )
 
 // AgentAdminHandler manages agent YAML CRUD operations.
 type AgentAdminHandler struct {
 	runtime   *agentdef.AgentRuntime
 	configDir string // path to configs/agents/
+	store     *agentdef.AgentDefinitionStore
 }
 
 // NewAgentAdminHandler creates an AgentAdminHandler.
-func NewAgentAdminHandler(rt *agentdef.AgentRuntime, configDir string) *AgentAdminHandler {
-	return &AgentAdminHandler{runtime: rt, configDir: configDir}
+// store may be nil — all DB operations degrade gracefully without it.
+func NewAgentAdminHandler(rt *agentdef.AgentRuntime, configDir string, store *agentdef.AgentDefinitionStore) *AgentAdminHandler {
+	return &AgentAdminHandler{runtime: rt, configDir: configDir, store: store}
 }
 
 // agentFileItem is the list-view representation of an agent.
@@ -38,10 +41,31 @@ type yamlBody struct {
 }
 
 // HandleList returns all agent YAML files with their runtime status.
+// Falls back to DB listing when the config directory is unreadable and store is available.
 // GET /api/v1/admin/agents
 func (h *AgentAdminHandler) HandleList(_ context.Context, c *app.RequestContext) {
 	entries, err := os.ReadDir(h.configDir)
 	if err != nil {
+		// Degraded mode: config dir unavailable, try DB fallback.
+		if h.store != nil {
+			records, dbErr := h.store.List()
+			if dbErr != nil {
+				c.JSON(500, map[string]any{"code": 500, "msg": fmt.Sprintf("read config dir: %v; db fallback: %v", err, dbErr)})
+				return
+			}
+			items := make([]agentFileItem, 0, len(records))
+			for _, r := range records {
+				items = append(items, agentFileItem{
+					Name:        r.Name,
+					Type:        r.AgentType,
+					Description: r.Description,
+					Status:      r.Status,
+					File:        r.Name + ".yaml",
+				})
+			}
+			c.JSON(200, map[string]any{"agents": items, "source": "db"})
+			return
+		}
 		c.JSON(500, map[string]any{"code": 500, "msg": fmt.Sprintf("read config dir: %v", err)})
 		return
 	}
@@ -143,6 +167,11 @@ func (h *AgentAdminHandler) HandleCreate(ctx context.Context, c *app.RequestCont
 		return
 	}
 
+	// DB双写：写文件成功后同步到数据库，失败不阻塞主流程。
+	if saveErr := h.store.Save(def.Metadata.Name, def.Spec.Type, descriptionFromDef(def), body.YAML); saveErr != nil {
+		logs.Warnf("agentdef store: save %q failed (non-fatal): %v", def.Metadata.Name, saveErr)
+	}
+
 	if h.runtime != nil {
 		if reloadErr := h.runtime.Reload(ctx); reloadErr != nil {
 			// Log but do not fail the request — the file was written successfully.
@@ -199,6 +228,11 @@ func (h *AgentAdminHandler) HandleUpdate(ctx context.Context, c *app.RequestCont
 		return
 	}
 
+	// DB双写：写文件成功后同步到数据库，失败不阻塞主流程。
+	if saveErr := h.store.Save(def.Metadata.Name, def.Spec.Type, descriptionFromDef(def), body.YAML); saveErr != nil {
+		logs.Warnf("agentdef store: update %q failed (non-fatal): %v", def.Metadata.Name, saveErr)
+	}
+
 	if h.runtime != nil {
 		if reloadErr := h.runtime.Reload(ctx); reloadErr != nil {
 			c.JSON(200, map[string]any{
@@ -227,6 +261,11 @@ func (h *AgentAdminHandler) HandleDelete(ctx context.Context, c *app.RequestCont
 	if err := os.Remove(filePath); err != nil {
 		c.JSON(500, map[string]any{"code": 500, "msg": fmt.Sprintf("remove file: %v", err)})
 		return
+	}
+
+	// DB双写：删除文件后软删除数据库记录，失败不阻塞主流程。
+	if delErr := h.store.Delete(agentName); delErr != nil {
+		logs.Warnf("agentdef store: delete %q failed (non-fatal): %v", agentName, delErr)
 	}
 
 	if h.runtime != nil {

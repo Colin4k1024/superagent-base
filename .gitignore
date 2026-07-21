@@ -65,3 +65,5 @@ web/test-results/
 web/playwright-report/
 *.docx
 .claude/settings.local.json
+.claude/worktrees/
+.tmp-test.sh
