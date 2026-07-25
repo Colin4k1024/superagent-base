@@ -1,0 +1,24 @@
+{
+  "extends": "@coze-arch/ts-config/tsconfig.web.json",
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "include": [
+    "stories",
+    "./src/**/*.test.ts",
+    "vitest.config.ts",
+    "setup-vitest.ts",
+    "__mocks__/*.ts"
+  ],
+  "exclude": ["./dist"],
+  "references": [
+    {
+      "path": "./tsconfig.build.json"
+    }
+  ],
+  "compilerOptions": {
+    "rootDir": "./",
+    "outDir": "./dist",
+    "types": ["vitest/globals"],
+    "strictNullChecks": true,
+    "noImplicitAny": true
+  }
+}

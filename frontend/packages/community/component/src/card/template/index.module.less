@@ -1,0 +1,27 @@
+.template {
+  margin-bottom: 0;
+
+  .template-wrapper {
+    position: relative;
+  }
+
+  .btn-container {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+
+    display: none;
+
+    width: 100%;
+  }
+
+  &:hover {
+    .btn-container {
+      display: block;
+    }
+
+    .description {
+      visibility: hidden;
+    }
+  }
+}
