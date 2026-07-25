@@ -1,0 +1,90 @@
+# @coze-arch/monorepo-kits
+
+/* Function Overview */
+
+/* "@Coze-arch/monorepo-kits" is a toolkit for managing monorepo projects, providing project lookup, dependency analysis, and configuration management capabilities based on the Rush framework. */
+
+/* Main Functional Modules */
+
+/* ###1. Subpackage management (sub-packages.ts) */
+
+#### lookupSubPackages(packageName: string): string[]
+/* - ** Function **: Recursively find all child dependencies of the specified package */
+/* - ** Features **: Use caching mechanism to avoid double counting */
+/* - ** Returns **: Array of names of all dependent packages (after deduplicate) */
+
+#### getPackageLocation(packageName: string): string
+/* - ** Function **: Get the file system path of the specified package */
+/* - ** return **: the project folder path of the package */
+
+#### getPackageJson(packageName: string): RushConfigurationProject['packageJson']
+/* - ** Function **: Get the package.json configuration information of the specified package */
+/* - ** returns **: package's package.json object */
+
+/* ###2. Rush configuration management (rush-config.ts) */
+
+#### getRushConfiguration(): RushConfiguration
+/* - ** Features **: Get Rush Configuration Instance */
+/* - ** Features **: Singleton mode, first call loads configuration from default location, subsequent calls reuse instance */
+/* - ** returns **: RushConfiguration object */
+
+/* ###3. Project lookup (lookup.ts) */
+
+#### lookupTo(to: string): string[]
+/* - ** Features **: Find direct dependencies of a specified package */
+/* - ** Parameter **: Target package name */
+/* - ** Returns **: Array of dependency package names */
+
+#### lookupFrom(from: string): void
+/* - ** Features **: Find information about outgoing from a specified package (current implementation is incomplete) */
+/* - ** parameter **: source package name */
+
+#### lookupOnly(packageName: string): RushConfigurationProject
+/* - ** Features **: Find and return the project configuration object of the specified package */
+/* - ** parameter **: package name */
+/* - ** Return **: complete project configuration object */
+
+/* ##dependencies */
+
+/* - ** Major dependencies **: '@rushstack/rush-sdk@5.100.2' */
+/* - ** Development dependencies **: Includes ESLint, TypeScript, Vitest and other toolchains */
+
+/* ##usage scenario */
+
+/* 1. ** Dependency Analysis **: Analyze the dependencies between packages in Monorepo */
+/* 2. ** Path parsing **: Get the actual location of the package in the file system */
+/* 3. ** Configuration query **: Query the configuration information and metadata of the package */
+/* 4. ** Automation Tools **: Provide monorepo project information for build scripts, deployment tools, etc */
+
+/* ##Architecture Features */
+
+/* - ** Cache optimization **: Cache recursive dependency lookups to improve performance */
+/* - ** Error Handling **: Includes perfect package without exception handling */
+/* - ** Singleton mode **: Rush configuration adopts singleton mode to avoid repeated loading */
+/* Type safety: Based on TypeScript, complete type definition is provided */
+
+/* ##Code structure */
+
+```
+src/
+/* < unk > ─ index.ts #Main entry file, export all public APIs */
+/* < unk > ─ Sub-packages.ts #Subpackage management and dependency lookup function */
+/* 🥰 ─ rush-config.ts #Rush configuration management */
+/* 🥰 ─ ─ lookup.ts #Project lookup related functions */
+```
+
+/* ##API export */
+
+```typescript
+export {
+  lookupSubPackages,
+  getPackageLocation,
+  getPackageJson,
+} from './sub-packages';
+
+export { getRushConfiguration } from './rush-config';
+
+export { lookupTo, lookupFrom, lookupOnly } from './lookup';
+```
+
+/* This toolkit provides fundamental support for package management, dependency analysis, and automated tool development in Monorepo environments. */

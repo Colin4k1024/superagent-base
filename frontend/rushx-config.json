@@ -1,0 +1,84 @@
+{
+  "$schema": "./rushx-config.schema.json",
+  "team": [
+    "team-automation",
+    "team-builder",
+    "team-community",
+    "team-data",
+    "team-devops",
+    "team-arch",
+    "team-studio",
+    "team-qa"
+  ],
+  "level": ["level-1", "level-2", "level-3", "level-4"],
+  "packageAudit": {
+    "enable": true,
+    "rules": [
+      [
+        "essential-config-file",
+        "error",
+        { "essentialFiles": ["eslint.config.js"] }
+      ]
+    ]
+  },
+  "codecov": {
+    "coverage": 20,
+    "incrementCoverage": 80,
+    "level-1": {
+      "coverage": 80,
+      "incrementCoverage": 90
+    },
+    "level-2": {
+      "coverage": 30,
+      "incrementCoverage": 60
+    },
+    "level-3": {
+      "coverage": 0,
+      "incrementCoverage": 0
+    },
+    "level-4": {
+      "coverage": 0,
+      "incrementCoverage": 0
+    }
+  },
+  "dupCheck": {
+    "ignoreGlobPatterns": [
+      "**/__mocks__/**",
+      "**/__mock__/**",
+      "**/__tests__/**",
+      "**/__test__/**",
+      "**/tests/**",
+      "**/*.spec.*",
+      "**/*.test.*",
+      "**/coverage/**",
+      "**/*auto-generate/**",
+      "**/template/**",
+      "common/**",
+      "**/.*/**",
+      "**/dist/**",
+      "**/lib/**",
+      "**/build/**",
+      "**/output/**",
+      "**/*.d.ts",
+      "**/*config*/**",
+      "**/*configs*/**",
+      "**/*config*",
+      "**/*configs*",
+      "**/*rc.*",
+      "**/*setup.*",
+      "**/idl/**",
+      "**/e2e/**",
+      "**/scripts/**",
+      "packages/builder/lynx-runtime-sdk/**",
+      "packages/builder/web-runtime-sdk/**",
+      "packages/studio/bot-creator/entry/**",
+      "packages/studio/open-platform/entry/**",
+      "packages/studio/components/src/dnd-provider/**",
+      "packages/common/prompt-kit/**",
+      "packages/common/editor-plugins/**",
+      "packages/workflow/playground/src/nodes-v2/components/system-prompt/**",
+      "packages/data/knowledge-page/**",
+      "packages/studio/bot-creator/layout/src/components/**"
+    ]
+  }
+}

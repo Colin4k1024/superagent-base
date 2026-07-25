@@ -63,6 +63,36 @@ tests/e2e/reports/
 # Playwright
 web/test-results/
 web/playwright-report/
+
+# Rush.js infrastructure
+common/temp/
+common/autoinstallers/*/node_modules/
+common/autoinstallers/*/.npmrc
+common/deploy/
+**/.rush/temp/
+.rush/
+.pnpm-store/
+pnpm-local
+
+# Coze Studio frontend build
+frontend/**/node_modules/
+frontend/**/dist/
+frontend/**/dist_*/
+frontend/**/.next/
+frontend/**/build/
+frontend/**/build_cn/
+frontend/**/output/
+frontend/**/output_resource/
+frontend/**/.tsbuildinfo
+frontend/**/lib-ts/
+frontend/**/.eslintcache
+frontend/**/coverage/
+frontend/**/.nyc_output/
+frontend/**/storybook-static/
+frontend/**/.cache/
+frontend/**/missing-peer-dependencies.json
+frontend/**/_infra_log
+frontend/**/*.tgz
 *.docx
 .claude/settings.local.json
 .claude/worktrees/
