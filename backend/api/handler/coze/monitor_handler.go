@@ -1,4 +1,20 @@
 /*
+ * Copyright 2025 coze-dev Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+/*
  * Copyright 2025 superagent-ai Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -28,13 +44,17 @@ import (
 )
 
 // MonitorHandler provides observability dashboard endpoints.
+// Local TraceStore and MetricsBucketer are always present (zero-dependency baseline).
+// Langfuse is optional enhancement — when configured, certain queries may enrich from it.
 type MonitorHandler struct {
 	langfuse *observe.LangfuseClient
+	store    *observe.TraceStore
+	bucketer *observe.MetricsBucketer
 }
 
-// NewMonitorHandler creates a MonitorHandler.
-func NewMonitorHandler(lf *observe.LangfuseClient) *MonitorHandler {
-	return &MonitorHandler{langfuse: lf}
+// NewMonitorHandler creates a MonitorHandler with local store as primary data source.
+func NewMonitorHandler(lf *observe.LangfuseClient, store *observe.TraceStore, bucketer *observe.MetricsBucketer) *MonitorHandler {
+	return &MonitorHandler{langfuse: lf, store: store, bucketer: bucketer}
 }
 
 // HandleOverview returns aggregated KPI metrics from Prometheus.
@@ -66,89 +86,96 @@ func (h *MonitorHandler) HandleOverview(_ context.Context, c *app.RequestContext
 	c.JSON(200, result)
 }
 
-// HandleListTraces proxies trace listing from Langfuse.
+// HandleListTraces returns traces from the local store.
 // GET /api/v1/admin/monitor/traces
-func (h *MonitorHandler) HandleListTraces(ctx context.Context, c *app.RequestContext) {
-	if h.langfuse == nil {
-		c.JSON(503, map[string]string{"error": "langfuse not configured"})
+func (h *MonitorHandler) HandleListTraces(_ context.Context, c *app.RequestContext) {
+	if h.store == nil {
+		c.JSON(200, map[string]any{"data": []any{}, "meta": map[string]any{"page": 1, "limit": 20, "totalItems": 0, "totalPages": 0}})
 		return
 	}
 
-	params := observe.TraceListParams{
-		Page:    queryInt(c, "page", 1),
-		Limit:   queryInt(c, "limit", 20),
-		OrderBy: queryStr(c, "orderBy"),
-		Name:    queryStr(c, "name"),
-		FromTS:  queryStr(c, "fromTimestamp"),
-		ToTS:    queryStr(c, "toTimestamp"),
+	params := observe.TraceQueryParams{
+		Page:  queryInt(c, "page", 1),
+		Limit: queryInt(c, "limit", 20),
+		From:  queryStr(c, "fromTimestamp"),
+		To:    queryStr(c, "toTimestamp"),
+		Name:  queryStr(c, "name"),
 	}
 
-	resp, err := h.langfuse.ListTraces(ctx, params)
-	if err != nil {
-		c.JSON(502, map[string]string{"error": err.Error()})
-		return
-	}
-	c.JSON(200, resp)
+	traces, total := h.store.List(params)
+	totalPages := (total + params.Limit - 1) / params.Limit
+
+	c.JSON(200, map[string]any{
+		"data": traces,
+		"meta": map[string]any{
+			"page":       params.Page,
+			"limit":      params.Limit,
+			"totalItems": total,
+			"totalPages": totalPages,
+		},
+	})
 }
 
-// HandleGetTrace retrieves a single trace by ID from Langfuse.
+// HandleGetTrace retrieves a single trace by ID from the local store.
 // GET /api/v1/admin/monitor/traces/:id
-func (h *MonitorHandler) HandleGetTrace(ctx context.Context, c *app.RequestContext) {
-	if h.langfuse == nil {
-		c.JSON(503, map[string]string{"error": "langfuse not configured"})
-		return
-	}
-
+func (h *MonitorHandler) HandleGetTrace(_ context.Context, c *app.RequestContext) {
 	traceID := c.Param("id")
 	if traceID == "" {
 		c.JSON(400, map[string]string{"error": "missing trace id"})
 		return
 	}
 
-	resp, err := h.langfuse.GetTrace(ctx, traceID)
-	if err != nil {
-		c.JSON(502, map[string]string{"error": err.Error()})
+	if h.store == nil {
+		c.JSON(404, map[string]string{"error": "trace not found"})
 		return
 	}
-	c.JSON(200, resp)
+
+	tr := h.store.Get(traceID)
+	if tr == nil {
+		c.JSON(404, map[string]string{"error": "trace not found"})
+		return
+	}
+	c.JSON(200, tr)
 }
 
-// HandleDailyMetrics retrieves daily usage metrics from Langfuse.
+// HandleDailyMetrics returns daily aggregated metrics from the local bucketer.
 // GET /api/v1/admin/monitor/metrics/daily
-func (h *MonitorHandler) HandleDailyMetrics(ctx context.Context, c *app.RequestContext) {
-	if h.langfuse == nil {
-		c.JSON(503, map[string]string{"error": "langfuse not configured"})
+func (h *MonitorHandler) HandleDailyMetrics(_ context.Context, c *app.RequestContext) {
+	if h.bucketer == nil {
+		c.JSON(200, map[string]any{"data": []any{}})
 		return
 	}
 
-	fromDate := queryStr(c, "fromTimestamp")
-	toDate := queryStr(c, "toTimestamp")
+	from := queryStr(c, "fromTimestamp")
+	to := queryStr(c, "toTimestamp")
 
-	resp, err := h.langfuse.GetDailyMetrics(ctx, fromDate, toDate)
-	if err != nil {
-		c.JSON(502, map[string]string{"error": err.Error()})
-		return
-	}
-	c.JSON(200, resp)
+	buckets := h.bucketer.Query(from, to)
+	c.JSON(200, map[string]any{"data": buckets})
 }
 
-// HandleSessions retrieves session list from Langfuse.
+// HandleSessions returns distinct sessions from the local trace store.
 // GET /api/v1/admin/monitor/sessions
-func (h *MonitorHandler) HandleSessions(ctx context.Context, c *app.RequestContext) {
-	if h.langfuse == nil {
-		c.JSON(503, map[string]string{"error": "langfuse not configured"})
+func (h *MonitorHandler) HandleSessions(_ context.Context, c *app.RequestContext) {
+	if h.store == nil {
+		c.JSON(200, map[string]any{"data": []any{}, "meta": map[string]any{"page": 1, "limit": 20, "totalItems": 0, "totalPages": 0}})
 		return
 	}
 
 	page := queryInt(c, "page", 1)
 	limit := queryInt(c, "limit", 20)
 
-	resp, err := h.langfuse.ListSessions(ctx, page, limit)
-	if err != nil {
-		c.JSON(502, map[string]string{"error": err.Error()})
-		return
-	}
-	c.JSON(200, resp)
+	sessions, total := h.store.Sessions(page, limit)
+	totalPages := (total + limit - 1) / limit
+
+	c.JSON(200, map[string]any{
+		"data": sessions,
+		"meta": map[string]any{
+			"page":       page,
+			"limit":      limit,
+			"totalItems": total,
+			"totalPages": totalPages,
+		},
+	})
 }
 
 // --- helpers ---
