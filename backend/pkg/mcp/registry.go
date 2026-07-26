@@ -19,9 +19,11 @@ package mcp
 import (
 	"context"
 	"fmt"
+	"os"
 	"sync"
 
 	"gorm.io/gorm"
+	"gopkg.in/yaml.v3"
 )
 
 // ServerConfig holds configuration for a single MCP server.
@@ -40,6 +42,7 @@ type ServerConfig struct {
 type Registry struct {
 	mu          sync.RWMutex
 	clients     map[string]*Client
+	configs     map[string]ServerConfig
 	configStore *ConfigStore // nil → pure-memory mode (no persistence)
 }
 
@@ -47,7 +50,10 @@ type Registry struct {
 // Pass a non-nil *gorm.DB to enable configuration persistence across restarts.
 // Pass nil to run in pure-memory mode.
 func NewRegistry(db *gorm.DB) *Registry {
-	r := &Registry{clients: make(map[string]*Client)}
+	r := &Registry{
+		clients: make(map[string]*Client),
+		configs: make(map[string]ServerConfig),
+	}
 	if db != nil {
 		cs, err := NewConfigStore(db)
 		if err == nil {
@@ -78,6 +84,7 @@ func (r *Registry) Connect(ctx context.Context, cfg ServerConfig) error {
 		_ = old.Close()
 	}
 	r.clients[cfg.Name] = client
+	r.configs[cfg.Name] = cfg
 	r.mu.Unlock()
 
 	// Persist configuration so it survives restarts.
@@ -99,6 +106,14 @@ func (r *Registry) GetClient(name string) (*Client, bool) {
 	return c, ok
 }
 
+// GetConfig returns the ServerConfig for the named server, or false if not found.
+func (r *Registry) GetConfig(name string) (ServerConfig, bool) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	cfg, ok := r.configs[name]
+	return cfg, ok
+}
+
 // ListServers returns the names of all registered servers.
 func (r *Registry) ListServers() []string {
 	r.mu.RLock()
@@ -118,6 +133,7 @@ func (r *Registry) Disconnect(name string) error {
 	client, ok := r.clients[name]
 	if ok {
 		delete(r.clients, name)
+		delete(r.configs, name)
 	}
 	r.mu.Unlock()
 
@@ -162,6 +178,44 @@ func (r *Registry) ReconnectAll(ctx context.Context) error {
 
 		if connErr := r.Connect(ctx, cfg); connErr != nil {
 			// Non-fatal per-server failure: continue with remaining configs.
+			_ = connErr
+		}
+	}
+	return nil
+}
+
+// LoadFromConfig reads a YAML config file containing a list of MCP server
+// configurations and attempts to connect each one. Errors for individual
+// servers are logged but do not abort the loading of subsequent servers.
+// Servers that are already connected are skipped.
+func (r *Registry) LoadFromConfig(ctx context.Context, configPath string) error {
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return fmt.Errorf("mcp registry: read config %s: %w", configPath, err)
+	}
+
+	var cfg struct {
+		Servers []ServerConfig `yaml:"servers"`
+	}
+	if err := yaml.Unmarshal(data, &cfg); err != nil {
+		return fmt.Errorf("mcp registry: parse config %s: %w", configPath, err)
+	}
+
+	for _, sc := range cfg.Servers {
+		if sc.Name == "" {
+			continue
+		}
+		r.mu.RLock()
+		_, already := r.clients[sc.Name]
+		r.mu.RUnlock()
+		if already {
+			continue
+		}
+		if connErr := r.Connect(ctx, sc); connErr != nil {
+			// Non-fatal: log and continue.
 			_ = connErr
 		}
 	}
