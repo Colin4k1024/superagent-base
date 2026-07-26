@@ -377,7 +377,7 @@ func handleEvent(ctx context.Context, event *Event, repo workflow.Repository,
 		)
 
 		if err = repo.CancelAllRunningNodes(ctx, exeID); err != nil {
-			logs.CtxErrorf(ctx, err.Error())
+			logs.CtxErrorf(ctx, "%s", err.Error())
 		}
 
 		if updatedRows, currentStatus, err = repo.UpdateWorkflowExecution(ctx, wfExec, []entity.WorkflowExecuteStatus{entity.WorkflowRunning,

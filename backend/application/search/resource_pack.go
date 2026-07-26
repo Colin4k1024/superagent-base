@@ -179,7 +179,7 @@ func (w *workflowPacker) GetActions(ctx context.Context) []*common.ResourceActio
 		MetaOnly: true,
 	})
 	if err != nil {
-		logs.CtxWarnf(ctx, "get policy failed with '%s', err=%v", w.resID, err)
+		logs.CtxWarnf(ctx, "get policy failed with '%d', err=%v", w.resID, err)
 		return actions
 	}
 	key := ternary.IFElse(meta.Mode == workflow.WorkflowMode_Workflow, common.ActionKey_SwitchToChatflow, common.ActionKey_SwitchToFuncflow)
@@ -222,7 +222,7 @@ func (w *workflowPacker) GetProjectDefaultActions(ctx context.Context) []*common
 		MetaOnly: true,
 	})
 	if err != nil {
-		logs.CtxWarnf(ctx, "get policy failed with '%s', err=%v", w.resID, err)
+		logs.CtxWarnf(ctx, "get policy failed with '%d', err=%v", w.resID, err)
 		return actions
 	}
 	key := ternary.IFElse(meta.Mode == workflow.WorkflowMode_Workflow, common.ProjectResourceActionKey_SwitchToChatflow, common.ProjectResourceActionKey_SwitchToFuncflow)

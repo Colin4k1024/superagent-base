@@ -35,5 +35,5 @@ func Recovery(ctx context.Context) {
 	}
 
 	err := fmt.Errorf("%v", e)
-	logs.CtxErrorf(ctx, fmt.Sprintf("[catch panic] err = %v \n stacktrace:\n%s", err, debug.Stack()))
+	logs.CtxErrorf(ctx, "[catch panic] err = %v \n stacktrace:\n%s", err, debug.Stack())
 }
