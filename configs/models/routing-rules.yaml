@@ -1,17 +1,85 @@
+# Dynamic Model Routing Configuration
+# Supports multiple providers with complexity-based routing.
+
 strategies:
   - name: capability-based
     rules:
-      - match: {task: [reasoning, planning, coding, review, vision, fast-chat, simple]}
+      - match: {task: [reasoning, planning, review]}
+        route: deepseek-r1
+      - match: {task: [coding]}
         route: qwen-max
+      - match: {task: [vision]}
+        route: gpt-4o
+      - match: {task: [fast-chat, simple]}
+        route: qwen-turbo
     fallback: qwen-max
+
   - name: cost-optimized
     rules:
-      - match: {complexity: [low, medium, high]}
+      - match: {complexity: [low]}
+        route: qwen-turbo
+      - match: {complexity: [medium]}
         route: qwen-max
+      - match: {complexity: [high]}
+        route: deepseek-r1
     fallback: qwen-max
+
 providers:
+  # --- Tier 1: Cheap & fast (low complexity) ---
+  qwen-turbo:
+    type: openai-compatible
+    endpoint: https://dashscope.aliyuncs.com/compatible-mode/v1
+    pricing:
+      input_per_1k: 0.0003
+      output_per_1k: 0.0006
+
+  # --- Tier 2: Balanced (medium complexity) ---
   qwen-max:
     type: openai-compatible
     endpoint: https://dashscope.aliyuncs.com/compatible-mode/v1
-    api_key: "sk-3f36480fd1b54bcab1957c7ae6a7cc96"
-    model: "qwen-max"
+    pricing:
+      input_per_1k: 0.02
+      output_per_1k: 0.06
+
+  deepseek-v3:
+    type: openai-compatible
+    endpoint: https://api.deepseek.com/v1
+    pricing:
+      input_per_1k: 0.00027
+      output_per_1k: 0.0011
+
+  # --- Tier 3: Strongest (high complexity) ---
+  deepseek-r1:
+    type: openai-compatible
+    endpoint: https://api.deepseek.com/v1
+    pricing:
+      input_per_1k: 0.0014
+      output_per_1k: 0.0028
+
+  gpt-4o:
+    type: openai-compatible
+    endpoint: https://api.openai.com/v1
+    pricing:
+      input_per_1k: 0.005
+      output_per_1k: 0.015
+
+# Feedback-driven adaptive routing (optional).
+# When enabled, the system learns from real latency/success/cost data
+# and adjusts routing decisions automatically.
+feedback:
+  enabled: false
+  ema_alpha: 0.1
+  min_samples: 5
+  stale_duration: 5m
+  circuit_breaker:
+    error_threshold: 0.5
+    cooldown: 30s
+    probe_interval: 10s
+
+# Complexity analyzer configuration.
+# Uses a lightweight LLM to classify task complexity per request.
+complexity_analyzer:
+  enabled: true
+  model: qwen-turbo
+  fallback_complexity: medium
+  cache_ttl: 5m

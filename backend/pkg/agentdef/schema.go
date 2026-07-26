@@ -1,4 +1,20 @@
 /*
+ * Copyright 2025 coze-dev Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+/*
  * Copyright 2025 superagent-ai Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -257,6 +273,22 @@ type ModelSpec struct {
 	// APIKeyEnv is the environment variable name holding the API key for this agent.
 	// When empty, the global ModelRuntimeConfig.APIKey is used.
 	APIKeyEnv string `yaml:"api_key_env,omitempty" json:"api_key_env,omitempty"`
+	// Models defines a complexity-tiered model pool for dynamic routing.
+	// When non-empty, the runtime analyzes each request's complexity and
+	// selects the matching tier's model. When empty, Primary is used directly.
+	Models []ModelTier `yaml:"models,omitempty" json:"models,omitempty"`
+}
+
+// ModelTier maps a complexity level to a specific model.
+type ModelTier struct {
+	// Level is the complexity tier: "low", "medium", "high".
+	Level string `yaml:"level" json:"level"`
+	// ModelID is the model to use for this complexity level.
+	ModelID string `yaml:"model_id" json:"model_id"`
+	// Protocol overrides ModelSpec.Protocol for this tier (optional).
+	Protocol string `yaml:"protocol,omitempty" json:"protocol,omitempty"`
+	// BaseURL overrides ModelSpec.BaseURL for this tier (optional).
+	BaseURL string `yaml:"base_url,omitempty" json:"base_url,omitempty"`
 }
 
 // ToolRef identifies a tool by reference URI and optional per-tool config.

@@ -18,9 +18,10 @@ package modelrouter
 
 // RouterConfig is the top-level routing configuration loaded from YAML.
 type RouterConfig struct {
-	Strategies []StrategyConfig          `yaml:"strategies"`
-	Providers  map[string]ProviderConfig `yaml:"providers"`
-	Feedback   *FeedbackConfig           `yaml:"feedback,omitempty"`
+	Strategies         []StrategyConfig          `yaml:"strategies"`
+	Providers          map[string]ProviderConfig `yaml:"providers"`
+	Feedback           *FeedbackConfig           `yaml:"feedback,omitempty"`
+	ComplexityAnalyzer *ComplexityConfig         `yaml:"complexity_analyzer,omitempty"`
 }
 
 // StrategyConfig defines a named routing strategy with ordered rules.
@@ -44,6 +45,7 @@ type RuleConfig struct {
 type ProviderConfig struct {
 	Type     string      `yaml:"type"`
 	Endpoint string      `yaml:"endpoint,omitempty"`
+	APIKey   string      `yaml:"api_key,omitempty"`
 	Pricing  PricingInfo `yaml:"pricing,omitempty"`
 }
 

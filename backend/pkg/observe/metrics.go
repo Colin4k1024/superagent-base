@@ -1,4 +1,20 @@
 /*
+ * Copyright 2025 coze-dev Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+/*
  * Copyright 2025 superagent-ai Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -158,4 +174,19 @@ var (
 		Help:      "Actual LLM response latency per model (first token)",
 		Buckets:   prometheus.DefBuckets,
 	}, []string{"model_id", "provider"})
+
+	// DynamicRouteTotal tracks per-request dynamic model routing decisions.
+	DynamicRouteTotal = promauto.NewCounterVec(prometheus.CounterOpts{
+		Namespace: "superagent",
+		Name:      "dynamic_route_total",
+		Help:      "Dynamic routing decisions by agent, complexity, and selected model",
+	}, []string{"agent", "complexity", "model_id"})
+
+	// ComplexityAnalyzeDuration tracks the latency of the complexity analyzer.
+	ComplexityAnalyzeDuration = promauto.NewHistogramVec(prometheus.HistogramOpts{
+		Namespace: "superagent",
+		Name:      "complexity_analyze_duration_seconds",
+		Help:      "Time to analyze task complexity",
+		Buckets:   []float64{0.01, 0.05, 0.1, 0.5, 1.0, 2.0, 3.0},
+	}, []string{"result"})
 )

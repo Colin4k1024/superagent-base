@@ -25,6 +25,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime/debug"
+	"strconv"
 	"strings"
 	"time"
 
@@ -51,6 +52,7 @@ import (
 	"github.com/superagent-ai/superagent-base/backend/pkg/mcp"
 	"github.com/superagent-ai/superagent-base/backend/pkg/memory"
 	"github.com/superagent-ai/superagent-base/backend/pkg/memory/builtin"
+	"github.com/superagent-ai/superagent-base/backend/pkg/modelrouter"
 	"github.com/superagent-ai/superagent-base/backend/pkg/observe"
 	"github.com/superagent-ai/superagent-base/backend/pkg/rbac"
 	"github.com/superagent-ai/superagent-base/backend/pkg/skill"
@@ -94,6 +96,12 @@ func main() {
 	// OBS-001: Register Eino observability callback globally so all model/tool
 	// invocations automatically report Prometheus metrics and OTel spans.
 	callbacks.AppendGlobalHandlers(observe.NewEinoObserveCallback())
+
+	// OBS-002: Local trace store + daily metrics bucketer (zero external dependency).
+	traceStore := observe.NewTraceStore(envIntOr("TRACE_BUFFER_SIZE", 500))
+	metricsBucketer := observe.NewMetricsBucketer(30)
+	observe.SetTraceStore(traceStore)
+	observe.SetMetricsBucketer(metricsBucketer)
 
 	// EVO-001: Initialise local experience self-evolution engine (MySQL-backed).
 	// Non-fatal — returns nil when EVOLUTION_ENABLED is false or unset.
@@ -214,6 +222,38 @@ func main() {
 
 	// Build the AgentRuntime that powers YAML-defined agents.
 	// Single builder construction — SkillManager and MCPRegistry conditionally added.
+
+	// Initialize model router from config file.
+	var modelRouterInst modelrouter.Router
+	var complexityAnalyzerInst modelrouter.ComplexityAnalyzer
+	var routingCfg *modelrouter.RouterConfig
+	routingConfigPath := getEnv("ROUTING_CONFIG_PATH", "configs/models/routing-rules.yaml")
+	if cfg, rcErr := modelrouter.LoadConfigFromFile(routingConfigPath); rcErr != nil {
+		logs.Warnf("model router: load config failed (routing disabled): %v", rcErr)
+	} else {
+		routingCfg = cfg
+		router, rtErr := modelrouter.NewDefaultRouter(routingCfg)
+		if rtErr != nil {
+			logs.Warnf("model router: init failed (routing disabled): %v", rtErr)
+		} else {
+			modelRouterInst = router
+			logs.Infof("model router: initialized with %d strategies and %d providers", len(routingCfg.Strategies), len(routingCfg.Providers))
+		}
+		// Initialize complexity analyzer if configured.
+		if routingCfg.ComplexityAnalyzer != nil && routingCfg.ComplexityAnalyzer.Enabled {
+			analyzerCfg := *routingCfg.ComplexityAnalyzer
+			// Resolve API key from env if not set in config.
+			if analyzerCfg.APIKey == "" {
+				analyzerCfg.APIKey = getEnv("MODEL_API_KEY_0", "123456")
+			}
+			if analyzerCfg.BaseURL == "" {
+				analyzerCfg.BaseURL = getEnv("MODEL_BASE_URL_0", "http://127.0.0.1:8000/v1")
+			}
+			complexityAnalyzerInst = modelrouter.NewLLMComplexityAnalyzer(analyzerCfg)
+			logs.Infof("complexity analyzer: enabled with model=%s", analyzerCfg.Model)
+		}
+	}
+
 	builderOpts := []agentdef.BuilderOption{
 		agentdef.WithModelConfig(agentdef.ModelRuntimeConfig{
 			BaseURL: getEnv("MODEL_BASE_URL_0", "http://127.0.0.1:8000/v1"),
@@ -240,6 +280,29 @@ func main() {
 		builderOpts = append(builderOpts, agentdef.WithEvolutionAdvisor(evoEngine.Advisor()))
 		builderOpts = append(builderOpts, agentdef.WithEvolutionCollector(evoEngine.Collector()))
 	}
+	if modelRouterInst != nil {
+		builderOpts = append(builderOpts, agentdef.WithModelRouter(modelRouterInst))
+	}
+	if complexityAnalyzerInst != nil {
+		builderOpts = append(builderOpts, agentdef.WithComplexityAnalyzer(complexityAnalyzerInst))
+	}
+	// Extract provider endpoints from routing config for tier model creation.
+	if routingCfg != nil {
+		providerEPs := make(map[string]agentdef.ProviderEndpoint, len(routingCfg.Providers))
+		for modelID, pc := range routingCfg.Providers {
+			apiKey := pc.APIKey
+			// Resolve ${ENV_VAR} references in API keys.
+			if strings.HasPrefix(apiKey, "${") && strings.HasSuffix(apiKey, "}") {
+				envKey := apiKey[2 : len(apiKey)-1]
+				apiKey = os.Getenv(envKey)
+			}
+			providerEPs[modelID] = agentdef.ProviderEndpoint{
+				Endpoint: pc.Endpoint,
+				APIKey:   apiKey,
+			}
+		}
+		builderOpts = append(builderOpts, agentdef.WithProviderEndpoints(providerEPs))
+	}
 	agentBuilder := agentdef.NewAgentBuilder(builderOpts...)
 
 	agentRT := agentdef.NewRuntime(agentdef.RuntimeConfig{
@@ -255,6 +318,12 @@ func main() {
 	// dependent infrastructure (MySQL, Redis) is ready.
 	if reconnErr := mcpRegistry.ReconnectAll(ctx); reconnErr != nil {
 		logs.Warnf("mcp registry: reconnect all failed: %v", reconnErr)
+	}
+
+	// Load MCP servers from YAML config file (configs/mcp/servers.yaml).
+	mcpConfigPath := getEnv("MCP_CONFIG_PATH", "configs/mcp/servers.yaml")
+	if loadErr := mcpRegistry.LoadFromConfig(ctx, mcpConfigPath); loadErr != nil {
+		logs.Warnf("mcp registry: load from config failed: %v", loadErr)
 	}
 
 	// AGT-DB-001: 构造 AgentDefinitionStore 实现 Agent 定义 DB 双写。
@@ -452,14 +521,19 @@ func startHttpServer(agentRT *agentdef.AgentRuntime, skillMgr *skill.Manager, to
 	adminGroup.POST("/webhooks/:id/test", webhookH.HandleTest)
 	adminGroup.GET("/webhooks/:id/logs", webhookH.HandleLogs)
 
-	// Observability dashboard endpoints — Prometheus overview + Langfuse proxy.
-	monitorH := cozehandler.NewMonitorHandler(observe.NewLangfuseClient(observe.LoadConfigFromEnv().Langfuse))
+	// Observability dashboard endpoints — local store primary, Langfuse optional.
+	monitorH := cozehandler.NewMonitorHandler(observe.NewLangfuseClient(observe.LoadConfigFromEnv().Langfuse), observe.GetTraceStore(), observe.GetMetricsBucketer())
 	monitorGroup := adminGroup.Group("/monitor")
 	monitorGroup.GET("/overview", monitorH.HandleOverview)
 	monitorGroup.GET("/traces", monitorH.HandleListTraces)
 	monitorGroup.GET("/traces/:id", monitorH.HandleGetTrace)
 	monitorGroup.GET("/metrics/daily", monitorH.HandleDailyMetrics)
 	monitorGroup.GET("/sessions", monitorH.HandleSessions)
+
+	// Model config CRUD — proxied from the legacy IDL routes to the admin group for proper auth.
+	adminGroup.GET("/config/model/list", cozehandler.GetModelList)
+	adminGroup.POST("/config/model/create", cozehandler.CreateModel)
+	adminGroup.POST("/config/model/delete", cozehandler.DeleteModel)
 
 	// Session history — conversation message read/clear (backed by shared Redis memory).
 	sessionH := cozehandler.NewSessionHandler(sharedMem)
@@ -853,6 +927,18 @@ func getEnv(key string, defaultValue string) string {
 		return defaultValue
 	}
 	return v
+}
+
+func envIntOr(key string, defaultVal int) int {
+	v := os.Getenv(key)
+	if v == "" {
+		return defaultVal
+	}
+	n, err := strconv.Atoi(v)
+	if err != nil {
+		return defaultVal
+	}
+	return n
 }
 
 func setLogLevel() {
