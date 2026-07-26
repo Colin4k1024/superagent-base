@@ -1,4 +1,20 @@
 /*
+ * Copyright 2025 coze-dev Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+/*
  * Copyright 2025 superagent-ai Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -61,6 +77,7 @@ type einoChatAgent struct {
 	memBackend   memory.Backend
 	chatModel    model.ToolCallingChatModel
 	systemPrompt string
+	modelSelector *DynamicModelSelector // nil when dynamic routing is not configured
 }
 
 func (a *einoChatAgent) Name() string                    { return a.def.Metadata.Name }
@@ -97,8 +114,22 @@ func (a *einoChatAgent) Chat(ctx context.Context, sessionID string, message stri
 		})
 	}
 
-	ctx = observe.WithModelInfo(ctx, a.modelID, a.provider)
-	reader, err := a.chatModel.Stream(ctx, msgs)
+	// Dynamic model selection based on message complexity.
+	activeModel := a.chatModel
+	activeModelID := a.modelID
+	if a.modelSelector != nil {
+		selected, complexity := a.modelSelector.SelectModel(ctx, msgs)
+		if selected != nil {
+			activeModel = selected
+			// Update modelID for observability if the complexity changed the model.
+			if tierDef, ok := findModelTier(a.def, complexity); ok {
+				activeModelID = tierDef.ModelID
+			}
+		}
+	}
+
+	ctx = observe.WithModelInfo(ctx, activeModelID, a.provider)
+	reader, err := activeModel.Stream(ctx, msgs)
 	if err != nil {
 		return nil, fmt.Errorf("agentdef: chat: stream: %w", err)
 	}
@@ -130,7 +161,7 @@ func (a *einoChatAgent) Chat(ctx context.Context, sessionID string, message stri
 			}
 			if chunk != nil && chunk.Content != "" {
 				if firstToken {
-					modelrouter.RecordModelLatency(a.modelID, a.provider, time.Since(streamStart))
+					modelrouter.RecordModelLatency(activeModelID, a.provider, time.Since(streamStart))
 					firstToken = false
 				}
 				fullResponse.WriteString(chunk.Content)
@@ -180,4 +211,14 @@ func (a *adkChatModelAgent) Chat(ctx context.Context, sessionID string, message 
 	}
 	go consumeADKIterator(ctx, params, iter, ch, nil)
 	return ch, nil
+}
+
+// findModelTier returns the ModelTier definition for the given complexity level.
+func findModelTier(def *AgentDefinition, complexity string) (ModelTier, bool) {
+	for _, tier := range def.Spec.Model.Models {
+		if tier.Level == complexity {
+			return tier, true
+		}
+	}
+	return ModelTier{}, false
 }

@@ -1,0 +1,38 @@
+apiVersion: superagent/v1
+kind: Agent
+metadata:
+  name: smart-assistant
+  version: "1.0.0"
+  tags: [dynamic-routing, multi-model]
+  labels:
+    team: core
+    tier: experimental
+spec:
+  type: chat_model_agent
+  model:
+    protocol: openai
+    primary: qwen-max
+    fallback: deepseek-v3
+    models:
+      - level: low
+        model_id: qwen-turbo
+      - level: medium
+        model_id: qwen-max
+      - level: high
+        model_id: deepseek-r1
+  system_prompt: |
+    You are a versatile AI assistant. Adapt your response depth and style
+    based on the complexity of the user's request. For simple questions,
+    be concise. For complex tasks, be thorough and structured.
+  tools:
+    - ref: builtin/web_search
+  middleware:
+    - name: guardrails
+      max_input_length: 50000
+      max_output_length: 32000
+    - name: context_injection
+      inject_timestamp: true
+  observability:
+    tracing: true
+    metrics: true
+    log_level: info

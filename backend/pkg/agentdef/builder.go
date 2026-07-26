@@ -1,4 +1,20 @@
 /*
+ * Copyright 2025 coze-dev Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+/*
  * Copyright 2025 superagent-ai Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -27,6 +43,7 @@ import (
 	"time"
 
 	"github.com/cloudwego/eino/adk"
+	"github.com/cloudwego/eino/components/model"
 	einotool "github.com/cloudwego/eino/components/tool"
 	"github.com/cloudwego/eino/compose"
 	"github.com/cloudwego/eino/schema"
@@ -110,9 +127,21 @@ func WithRedisClient(client cache.Cmdable) BuilderOption {
 	return func(b *AgentBuilder) { b.redisClient = client }
 }
 
+// WithComplexityAnalyzer sets the complexity analyzer for dynamic model routing.
+func WithComplexityAnalyzer(a modelrouter.ComplexityAnalyzer) BuilderOption {
+	return func(b *AgentBuilder) { b.complexityAnalyzer = a }
+}
+
+// WithProviderEndpoints sets per-model provider endpoints from routing config.
+func WithProviderEndpoints(pe map[string]ProviderEndpoint) BuilderOption {
+	return func(b *AgentBuilder) { b.providerEndpoints = pe }
+}
+
 // AgentBuilder converts AgentDefinitions into running Agent instances.
 type AgentBuilder struct {
 	modelRouter         modelrouter.Router
+	complexityAnalyzer  modelrouter.ComplexityAnalyzer
+	providerEndpoints   map[string]ProviderEndpoint
 	toolManager         *tool.Manager
 	memoryFactory       func(config memory.BackendConfig) (memory.Backend, error)
 	mcpRegistry         *mcp.Registry
@@ -224,6 +253,9 @@ func (b *AgentBuilder) Build(ctx context.Context, def *AgentDefinition) (Agent, 
 		}
 	}
 
+	// Check if dynamic model routing is configured (tiered model pool).
+	hasDynamicRouting := len(def.Spec.Model.Models) > 0 && b.complexityAnalyzer != nil
+
 	var built Agent
 
 	// If no real model config is provided fall back to the stub agent so
@@ -266,6 +298,15 @@ func (b *AgentBuilder) Build(ctx context.Context, def *AgentDefinition) (Agent, 
 		return nil, fmt.Errorf("agentdef: Build %q: create model (protocol=%s): %w", def.Metadata.Name, protocol, err)
 	}
 
+	// Build tier models for dynamic routing (if configured).
+	var tierModels map[string]model.ToolCallingChatModel
+	if hasDynamicRouting {
+		tierModels, err = BuildTierModels(ctx, def, b.createChatModel, baseURL, apiKey, protocol, b.providerEndpoints)
+		if err != nil {
+			return nil, fmt.Errorf("agentdef: Build %q: create tier models: %w", def.Metadata.Name, err)
+		}
+	}
+
 	// Gather Eino-compatible tools from resolved refs.
 	einoTools := b.resolveEinoTools(ctx, toolRefs)
 
@@ -305,7 +346,7 @@ func (b *AgentBuilder) Build(ctx context.Context, def *AgentDefinition) (Agent, 
 		}
 	} else {
 		// Simple chat agent without tools.
-		built = &einoChatAgent{
+		agent := &einoChatAgent{
 			def:          def,
 			modelID:      effectiveModelID,
 			provider:     protocol,
@@ -313,6 +354,13 @@ func (b *AgentBuilder) Build(ctx context.Context, def *AgentDefinition) (Agent, 
 			chatModel:    chatModel,
 			systemPrompt: def.Spec.SystemPrompt,
 		}
+		// Attach dynamic model selector if tier models are configured.
+		if hasDynamicRouting && tierModels != nil {
+			agent.modelSelector = NewDynamicModelSelector(
+				def, b.complexityAnalyzer, tierModels, chatModel, nil,
+			)
+		}
+		built = agent
 	}
 
 	// Apply middleware wrapping (timeout, retry, rate_limit, cache).
