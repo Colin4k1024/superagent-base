@@ -1,4 +1,20 @@
 /*
+ * Copyright 2025 coze-dev Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+/*
  * Copyright 2025 superagent-ai Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -68,26 +84,26 @@ func (a *cacheAdapter) Set(ctx context.Context, key string, value interface{}, e
 
 func (a *cacheAdapter) Del(ctx context.Context, keys ...string) (int64, error) {
 	cmd := a.inner.Del(ctx, keys...)
-	return cmd.Val(), cmd.Err()
+	return cmd.Result()
 }
 
 func (a *cacheAdapter) Exists(ctx context.Context, keys ...string) (int64, error) {
 	cmd := a.inner.Exists(ctx, keys...)
-	return cmd.Val(), cmd.Err()
+	return cmd.Result()
 }
 
 func (a *cacheAdapter) Expire(ctx context.Context, key string, expiration time.Duration) (bool, error) {
 	cmd := a.inner.Expire(ctx, key, expiration)
-	return cmd.Val(), cmd.Err()
+	return cmd.Result()
 }
 
 func (a *cacheAdapter) HGet(ctx context.Context, key, field string) (string, error) {
-	// HGet is not directly available on Cmdable; use HGetAll and pick the field
 	all := a.inner.HGetAll(ctx, key)
-	if err := all.Err(); err != nil {
+	m, err := all.Result()
+	if err != nil {
 		return "", err
 	}
-	val, ok := all.Val()[field]
+	val, ok := m[field]
 	if !ok {
 		return "", cache.Nil
 	}
@@ -96,27 +112,27 @@ func (a *cacheAdapter) HGet(ctx context.Context, key, field string) (string, err
 
 func (a *cacheAdapter) HSet(ctx context.Context, key string, values ...interface{}) (int64, error) {
 	cmd := a.inner.HSet(ctx, key, values...)
-	return cmd.Val(), cmd.Err()
+	return cmd.Result()
 }
 
 func (a *cacheAdapter) HDel(ctx context.Context, key string, fields ...string) (int64, error) {
 	cmd := a.inner.HDel(ctx, key, fields...)
-	return cmd.Val(), cmd.Err()
+	return cmd.Result()
 }
 
 func (a *cacheAdapter) LPush(ctx context.Context, key string, values ...interface{}) (int64, error) {
 	cmd := a.inner.LPush(ctx, key, values...)
-	return cmd.Val(), cmd.Err()
+	return cmd.Result()
 }
 
 func (a *cacheAdapter) RPush(ctx context.Context, key string, values ...interface{}) (int64, error) {
 	cmd := a.inner.RPush(ctx, key, values...)
-	return cmd.Val(), cmd.Err()
+	return cmd.Result()
 }
 
 func (a *cacheAdapter) LRange(ctx context.Context, key string, start, stop int64) ([]string, error) {
 	cmd := a.inner.LRange(ctx, key, start, stop)
-	return cmd.Val(), cmd.Err()
+	return cmd.Result()
 }
 
 func (a *cacheAdapter) Close() error {
