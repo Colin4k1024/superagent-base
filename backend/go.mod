@@ -15,7 +15,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/credentials v1.17.62
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.84.1
 	github.com/bytedance/gopkg v0.1.3
-	github.com/bytedance/mockey v1.2.14
+	github.com/bytedance/mockey v1.4.6
 	github.com/bytedance/sonic v1.15.0
 	github.com/cloudwego/eino v0.9.0-beta.1
 	github.com/cloudwego/eino-ext/components/embedding/ark v0.1.0
