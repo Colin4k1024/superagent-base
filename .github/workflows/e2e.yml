@@ -43,7 +43,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.24'
+          go-version: '1.25'
           cache-dependency-path: backend/go.sum
           check-latest: true
 
@@ -54,6 +54,8 @@ jobs:
           cache: 'npm'
           cache-dependency-path: web/package-lock.json
 
+      - name: Configure npm registry
+        run: npm config set registry https://registry.npmmirror.com/
       - name: Install frontend dependencies
         run: cd web && npm ci
 
