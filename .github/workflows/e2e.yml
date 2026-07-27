@@ -114,13 +114,13 @@ jobs:
           cd web && npm run dev > /tmp/frontend.log 2>&1 &
           # Wait for vite to be ready
           for i in $(seq 1 30); do
-            if curl -s http://localhost:3000 > /dev/null 2>&1; then
+            if curl -s http://localhost:3500 > /dev/null 2>&1; then
               echo "Frontend ready after ${i}s"
               break
             fi
             sleep 1
           done
-          if ! curl -s http://localhost:3000 > /dev/null 2>&1; then
+          if ! curl -s http://localhost:3500 > /dev/null 2>&1; then
             echo "Frontend failed to start. Logs:"
             cat /tmp/frontend.log
             exit 1
