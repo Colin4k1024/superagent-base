@@ -1,4 +1,20 @@
 /*
+ * Copyright 2025 coze-dev Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+/*
  * Copyright 2025 superagent-ai Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -153,10 +169,12 @@ func (fc *FeedbackCollector) RecordLatency(modelID string, ttft, totalDur time.D
 
 // RecordOutcome records the success/failure outcome for modelID.
 func (fc *FeedbackCollector) RecordOutcome(modelID string, outcome Outcome) {
+	// Acquire all fc.mu-dependent objects BEFORE touching stats.mu to avoid
+	// lock-order inversion (fc.mu → stats.mu is the required order).
 	stats := fc.getOrCreate(modelID)
-	stats.mu.Lock()
-	defer stats.mu.Unlock()
+	breaker := fc.getOrCreateBreaker(modelID)
 
+	stats.mu.Lock()
 	successSample := 0.0
 	if outcome == OutcomeSuccess {
 		successSample = 1.0
@@ -165,18 +183,19 @@ func (fc *FeedbackCollector) RecordOutcome(modelID string, outcome Outcome) {
 	stats.successRate = alpha*successSample + (1-alpha)*stats.successRate
 	stats.lastUpdated = time.Now()
 	stats.sampleCount++
+	stats.mu.Unlock()
 
-	// Update circuit breaker.
-	b := fc.getOrCreateBreaker(modelID)
+	// Update circuit breaker (uses its own internal lock).
 	if outcome == OutcomeSuccess {
-		b.RecordSuccess()
+		breaker.RecordSuccess()
 	} else {
-		b.RecordFailure()
+		breaker.RecordFailure()
 	}
 }
 
 // RecordTokens records input/output token counts and updates the cost EMA for modelID.
 func (fc *FeedbackCollector) RecordTokens(modelID string, inputTokens, outputTokens int) {
+	// Acquire fc.mu-dependent data BEFORE touching stats.mu to avoid lock-order inversion.
 	stats := fc.getOrCreate(modelID)
 
 	fc.mu.RLock()
@@ -192,11 +211,10 @@ func (fc *FeedbackCollector) RecordTokens(modelID string, inputTokens, outputTok
 	costPerToken := cost / float64(inputTokens+outputTokens)
 
 	stats.mu.Lock()
-	defer stats.mu.Unlock()
-
 	alpha := fc.alpha
 	stats.costPerToken = alpha*costPerToken + (1-alpha)*stats.costPerToken
 	stats.lastUpdated = time.Now()
+	stats.mu.Unlock()
 }
 
 // Score computes a composite routing score for modelID using the given weights.
