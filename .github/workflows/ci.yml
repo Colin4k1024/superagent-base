@@ -32,7 +32,10 @@ jobs:
           cache: 'npm'
           cache-dependency-path: web/package-lock.json
       - name: Configure npm registry
-        run: npm config set registry https://registry.npmmirror.com/
+        run: |
+          npm config set registry https://registry.npmmirror.com/
+          # Replace internal registry URLs in lockfile with public mirror
+          sed -i 's|http://nexus.haier.net/repository/dts-npm-group/|https://registry.npmmirror.com/|g' web/package-lock.json
       - name: Install
         run: cd web && npm ci
       - name: Type check + Build
