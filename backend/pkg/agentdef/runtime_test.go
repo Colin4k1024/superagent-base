@@ -1,4 +1,20 @@
 /*
+ * Copyright 2025 coze-dev Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+/*
  * Copyright 2025 superagent-ai Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -18,6 +34,8 @@ package agentdef_test
 
 import (
 	"context"
+	"encoding/json"
+	"io"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -30,14 +48,42 @@ import (
 
 // modelAvailable probes the local model endpoint to determine whether
 // integration tests that require a live model should run.
-func modelAvailable(baseURL string) bool {
+// It checks both server reachability and whether the specific model is loaded.
+func modelAvailable(baseURL, modelID, apiKey string) bool {
 	client := &http.Client{Timeout: 2 * time.Second}
-	resp, err := client.Get(baseURL + "/models")
+	req, _ := http.NewRequest("GET", baseURL+"/models", nil)
+	if apiKey != "" {
+		req.Header.Set("Authorization", "Bearer "+apiKey)
+	}
+	resp, err := client.Do(req)
 	if err != nil {
 		return false
 	}
-	_ = resp.Body.Close()
-	return resp.StatusCode < 500
+	defer resp.Body.Close()
+	if resp.StatusCode >= 500 {
+		return false
+	}
+	if modelID == "" {
+		return true
+	}
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return false
+	}
+	var result struct {
+		Data []struct {
+			ID string `json:"id"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(body, &result); err != nil {
+		return false
+	}
+	for _, m := range result.Data {
+		if strings.EqualFold(m.ID, modelID) {
+			return true
+		}
+	}
+	return false
 }
 
 // TestRuntimeStub verifies that the runtime loads agents and the stub Chat
@@ -117,7 +163,7 @@ func TestRuntimeLiveModel(t *testing.T) {
 		modelID = "Qwen3-Coder-Next-4bit"
 	)
 
-	if os.Getenv("INTEGRATION") == "" && !modelAvailable(baseURL) {
+	if os.Getenv("INTEGRATION") == "" && !modelAvailable(baseURL, modelID, apiKey) {
 		t.Skip("local model not available; set INTEGRATION=1 or start the model server")
 	}
 
