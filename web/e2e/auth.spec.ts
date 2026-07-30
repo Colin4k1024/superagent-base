@@ -22,8 +22,8 @@ test.describe('Authentication', () => {
       localStorage.removeItem('session_key')
     })
     await page.goto('/agents')
-    // Login page should render with redirecting message
-    await expect(page.locator('text=Redirecting to Company Account Center').or(page.locator('text=正在跳转企业账号中心登录'))).toBeVisible({ timeout: 10_000 })
+    // Login page should render with sign-in form
+    await expect(page.locator('text=Superagent Base')).toBeVisible({ timeout: 10_000 })
   })
 
   test('stored token bypasses login', async ({ page }) => {
