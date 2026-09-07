@@ -1,4 +1,20 @@
 /*
+ * Copyright 2025 coze-dev Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+/*
  * Copyright 2025 superagent-ai Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -27,16 +43,18 @@ import (
 	"github.com/cloudwego/eino/adk"
 	"github.com/cloudwego/eino/schema"
 
+	"github.com/superagent-ai/superagent-base/backend/pkg/llm"
+	einollm "github.com/superagent-ai/superagent-base/backend/pkg/llm/eino"
 	"github.com/superagent-ai/superagent-base/backend/pkg/memory"
 	"github.com/superagent-ai/superagent-base/backend/pkg/modelrouter"
 )
 
 // streamConsumerParams holds the common parameters for consuming an ADK iterator.
 type streamConsumerParams struct {
-	sessionID    string
-	modelID      string
-	provider     string
-	memBackend   memory.Backend
+	sessionID  string
+	modelID    string
+	provider   string
+	memBackend memory.Backend
 }
 
 // interruptHandler is called when an interrupt event is detected during iteration.
@@ -56,9 +74,6 @@ func consumeADKIterator(
 ) {
 	defer close(ch)
 
-	// earlyExit tracks whether we left the loop before the iterator was
-	// naturally exhausted. If so, drainIterator must be called to prevent
-	// the ADK's internal goroutines from blocking forever.
 	earlyExit := true
 	defer func() {
 		if earlyExit {
@@ -175,14 +190,14 @@ func drainIterator(iter *adk.AsyncIterator[*adk.AgentEvent]) {
 }
 
 // buildMessageHistory constructs the LLM message slice from system prompt and
-// memory history. The current user message is NOT included — the caller appends
-// it separately after this call. persistUserMessage should be called AFTER this
-// function to avoid the current message appearing twice (once from history, once
-// from the explicit append).
-func buildMessageHistory(ctx context.Context, systemPrompt, sessionID string, memBackend memory.Backend) []*schema.Message {
-	msgs := make([]*schema.Message, 0, 8)
+// memory history using the framework-agnostic llm.Message type.
+// The current user message is NOT included — the caller appends it separately
+// after this call. persistUserMessage should be called AFTER this function
+// to avoid the current message appearing twice.
+func buildMessageHistory(ctx context.Context, systemPrompt, sessionID string, memBackend memory.Backend) []*llm.Message {
+	msgs := make([]*llm.Message, 0, 8)
 	if systemPrompt != "" {
-		msgs = append(msgs, schema.SystemMessage(systemPrompt))
+		msgs = append(msgs, llm.SystemMessage(systemPrompt))
 	}
 
 	if memBackend != nil && sessionID != "" {
@@ -191,9 +206,9 @@ func buildMessageHistory(ctx context.Context, systemPrompt, sessionID string, me
 			for _, m := range history {
 				switch m.Role {
 				case "user":
-					msgs = append(msgs, schema.UserMessage(m.Content))
+					msgs = append(msgs, llm.UserMessage(m.Content))
 				case "assistant":
-					msgs = append(msgs, schema.AssistantMessage(m.Content, nil))
+					msgs = append(msgs, llm.AssistantMessage(m.Content, nil))
 				}
 			}
 		}
@@ -212,3 +227,5 @@ func persistUserMessage(ctx context.Context, sessionID, message string, memBacke
 	}
 }
 
+// Avoid unused import warning for einollm (used by callers, not directly here).
+var _ = einollm.ToEinoMessages
