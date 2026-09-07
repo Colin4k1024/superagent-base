@@ -8,11 +8,35 @@ on:
 jobs:
   backend:
     runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: opencoze
+          MYSQL_USER: coze
+          MYSQL_PASSWORD: coze123
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h localhost"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd="redis-cli ping"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.25'
+          go-version: '1.26'
           cache-dependency-path: backend/go.sum
           check-latest: true
       - name: Build
@@ -20,7 +44,10 @@ jobs:
       - name: Vet
         run: cd backend && go vet ./...
       - name: Test
-        run: cd backend && go test ./pkg/... -count=1 -timeout 60s
+        run: cd backend && go test -gcflags="all=-l -N" ./... -count=1 -timeout 120s
+        env:
+          MYSQL_DSN: "coze:coze123@tcp(127.0.0.1:3306)/opencoze?charset=utf8mb4&parseTime=True"
+          REDIS_ADDR: "127.0.0.1:6379"
 
   frontend:
     runs-on: ubuntu-latest

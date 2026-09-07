@@ -43,6 +43,8 @@ import (
 	"github.com/cloudwego/eino/adk"
 
 	"github.com/superagent-ai/superagent-base/backend/pkg/llm"
+	aclagent "github.com/superagent-ai/superagent-base/backend/pkg/agent"
+	adkagent "github.com/superagent-ai/superagent-base/backend/pkg/agent/adk"
 	einollm "github.com/superagent-ai/superagent-base/backend/pkg/llm/eino"
 	"github.com/superagent-ai/superagent-base/backend/pkg/memory"
 	"github.com/superagent-ai/superagent-base/backend/pkg/modelrouter"
@@ -225,4 +227,92 @@ func findModelTier(def *AgentDefinition, complexity string) (ModelTier, bool) {
 		}
 	}
 	return ModelTier{}, false
+}
+
+// adkRunnerAgent wraps a Google ADK Go AgentAdapter for tool-using interactions.
+// This is the target implementation that replaces adkChatModelAgent once
+// the eino runtime is fully removed.
+type adkRunnerAgent struct {
+	def          *AgentDefinition
+	modelID      string
+	provider     string
+	memBackend   memory.Backend
+	agent        *adkagent.AgentAdapter
+	systemPrompt string
+}
+
+func (a *adkRunnerAgent) Name() string                    { return a.def.Metadata.Name }
+func (a *adkRunnerAgent) Description() string             { return a.systemPrompt }
+func (a *adkRunnerAgent) GetDefinition() *AgentDefinition { return a.def }
+
+func (a *adkRunnerAgent) Chat(ctx context.Context, sessionID string, message string) (<-chan string, error) {
+	msgs := buildMessageHistory(ctx, a.systemPrompt, sessionID, a.memBackend)
+	msgs = append(msgs, llm.UserMessage(message))
+	persistUserMessage(ctx, sessionID, message, a.memBackend)
+
+	ctx = observe.WithModelInfo(ctx, a.modelID, a.provider)
+
+	iter, err := a.agent.Run(ctx, &aclagent.AgentInput{
+		Messages:       msgs,
+		EnableStreaming: true,
+		MaxIterations:  10,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("agentdef: adk runner chat: %w", err)
+	}
+
+	ch := make(chan string, 64)
+	go func() {
+		defer close(ch)
+		var fullResponse strings.Builder
+		for {
+			event, ok := iter.Next()
+			if !ok {
+				break
+			}
+			if event.Err != nil {
+				select {
+				case ch <- fmt.Sprintf("[error] %v", event.Err):
+				case <-ctx.Done():
+				}
+				return
+			}
+			if event.MessageOutput != nil {
+				if event.MessageOutput.IsStreaming && event.MessageOutput.MessageStream != nil {
+					for {
+						chunk, recvErr := event.MessageOutput.MessageStream.Recv()
+						if errors.Is(recvErr, io.EOF) {
+							break
+						}
+						if recvErr != nil {
+							break
+						}
+						if chunk != nil && chunk.Content != "" {
+							fullResponse.WriteString(chunk.Content)
+							select {
+							case ch <- chunk.Content:
+							case <-ctx.Done():
+								return
+							}
+						}
+					}
+				} else if event.MessageOutput.Message != nil && event.MessageOutput.Message.Content != "" {
+					fullResponse.WriteString(event.MessageOutput.Message.Content)
+					select {
+					case ch <- event.MessageOutput.Message.Content:
+					case <-ctx.Done():
+						return
+					}
+				}
+			}
+		}
+		if a.memBackend != nil && sessionID != "" && fullResponse.Len() > 0 {
+			_ = a.memBackend.AddMessage(ctx, sessionID, memory.Message{
+				Role:      "assistant",
+				Content:   fullResponse.String(),
+				Timestamp: time.Now().Unix(),
+			})
+		}
+	}()
+	return ch, nil
 }

@@ -51,6 +51,8 @@ import (
 	"github.com/superagent-ai/superagent-base/backend/infra/checkpoint"
 	"github.com/superagent-ai/superagent-base/backend/pkg/llm"
 	einollm "github.com/superagent-ai/superagent-base/backend/pkg/llm/eino"
+	adkllm "github.com/superagent-ai/superagent-base/backend/pkg/llm/adk"
+	adkagent "github.com/superagent-ai/superagent-base/backend/pkg/agent/adk"
 	"github.com/superagent-ai/superagent-base/backend/pkg/evolution"
 	"github.com/superagent-ai/superagent-base/backend/pkg/graphs"
 	"github.com/superagent-ai/superagent-base/backend/pkg/mcp"
@@ -108,6 +110,12 @@ func WithModelProviderRegistry(r *llm.ModelProviderRegistry) BuilderOption {
 	return func(b *AgentBuilder) { b.modelProviderRegistry = r }
 }
 
+// WithModelFramework sets the underlying agent framework.
+// "eino" (default) uses cloudwego/eino; "adk" uses Google ADK Go.
+func WithModelFramework(fw string) BuilderOption {
+	return func(b *AgentBuilder) { b.framework = fw }
+}
+
 // WithAgentRegistry sets the resolver used to look up sub-agents by name when
 // building orchestration types (supervisor, sequential, parallel).
 func WithAgentRegistry(fn func(name string) (Agent, bool)) BuilderOption {
@@ -160,6 +168,7 @@ type AgentBuilder struct {
 	evolutionAdvisor    *evolution.EvolutionAdvisor
 	evolutionCollector  *evolution.SignalCollector
 	modelProviderRegistry *llm.ModelProviderRegistry
+	framework string // "eino" (default) or "adk" for Google ADK Go
 }
 
 // NewAgentBuilder creates an AgentBuilder with optional configuration.
@@ -315,6 +324,50 @@ func (b *AgentBuilder) Build(ctx context.Context, def *AgentDefinition) (Agent, 
 			return nil, fmt.Errorf("agentdef: Build %q: create tier models: %w", def.Metadata.Name, err)
 		}
 	}
+
+
+	// ADK Go framework path: use Google ADK Go instead of eino.
+	if b.isADKFramework() {
+		aclModel, aclErr := b.createACLChatModel(ctx, protocol, baseURL, apiKey, effectiveModelID)
+		if aclErr != nil {
+			return nil, fmt.Errorf("agentdef: Build %q: create ACL model: %w", def.Metadata.Name, aclErr)
+		}
+		aclTools := b.resolveTools(ctx, toolRefs)
+		maxStep := 10
+		if def.Spec.MaxTurns > 0 {
+			maxStep = def.Spec.MaxTurns
+		}
+		if len(aclTools) > 0 {
+			adkAdapter, ok := aclModel.(*adkllm.ChatModelAdapter)
+			if !ok {
+				return nil, fmt.Errorf("agentdef: Build %q: expected *adk.ChatModelAdapter, got %T", def.Metadata.Name, aclModel)
+			}
+			agentRT, rtErr := adkagent.NewAgentAdapter(def.Metadata.Name, def.Spec.SystemPrompt, adkAdapter.UnwrapADKModel(), aclTools, maxStep)
+			if rtErr != nil {
+				return nil, fmt.Errorf("agentdef: Build %q: create adk agent: %w", def.Metadata.Name, rtErr)
+			}
+			built = &adkRunnerAgent{
+				def:          def,
+				modelID:      effectiveModelID,
+				provider:     protocol,
+				memBackend:   memBackend,
+				agent:        agentRT,
+				systemPrompt: def.Spec.SystemPrompt,
+			}
+		} else {
+			built = &einoChatAgent{
+				def:          def,
+				modelID:      effectiveModelID,
+				provider:     protocol,
+				memBackend:   memBackend,
+				chatModel:    aclModel,
+				systemPrompt: def.Spec.SystemPrompt,
+			}
+		}
+		built = b.applyMiddleware(built, def)
+		return b.maybeWrapInterruptable(ctx, built, def), nil
+	}
+
 
 	// Gather Eino-compatible tools from resolved refs.
 	einoTools := einollm.UnwrapEinoToolFromSlice(b.resolveTools(ctx, toolRefs))
@@ -1005,6 +1058,7 @@ func (b *AgentBuilder) buildWorkflow(def *AgentDefinition) (Agent, error) {
 		registry:    b.agentRegistry,
 		modelCfg:    b.modelConfig,
 		def:         def,
+		modelProviderRegistry: b.modelProviderRegistry,
 	}
 	// Inject evolution collector for node-level signal collection when enabled.
 	if b.evolutionCollector != nil && def.Spec.Evolution != nil && def.Spec.Evolution.Enabled {

@@ -343,3 +343,10 @@ func parseArgsJSON(s string) map[string]any {
 	return m
 }
 
+
+// UnwrapADKModel returns the underlying Google ADK Go model.LLM.
+// This is used when the agent runtime adapter needs the raw ADK model
+// to construct an llmagent.
+func (a *ChatModelAdapter) UnwrapADKModel() model.LLM {
+	return a.adkLLM
+}

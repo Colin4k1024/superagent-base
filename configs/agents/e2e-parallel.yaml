@@ -1,0 +1,12 @@
+apiVersion: superagent/v1
+kind: Agent
+metadata:
+  name: e2e-parallel
+  version: "1.0.0"
+  tags: [e2e, test, parallel]
+spec:
+  type: parallel
+  system_prompt: "Parallel multi-agent execution for e2e testing"
+  sub_agents:
+    - ref: e2e-basic
+      role: "Analyst A - provide a technical perspective"
