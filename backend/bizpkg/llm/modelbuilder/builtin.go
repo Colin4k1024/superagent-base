@@ -20,9 +20,9 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/cloudwego/eino/schema"
-
 	"github.com/superagent-ai/superagent-base/backend/bizpkg/config"
+	"github.com/superagent-ai/superagent-base/backend/pkg/llm"
+	einollm "github.com/superagent-ai/superagent-base/backend/pkg/llm/eino"
 	"github.com/superagent-ai/superagent-base/backend/pkg/ctxcache"
 	"github.com/superagent-ai/superagent-base/backend/pkg/logs"
 )
@@ -77,8 +77,12 @@ func GetBuiltinChatModel(ctx context.Context, envPrefix string) (bcm BaseChatMod
 }
 
 func checkModelConfig(ctx context.Context, bcm BaseChatModel) (err error) {
-	respMsgs, err := bcm.Generate(ctx, []*schema.Message{
-		schema.SystemMessage("1+1=?,Just answer with a number, no explanation.")})
+	// Build the health-check message using ACL types, then convert to eino
+	// format at the boundary since bcm.Generate expects []*schema.Message.
+	msgs := []*llm.Message{
+		llm.SystemMessage("1+1=?,Just answer with a number, no explanation."),
+	}
+	respMsgs, err := bcm.Generate(ctx, einollm.ToEinoMessages(msgs))
 	if err != nil {
 		logs.CtxWarnf(ctx, "builtin chat model not configured: %v", err)
 		return fmt.Errorf("builtin chat model not configured: %w", err)
