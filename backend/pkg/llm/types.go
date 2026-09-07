@@ -78,6 +78,7 @@ func (r *StreamReader) Close() error {
 
 // ToolInfo describes a tool's metadata for the model.
 type ToolInfo struct {
+	Extra map[string]any // optional extra metadata
 	Name        string      // tool identifier
 	Desc        string      // human-readable description
 	ParamsOneOf ParamsOneOf // parameter schema

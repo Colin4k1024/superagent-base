@@ -77,8 +77,9 @@ func (a *ReverseToolAdapter) Info(ctx context.Context) (*llm.ToolInfo, error) {
 		return nil, fmt.Errorf("eino reverse adapter: get info: %w", err)
 	}
 	return &llm.ToolInfo{
-		Name: einoInfo.Name,
-		Desc: einoInfo.Desc,
+		Name:  einoInfo.Name,
+		Desc:  einoInfo.Desc,
+		Extra: einoInfo.Extra,
 	}, nil
 }
 

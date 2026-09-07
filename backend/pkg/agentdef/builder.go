@@ -567,7 +567,7 @@ func (b *AgentBuilder) resolveTools(ctx context.Context, refs []resolvedTool) []
 			if !ok {
 				continue
 			}
-			result = append(result, einollm.NewReverseToolAdapter(t))
+			result = append(result, t)
 		case "skill":
 			if b.skillManager == nil {
 				continue
@@ -597,7 +597,7 @@ func (b *AgentBuilder) resolveTools(ctx context.Context, refs []resolvedTool) []
 			}
 			for _, td := range tools {
 				if td.Name == toolName {
-					result = append(result, einollm.NewReverseToolAdapter(mcp.NewMCPToolAdapter(client, td)))
+					result = append(result, mcp.NewMCPToolAdapter(client, td))
 					break
 				}
 			}
