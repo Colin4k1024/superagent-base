@@ -576,7 +576,7 @@ func (b *AgentBuilder) resolveTools(ctx context.Context, refs []resolvedTool) []
 			if !ok {
 				continue
 			}
-			result = append(result, einollm.NewReverseToolAdapter(t))
+			result = append(result, t)
 		case "mcp":
 			if b.mcpRegistry == nil {
 				continue
