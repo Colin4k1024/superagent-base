@@ -50,6 +50,7 @@ import (
 
 	"github.com/superagent-ai/superagent-base/backend/infra/cache"
 	"github.com/superagent-ai/superagent-base/backend/infra/checkpoint"
+	"github.com/superagent-ai/superagent-base/backend/pkg/llm"
 	"github.com/superagent-ai/superagent-base/backend/pkg/evolution"
 	"github.com/superagent-ai/superagent-base/backend/pkg/graphs"
 	"github.com/superagent-ai/superagent-base/backend/pkg/mcp"
@@ -98,6 +99,13 @@ func WithMCPRegistry(r *mcp.Registry) BuilderOption {
 // WithModelConfig sets the default LLM endpoint for all built agents.
 func WithModelConfig(cfg ModelRuntimeConfig) BuilderOption {
 	return func(b *AgentBuilder) { b.modelConfig = cfg }
+}
+
+// WithModelProviderRegistry sets the ACL model provider registry used to
+// create ChatModel instances. This decouples agentdef from direct eino-ext
+// imports — all provider creation goes through the anti-corruption layer.
+func WithModelProviderRegistry(r *llm.ModelProviderRegistry) BuilderOption {
+	return func(b *AgentBuilder) { b.modelProviderRegistry = r }
 }
 
 // WithAgentRegistry sets the resolver used to look up sub-agents by name when
@@ -151,6 +159,7 @@ type AgentBuilder struct {
 	redisClient         cache.Cmdable
 	evolutionAdvisor    *evolution.EvolutionAdvisor
 	evolutionCollector  *evolution.SignalCollector
+	modelProviderRegistry *llm.ModelProviderRegistry
 }
 
 // NewAgentBuilder creates an AgentBuilder with optional configuration.

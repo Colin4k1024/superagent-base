@@ -160,3 +160,11 @@ func FromEinoMessage(m *schema.Message) *llm.Message {
 }
 
 var _ llm.ChatModel = (*ChatModelAdapter)(nil)
+
+// UnwrapEinoModel returns the underlying eino ToolCallingChatModel.
+// This is used during the migration transition period where eino's adk
+// still requires the raw eino model type. Once the migration to the
+// target framework is complete, this method will be removed.
+func (a *ChatModelAdapter) UnwrapEinoModel() model.ToolCallingChatModel {
+	return a.chatModel
+}

@@ -45,6 +45,7 @@ import (
 	"github.com/superagent-ai/superagent-base/backend/infra/cache/impl/redis"
 	mysqlpkg "github.com/superagent-ai/superagent-base/backend/infra/orm/impl/mysql"
 	"github.com/superagent-ai/superagent-base/backend/pkg/agentdef"
+	einollm "github.com/superagent-ai/superagent-base/backend/pkg/llm/eino"
 	"github.com/superagent-ai/superagent-base/backend/pkg/evolution"
 	"github.com/superagent-ai/superagent-base/backend/pkg/lang/conv"
 	"github.com/superagent-ai/superagent-base/backend/pkg/lang/ternary"
@@ -303,6 +304,10 @@ func main() {
 		}
 		builderOpts = append(builderOpts, agentdef.WithProviderEndpoints(providerEPs))
 	}
+	// Create ACL model provider registry with all 7 eino-ext providers.
+	modelProviderReg := einollm.NewDefaultRegistry(getEnv("MODEL_BASE_URL_0", "http://127.0.0.1:8000/v1"))
+	builderOpts = append(builderOpts, agentdef.WithModelProviderRegistry(modelProviderReg))
+
 	agentBuilder := agentdef.NewAgentBuilder(builderOpts...)
 
 	agentRT := agentdef.NewRuntime(agentdef.RuntimeConfig{

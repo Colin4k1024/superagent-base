@@ -44,6 +44,7 @@ import (
 	"time"
 
 	"github.com/superagent-ai/superagent-base/backend/pkg/agentdef"
+	einollm "github.com/superagent-ai/superagent-base/backend/pkg/llm/eino"
 )
 
 // modelAvailable probes the local model endpoint to determine whether
@@ -188,6 +189,7 @@ spec:
 			APIKey:  apiKey,
 			ModelID: modelID,
 		}),
+		agentdef.WithModelProviderRegistry(einollm.NewDefaultRegistry("")),
 	)
 	rt := agentdef.NewRuntime(agentdef.RuntimeConfig{ConfigDir: dir}, builder)
 
