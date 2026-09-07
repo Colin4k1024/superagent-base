@@ -1,4 +1,20 @@
 /*
+ * Copyright 2025 coze-dev Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+/*
  * Copyright 2025 superagent-ai Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -24,12 +40,14 @@ import (
 	"github.com/cloudwego/eino/callbacks"
 	"github.com/cloudwego/eino/components"
 	"github.com/cloudwego/eino/components/model"
+
+	"github.com/superagent-ai/superagent-base/backend/pkg/observe"
 )
 
 // startKey is a context key for storing component start time.
 type startKey struct{}
 
-// NewEvolutionCallback builds an Eino callbacks.Handler that feeds
+// NewEvolutionCallback builds an eino callbacks.Handler that feeds
 // Tool and Model execution events into the Engine's SignalCollector.
 //
 // The callback is designed to be registered globally:
@@ -59,7 +77,9 @@ func (c *evolutionCallback) onEnd(ctx context.Context, info *callbacks.RunInfo, 
 		return ctx
 	}
 	start, _ := ctx.Value(startKey{}).(time.Time)
-	sig := buildSuccessSignal(info, output, start)
+	// Convert eino RunInfo to ACL CallbackRunInfo for framework-agnostic signal building.
+	aclInfo := einoToEvolutionRunInfo(info)
+	sig := buildSuccessSignal(aclInfo, output, start)
 	c.engine.Collector().Collect(ctx, sig)
 	return ctx
 }
@@ -69,39 +89,50 @@ func (c *evolutionCallback) onError(ctx context.Context, info *callbacks.RunInfo
 		return ctx
 	}
 	start, _ := ctx.Value(startKey{}).(time.Time)
-	sig := buildErrorSignal(info, err, start)
+	aclInfo := einoToEvolutionRunInfo(info)
+	sig := buildErrorSignal(aclInfo, err, start)
 	c.engine.Collector().Collect(ctx, sig)
 	return ctx
 }
 
-func buildSuccessSignal(info *callbacks.RunInfo, output callbacks.CallbackOutput, start time.Time) Signal {
+// einoToEvolutionRunInfo converts eino's callbacks.RunInfo to observe.CallbackRunInfo.
+func einoToEvolutionRunInfo(info *callbacks.RunInfo) observe.CallbackRunInfo {
+	comp := observe.ComponentOther
+	switch info.Component {
+	case components.ComponentOfChatModel:
+		comp = observe.ComponentChatModel
+	case components.ComponentOfTool:
+		comp = observe.ComponentTool
+	}
+	return observe.CallbackRunInfo{Component: comp, Name: info.Name}
+}
+
+// buildSuccessSignal constructs a Signal from ACL run info and eino callback output.
+func buildSuccessSignal(info observe.CallbackRunInfo, output callbacks.CallbackOutput, start time.Time) Signal {
 	sig := Signal{
 		Component: info.Name,
 		Timestamp: time.Now(),
 		Duration:  durationSince(start),
 	}
-
 	switch info.Component {
-	case components.ComponentOfTool:
+	case observe.ComponentTool:
 		sig.Type = "tool_success"
 		sig.Output = fmt.Sprintf("%v", output)
-
-	case components.ComponentOfChatModel:
+	case observe.ComponentChatModel:
 		sig.Type = "model_invoke"
 		if cbOut := model.ConvCallbackOutput(output); cbOut != nil && cbOut.Message != nil {
 			if cbOut.Message.Content != "" {
 				sig.Output = Truncate(cbOut.Message.Content, 200)
 			}
 		}
-
 	default:
 		sig.Type = fmt.Sprintf("%s_success", info.Component)
 	}
-
 	return sig
 }
 
-func buildErrorSignal(info *callbacks.RunInfo, err error, start time.Time) Signal {
+// buildErrorSignal constructs a Signal from ACL run info and an error.
+func buildErrorSignal(info observe.CallbackRunInfo, err error, start time.Time) Signal {
 	sig := Signal{
 		Component: info.Name,
 		Timestamp: time.Now(),
@@ -110,16 +141,14 @@ func buildErrorSignal(info *callbacks.RunInfo, err error, start time.Time) Signa
 	if err != nil {
 		sig.Error = err.Error()
 	}
-
 	switch info.Component {
-	case components.ComponentOfTool:
+	case observe.ComponentTool:
 		sig.Type = "tool_error"
-	case components.ComponentOfChatModel:
+	case observe.ComponentChatModel:
 		sig.Type = "model_error"
 	default:
 		sig.Type = fmt.Sprintf("%s_error", info.Component)
 	}
-
 	return sig
 }
 

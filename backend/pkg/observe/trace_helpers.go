@@ -36,75 +36,8 @@ import (
 	"context"
 	"time"
 
-	"github.com/cloudwego/eino/callbacks"
-	"github.com/cloudwego/eino/components"
 	"go.opentelemetry.io/otel/trace"
 )
-
-// recordSpanToStore writes a completed span to the local TraceStore.
-func recordSpanToStore(ctx context.Context, info *callbacks.RunInfo, start time.Time, status, errMsg string) {
-	if defaultTraceStore == nil {
-		return
-	}
-
-	traceID := resolveTraceID(ctx)
-	if traceID == "" {
-		return
-	}
-
-	elapsed := time.Since(start)
-	span := TraceSpan{
-		SpanID:    spanIDFromCtx(ctx),
-		Name:      info.Name,
-		Component: string(info.Component),
-		StartTime: start.Format(time.RFC3339Nano),
-		EndTime:   time.Now().Format(time.RFC3339Nano),
-		DurationMs: float64(elapsed.Milliseconds()),
-		Status:    status,
-		Error:     errMsg,
-	}
-
-	switch info.Component {
-	case components.ComponentOfChatModel:
-		provider, modelID := resolveModelInfo(ctx, info)
-		span.ModelID = modelID
-		span.Provider = provider
-	case components.ComponentOfTool:
-		span.ToolName = info.Name
-	}
-
-	defaultTraceStore.AddSpan(traceID, span)
-}
-
-// recordStreamSpanToStore writes a streaming model span with token counts.
-func recordStreamSpanToStore(ctx context.Context, info *callbacks.RunInfo, start time.Time, modelID, provider string, promptTokens, completionTokens int) {
-	if defaultTraceStore == nil {
-		return
-	}
-
-	traceID := resolveTraceID(ctx)
-	if traceID == "" {
-		return
-	}
-
-	elapsed := time.Since(start)
-	span := TraceSpan{
-		SpanID:       spanIDFromCtx(ctx),
-		Name:         info.Name,
-		Component:    string(info.Component),
-		StartTime:    start.Format(time.RFC3339Nano),
-		EndTime:      time.Now().Format(time.RFC3339Nano),
-		DurationMs:   float64(elapsed.Milliseconds()),
-		Status:       "ok",
-		ModelID:      modelID,
-		Provider:     provider,
-		InputTokens:  promptTokens,
-		OutputTokens: completionTokens,
-		TotalTokens:  promptTokens + completionTokens,
-	}
-
-	defaultTraceStore.AddSpan(traceID, span)
-}
 
 // resolveTraceID extracts a trace ID, preferring our custom context key,
 // falling back to the OTel span context.
@@ -126,4 +59,16 @@ func spanIDFromCtx(ctx context.Context) string {
 		return sc.SpanID().String()
 	}
 	return ""
+}
+
+// resolveModelInfoFromCtx extracts provider and model ID from context.
+// This is the framework-agnostic version used by trace_helpers.
+func resolveModelInfoFromCtx(ctx context.Context) (provider, modelID string) {
+	return modelInfoFromCtx(ctx)
+}
+
+// recordSpanToTraceStore writes a completed span to the local TraceStore
+// using ACL types.  This replaces the old eino-dependent recordSpanToStore.
+func recordSpanToTraceStore(ctx context.Context, info CallbackRunInfo, start time.Time, status, errMsg string) {
+	aclRecordSpanToStore(ctx, info, start, status, errMsg, 0, 0)
 }

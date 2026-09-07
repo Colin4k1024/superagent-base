@@ -1,3 +1,35 @@
+/*
+ * Copyright 2025 coze-dev Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+/*
+ * Copyright 2025 superagent-ai Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package agentdef
 
 import (
@@ -5,15 +37,12 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/cloudwego/eino/adk"
-	"github.com/cloudwego/eino/components/tool"
-	"github.com/cloudwego/eino/schema"
+	aclagent "github.com/superagent-ai/superagent-base/backend/pkg/agent"
+	"github.com/superagent-ai/superagent-base/backend/pkg/llm"
 )
 
-var _ adk.ChatModelAgentMiddleware = (*toolPermissionMiddleware)(nil)
-
 type toolPermissionMiddleware struct {
-	*adk.BaseChatModelAgentMiddleware
+	aclagent.BaseMiddleware
 	allow []string
 	deny  []string
 }
@@ -47,46 +76,31 @@ func matchPattern(pattern, name string) bool {
 	return pattern == name
 }
 
-func (m *toolPermissionMiddleware) WrapInvokableToolCall(ctx context.Context, endpoint adk.InvokableToolCallEndpoint, tCtx *adk.ToolContext) (adk.InvokableToolCallEndpoint, error) {
-	if m.isAllowed(tCtx.Name) {
-		return endpoint, nil
+func (m *toolPermissionMiddleware) WrapTool(ctx context.Context, tool llm.Tool) (llm.Tool, error) {
+	info, err := tool.Info(ctx)
+	if err != nil {
+		return nil, err
 	}
-	return func(_ context.Context, _ string, _ ...tool.Option) (string, error) {
-		return "", fmt.Errorf("tool %q denied by tool_permission middleware", tCtx.Name)
-	}, nil
+	if m.isAllowed(info.Name) {
+		return tool, nil
+	}
+	return &deniedTool{name: info.Name}, nil
 }
 
-func (m *toolPermissionMiddleware) WrapStreamableToolCall(ctx context.Context, endpoint adk.StreamableToolCallEndpoint, tCtx *adk.ToolContext) (adk.StreamableToolCallEndpoint, error) {
-	if m.isAllowed(tCtx.Name) {
-		return endpoint, nil
-	}
-	return func(_ context.Context, _ string, _ ...tool.Option) (*schema.StreamReader[string], error) {
-		return nil, fmt.Errorf("tool %q denied by tool_permission middleware", tCtx.Name)
-	}, nil
+type deniedTool struct {
+	name string
 }
 
-func (m *toolPermissionMiddleware) WrapEnhancedInvokableToolCall(ctx context.Context, endpoint adk.EnhancedInvokableToolCallEndpoint, tCtx *adk.ToolContext) (adk.EnhancedInvokableToolCallEndpoint, error) {
-	if m.isAllowed(tCtx.Name) {
-		return endpoint, nil
-	}
-	return func(_ context.Context, _ *schema.ToolArgument, _ ...tool.Option) (*schema.ToolResult, error) {
-		return nil, fmt.Errorf("tool %q denied by tool_permission middleware", tCtx.Name)
-	}, nil
+func (t *deniedTool) Info(_ context.Context) (*llm.ToolInfo, error) {
+	return &llm.ToolInfo{Name: t.name}, nil
 }
 
-func (m *toolPermissionMiddleware) WrapEnhancedStreamableToolCall(ctx context.Context, endpoint adk.EnhancedStreamableToolCallEndpoint, tCtx *adk.ToolContext) (adk.EnhancedStreamableToolCallEndpoint, error) {
-	if m.isAllowed(tCtx.Name) {
-		return endpoint, nil
-	}
-	return func(_ context.Context, _ *schema.ToolArgument, _ ...tool.Option) (*schema.StreamReader[*schema.ToolResult], error) {
-		return nil, fmt.Errorf("tool %q denied by tool_permission middleware", tCtx.Name)
-	}, nil
+func (t *deniedTool) Run(_ context.Context, _ string, _ ...llm.ToolOption) (string, error) {
+	return "", fmt.Errorf("tool %q denied by tool_permission middleware", t.name)
 }
 
-func buildToolPermissionHandler(_ context.Context, cfg map[string]any) (adk.ChatModelAgentMiddleware, error) {
-	m := &toolPermissionMiddleware{
-		BaseChatModelAgentMiddleware: &adk.BaseChatModelAgentMiddleware{},
-	}
+func buildToolPermissionHandler(_ context.Context, cfg map[string]any) (aclagent.Middleware, error) {
+	m := &toolPermissionMiddleware{}
 	if v, ok := cfg["allow"]; ok {
 		m.allow = toStringSlice(v)
 	}

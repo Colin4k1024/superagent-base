@@ -1,4 +1,20 @@
 /*
+ * Copyright 2025 coze-dev Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+/*
  * Copyright 2025 superagent-ai Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -24,6 +40,8 @@ import (
 	"github.com/cloudwego/eino/callbacks"
 	"github.com/cloudwego/eino/components"
 	"github.com/cloudwego/eino/components/tool"
+
+	"github.com/superagent-ai/superagent-base/backend/pkg/observe"
 )
 
 // streamKey is a private context key type for storing an EventStream in context.
@@ -41,7 +59,7 @@ func streamFromCtx(ctx context.Context) *EventStream {
 	return s
 }
 
-// NewA2UICallback creates an Eino callback handler that injects tool_call and
+// NewA2UICallback creates an eino callback handler that injects tool_call and
 // tool_result events into the A2UI EventStream stored in context.
 // This enables structured rendering of tool usage on the frontend.
 func NewA2UICallback() callbacks.Handler {
@@ -60,14 +78,11 @@ func (c *a2uiCallback) OnStart(ctx context.Context, info *callbacks.RunInfo, inp
 	if stream == nil {
 		return ctx
 	}
-
-	switch info.Component {
-	case components.ComponentOfTool:
-		// Emit tool_call event when a tool starts executing.
+	aclInfo := einoToA2UIRunInfo(info)
+	if aclInfo.Component == observe.ComponentTool {
 		args := extractToolArgs(input)
 		stream.SendToolCall(info.Name, info.Name, args)
 	}
-
 	return ctx
 }
 
@@ -76,14 +91,11 @@ func (c *a2uiCallback) OnEnd(ctx context.Context, info *callbacks.RunInfo, outpu
 	if stream == nil {
 		return ctx
 	}
-
-	switch info.Component {
-	case components.ComponentOfTool:
-		// Emit tool_result event when a tool finishes.
+	aclInfo := einoToA2UIRunInfo(info)
+	if aclInfo.Component == observe.ComponentTool {
 		result := extractToolResult(output)
 		stream.SendToolResult(info.Name, info.Name, result, false)
 	}
-
 	return ctx
 }
 
@@ -92,13 +104,23 @@ func (c *a2uiCallback) OnError(ctx context.Context, info *callbacks.RunInfo, err
 	if stream == nil {
 		return ctx
 	}
-
-	switch info.Component {
-	case components.ComponentOfTool:
+	aclInfo := einoToA2UIRunInfo(info)
+	if aclInfo.Component == observe.ComponentTool {
 		stream.SendToolResult(info.Name, info.Name, err.Error(), true)
 	}
-
 	return ctx
+}
+
+// einoToA2UIRunInfo converts eino's callbacks.RunInfo to ACL CallbackRunInfo.
+func einoToA2UIRunInfo(info *callbacks.RunInfo) observe.CallbackRunInfo {
+	comp := observe.ComponentOther
+	switch info.Component {
+	case components.ComponentOfChatModel:
+		comp = observe.ComponentChatModel
+	case components.ComponentOfTool:
+		comp = observe.ComponentTool
+	}
+	return observe.CallbackRunInfo{Component: comp, Name: info.Name}
 }
 
 // extractToolArgs attempts to extract tool arguments from callback input.
@@ -110,12 +132,10 @@ func extractToolArgs(input callbacks.CallbackInput) map[string]any {
 	if in == nil {
 		return nil
 	}
-	// Try to parse the ArgumentsInJSON as structured args.
 	var args map[string]any
 	if err := json.Unmarshal([]byte(in.ArgumentsInJSON), &args); err == nil {
 		return args
 	}
-	// Fallback: return raw string.
 	if in.ArgumentsInJSON != "" {
 		return map[string]any{"input": in.ArgumentsInJSON}
 	}
@@ -131,7 +151,6 @@ func extractToolResult(output callbacks.CallbackOutput) string {
 	if out == nil {
 		return fmt.Sprintf("%v", output)
 	}
-	// Truncate very long results for the frontend.
 	result := out.Response
 	if len(result) > 2000 {
 		result = result[:2000] + "...(truncated)"

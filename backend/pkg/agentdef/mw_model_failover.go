@@ -1,40 +1,69 @@
+/*
+ * Copyright 2025 coze-dev Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+/*
+ * Copyright 2025 superagent-ai Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package agentdef
 
 import (
 	"context"
 	"log"
 
-	"github.com/cloudwego/eino/adk"
-	"github.com/cloudwego/eino/components/model"
-	"github.com/cloudwego/eino/schema"
+	aclagent "github.com/superagent-ai/superagent-base/backend/pkg/agent"
+	"github.com/superagent-ai/superagent-base/backend/pkg/llm"
 )
 
-var _ adk.ChatModelAgentMiddleware = (*modelFailoverMiddleware)(nil)
-
 type modelFailoverMiddleware struct {
-	*adk.BaseChatModelAgentMiddleware
+	aclagent.BaseMiddleware
 	fallbackModel string
 	maxRetries    int
 }
 
-func (m *modelFailoverMiddleware) WrapModel(ctx context.Context, baseModel model.BaseModel[*schema.Message], mc *adk.ModelContext) (model.BaseModel[*schema.Message], error) {
-	return &failoverModelWrapper{
-		primary:    baseModel,
+func (m *modelFailoverMiddleware) WrapModel(ctx context.Context, base llm.ChatModel) (llm.ChatModel, error) {
+	return &failoverChatModel{
+		primary:    base,
 		maxRetries: m.maxRetries,
 		modelName:  m.fallbackModel,
 	}, nil
 }
 
-type failoverModelWrapper struct {
-	primary    model.BaseModel[*schema.Message]
+type failoverChatModel struct {
+	primary    llm.ChatModel
 	maxRetries int
 	modelName  string
 }
 
-func (w *failoverModelWrapper) Generate(ctx context.Context, input []*schema.Message, opts ...model.Option) (*schema.Message, error) {
+func (w *failoverChatModel) Generate(ctx context.Context, msgs []*llm.Message) (*llm.Message, error) {
 	var lastErr error
 	for attempt := 0; attempt <= w.maxRetries; attempt++ {
-		result, err := w.primary.Generate(ctx, input, opts...)
+		result, err := w.primary.Generate(ctx, msgs)
 		if err == nil {
 			return result, nil
 		}
@@ -44,10 +73,10 @@ func (w *failoverModelWrapper) Generate(ctx context.Context, input []*schema.Mes
 	return nil, lastErr
 }
 
-func (w *failoverModelWrapper) Stream(ctx context.Context, input []*schema.Message, opts ...model.Option) (*schema.StreamReader[*schema.Message], error) {
+func (w *failoverChatModel) Stream(ctx context.Context, msgs []*llm.Message) (*llm.StreamReader, error) {
 	var lastErr error
 	for attempt := 0; attempt <= w.maxRetries; attempt++ {
-		result, err := w.primary.Stream(ctx, input, opts...)
+		result, err := w.primary.Stream(ctx, msgs)
 		if err == nil {
 			return result, nil
 		}
@@ -57,18 +86,8 @@ func (w *failoverModelWrapper) Stream(ctx context.Context, input []*schema.Messa
 	return nil, lastErr
 }
 
-func (w *failoverModelWrapper) BindTools(tools []*schema.ToolInfo) error {
-	if binder, ok := w.primary.(interface{ BindTools([]*schema.ToolInfo) error }); ok {
-		return binder.BindTools(tools)
-	}
-	return nil
-}
-
-func buildModelFailoverHandler(_ context.Context, cfg map[string]any) (adk.ChatModelAgentMiddleware, error) {
-	m := &modelFailoverMiddleware{
-		BaseChatModelAgentMiddleware: &adk.BaseChatModelAgentMiddleware{},
-		maxRetries:                   1,
-	}
+func buildModelFailoverHandler(_ context.Context, cfg map[string]any) (aclagent.Middleware, error) {
+	m := &modelFailoverMiddleware{maxRetries: 1}
 	if v, ok := cfg["fallback_model"]; ok {
 		if s, ok := v.(string); ok {
 			m.fallbackModel = s
@@ -81,3 +100,17 @@ func buildModelFailoverHandler(_ context.Context, cfg map[string]any) (adk.ChatM
 }
 
 func init() { RegisterMiddleware("model_failover", buildModelFailoverHandler) }
+
+func (w *failoverChatModel) ID() string { return w.modelName }
+
+func (w *failoverChatModel) BindTools(tools []llm.Tool) (llm.ChatModel, error) {
+	bound, err := w.primary.BindTools(tools)
+	if err != nil {
+		return nil, err
+	}
+	return &failoverChatModel{
+		primary:    bound,
+		maxRetries: w.maxRetries,
+		modelName:  w.modelName,
+	}, nil
+}

@@ -1,16 +1,48 @@
+/*
+ * Copyright 2025 coze-dev Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+/*
+ * Copyright 2025 superagent-ai Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package agentdef
 
 import (
 	"context"
 	"testing"
 
-	"github.com/cloudwego/eino/adk"
+	aclagent "github.com/superagent-ai/superagent-base/backend/pkg/agent"
 )
 
 func TestRegisterMiddleware_AndGet(t *testing.T) {
 	name := "test_mw_register"
-	factory := func(_ context.Context, _ map[string]any) (adk.ChatModelAgentMiddleware, error) {
-		return &adk.BaseChatModelAgentMiddleware{}, nil
+	factory := func(_ context.Context, _ map[string]any) (aclagent.Middleware, error) {
+		return aclagent.BaseMiddleware{}, nil
 	}
 
 	RegisterMiddleware(name, factory)
@@ -41,8 +73,8 @@ func TestGetMiddlewareFactory_NotFound(t *testing.T) {
 
 func TestListMiddleware_ContainsRegistered(t *testing.T) {
 	name := "test_mw_list"
-	RegisterMiddleware(name, func(_ context.Context, _ map[string]any) (adk.ChatModelAgentMiddleware, error) {
-		return &adk.BaseChatModelAgentMiddleware{}, nil
+	RegisterMiddleware(name, func(_ context.Context, _ map[string]any) (aclagent.Middleware, error) {
+		return aclagent.BaseMiddleware{}, nil
 	})
 
 	names := ListMiddleware()
@@ -64,7 +96,7 @@ func TestRegisterMiddleware_PanicsOnEmpty(t *testing.T) {
 			t.Error("expected panic on empty name")
 		}
 	}()
-	RegisterMiddleware("", func(_ context.Context, _ map[string]any) (adk.ChatModelAgentMiddleware, error) {
+	RegisterMiddleware("", func(_ context.Context, _ map[string]any) (aclagent.Middleware, error) {
 		return nil, nil
 	})
 }

@@ -1,3 +1,35 @@
+/*
+ * Copyright 2025 coze-dev Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+/*
+ * Copyright 2025 superagent-ai Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package agentdef
 
 import (
@@ -5,14 +37,12 @@ import (
 	"log"
 	"time"
 
-	"github.com/cloudwego/eino/adk"
-	"github.com/cloudwego/eino/schema"
+	aclagent "github.com/superagent-ai/superagent-base/backend/pkg/agent"
+	"github.com/superagent-ai/superagent-base/backend/pkg/llm"
 )
 
-var _ adk.ChatModelAgentMiddleware = (*auditLogMiddleware)(nil)
-
 type auditLogMiddleware struct {
-	*adk.BaseChatModelAgentMiddleware
+	aclagent.BaseMiddleware
 	level           string
 	includeMessages bool
 }
@@ -20,56 +50,53 @@ type auditLogMiddleware struct {
 type auditCtxKey struct{}
 
 type auditState struct {
-	startTime  time.Time
-	iterations int
-	toolCalls  int
+	startTime   time.Time
+	iterations  int
+	toolCalls   int
 }
 
-func (m *auditLogMiddleware) BeforeAgent(ctx context.Context, runCtx *adk.ChatModelAgentContext) (context.Context, *adk.ChatModelAgentContext, error) {
+func (m *auditLogMiddleware) BeforeAgent(ctx context.Context, mCtx *aclagent.MiddlewareContext) (context.Context, error) {
 	state := &auditState{startTime: time.Now()}
 	ctx = context.WithValue(ctx, auditCtxKey{}, state)
-	log.Printf("[audit_log] agent run started, tools=%d", len(runCtx.Tools))
-	return ctx, runCtx, nil
+	log.Printf("[audit_log] agent run started, tools=%d", len(mCtx.Tools))
+	return ctx, nil
 }
 
-func (m *auditLogMiddleware) AfterAgent(ctx context.Context, state *adk.ChatModelAgentState) (context.Context, error) {
-	as, _ := ctx.Value(auditCtxKey{}).(*auditState)
-	if as == nil {
-		return ctx, nil
-	}
-	elapsed := time.Since(as.startTime)
-	msgCount := len(state.Messages)
-	log.Printf("[audit_log] agent run completed: duration=%s iterations=%d tool_calls=%d messages=%d",
-		elapsed, as.iterations, as.toolCalls, msgCount)
-	if m.includeMessages && msgCount > 0 {
-		last := state.Messages[msgCount-1]
-		log.Printf("[audit_log] final_message: role=%s content_len=%d", last.Role, len(last.Content))
+func (m *auditLogMiddleware) BeforeModel(ctx context.Context, mState *aclagent.MiddlewareState) (context.Context, error) {
+	if as, ok := ctx.Value(auditCtxKey{}).(*auditState); ok {
+		as.iterations++
 	}
 	return ctx, nil
 }
 
-func (m *auditLogMiddleware) BeforeModelRewriteState(ctx context.Context, state *adk.ChatModelAgentState, mc *adk.ModelContext) (context.Context, *adk.ChatModelAgentState, error) {
-	if as, ok := ctx.Value(auditCtxKey{}).(*auditState); ok {
-		as.iterations++
-	}
-	return ctx, state, nil
-}
-
-func (m *auditLogMiddleware) AfterModelRewriteState(ctx context.Context, state *adk.ChatModelAgentState, mc *adk.ModelContext) (context.Context, *adk.ChatModelAgentState, error) {
-	if as, ok := ctx.Value(auditCtxKey{}).(*auditState); ok && len(state.Messages) > 0 {
-		last := state.Messages[len(state.Messages)-1]
-		if last.Role == schema.Assistant && len(last.ToolCalls) > 0 {
+func (m *auditLogMiddleware) AfterModel(ctx context.Context, mState *aclagent.MiddlewareState) error {
+	if as, ok := ctx.Value(auditCtxKey{}).(*auditState); ok && len(mState.Messages) > 0 {
+		last := mState.Messages[len(mState.Messages)-1]
+		if last.Role == llm.RoleAssistant && len(last.ToolCalls) > 0 {
 			as.toolCalls += len(last.ToolCalls)
 		}
 	}
-	return ctx, state, nil
+	return nil
 }
 
-func buildAuditLogHandler(_ context.Context, cfg map[string]any) (adk.ChatModelAgentMiddleware, error) {
-	m := &auditLogMiddleware{
-		BaseChatModelAgentMiddleware: &adk.BaseChatModelAgentMiddleware{},
-		level:                        "info",
+func (m *auditLogMiddleware) AfterAgent(ctx context.Context, mCtx *aclagent.MiddlewareContext) error {
+	as, _ := ctx.Value(auditCtxKey{}).(*auditState)
+	if as == nil {
+		return nil
 	}
+	elapsed := time.Since(as.startTime)
+	msgCount := len(mCtx.Messages)
+	log.Printf("[audit_log] agent run completed: duration=%s iterations=%d tool_calls=%d messages=%d",
+		elapsed, as.iterations, as.toolCalls, msgCount)
+	if m.includeMessages && msgCount > 0 {
+		last := mCtx.Messages[msgCount-1]
+		log.Printf("[audit_log] final_message: role=%s content_len=%d", last.Role, len(last.Content))
+	}
+	return nil
+}
+
+func buildAuditLogHandler(_ context.Context, cfg map[string]any) (aclagent.Middleware, error) {
+	m := &auditLogMiddleware{level: "info"}
 	if v, ok := cfg["level"]; ok {
 		if s, ok := v.(string); ok {
 			m.level = s

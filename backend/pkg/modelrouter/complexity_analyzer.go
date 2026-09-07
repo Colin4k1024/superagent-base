@@ -14,6 +14,22 @@
  * limitations under the License.
  */
 
+/*
+ * Copyright 2025 superagent-ai Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package modelrouter
 
 import (
@@ -24,8 +40,10 @@ import (
 	"sync"
 	"time"
 
-	einoopenai "github.com/cloudwego/eino-ext/components/model/openai"
 	"github.com/cloudwego/eino/schema"
+
+	"github.com/superagent-ai/superagent-base/backend/pkg/llm"
+	einollm "github.com/superagent-ai/superagent-base/backend/pkg/llm/eino"
 )
 
 // ComplexityAnalyzer evaluates the complexity of a user request.
@@ -51,7 +69,8 @@ type LLMComplexityAnalyzer struct {
 	apiKey    string
 	fallback  string
 	cacheTTL  time.Duration
-	cache     sync.Map // conversationID -> cacheEntry
+	cache     sync.Map
+	registry  *llm.ModelProviderRegistry
 }
 
 type cacheEntry struct {
@@ -77,6 +96,7 @@ func NewLLMComplexityAnalyzer(cfg ComplexityConfig) *LLMComplexityAnalyzer {
 		apiKey:   cfg.APIKey,
 		fallback: fallback,
 		cacheTTL: cacheTTL,
+		registry: einollm.NewDefaultRegistry(cfg.BaseURL),
 	}
 }
 
@@ -96,7 +116,6 @@ func (a *LLMComplexityAnalyzer) Analyze(ctx context.Context, messages []*schema.
 		return a.fallback, nil
 	}
 
-	// Check cache using conversationID from context if available.
 	if convID := getConversationID(ctx); convID != "" {
 		if cached, ok := a.cache.Load(convID); ok {
 			entry := cached.(cacheEntry)
@@ -107,7 +126,6 @@ func (a *LLMComplexityAnalyzer) Analyze(ctx context.Context, messages []*schema.
 		}
 	}
 
-	// Extract recent user messages for analysis (last 3 turns).
 	analysisMessages := extractRecentUserMessages(messages, 3)
 	if len(analysisMessages) == 0 {
 		return a.fallback, nil
@@ -115,10 +133,9 @@ func (a *LLMComplexityAnalyzer) Analyze(ctx context.Context, messages []*schema.
 
 	complexity, err := a.callLLM(ctx, analysisMessages)
 	if err != nil {
-		return a.fallback, nil // degrade gracefully
+		return a.fallback, nil
 	}
 
-	// Cache the result.
 	if convID := getConversationID(ctx); convID != "" {
 		a.cache.Store(convID, cacheEntry{
 			complexity: complexity,
@@ -130,25 +147,26 @@ func (a *LLMComplexityAnalyzer) Analyze(ctx context.Context, messages []*schema.
 }
 
 func (a *LLMComplexityAnalyzer) callLLM(ctx context.Context, userMessages []string) (string, error) {
-	// Create a short-lived context with timeout for the analysis call.
 	analyzeCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
 	defer cancel()
 
-	chatModel, err := einoopenai.NewChatModel(analyzeCtx, &einoopenai.ChatModelConfig{
-		BaseURL: a.baseURL,
-		APIKey:  a.apiKey,
-		Model:   a.modelID,
+	// Create model via the ACL provider registry (no eino-ext import).
+	chatModel, err := a.registry.Create(analyzeCtx, llm.ModelConfig{
+		Protocol: "openai",
+		BaseURL:  a.baseURL,
+		APIKey:   a.apiKey,
+		ModelID:  a.modelID,
 	})
 	if err != nil {
 		return "", fmt.Errorf("complexity analyzer: create model: %w", err)
 	}
 
-	// Build the analysis prompt.
 	userContent := strings.Join(userMessages, "\n---\n")
 
-	msgs := []*schema.Message{
-		{Role: schema.System, Content: complexityPrompt},
-		{Role: schema.User, Content: userContent},
+	// Use ACL message types.
+	msgs := []*llm.Message{
+		llm.SystemMessage(complexityPrompt),
+		llm.UserMessage(userContent),
 	}
 
 	resp, err := chatModel.Generate(analyzeCtx, msgs)
@@ -160,7 +178,6 @@ func (a *LLMComplexityAnalyzer) callLLM(ctx context.Context, userMessages []stri
 }
 
 func parseComplexityResponse(content string) (string, error) {
-	// Try to parse as JSON first.
 	var result struct {
 		Complexity string `json:"complexity"`
 	}
@@ -171,7 +188,6 @@ func parseComplexityResponse(content string) (string, error) {
 		}
 	}
 
-	// Fallback: look for keywords.
 	content = strings.ToLower(content)
 	if strings.Contains(content, `"high"`) || strings.Contains(content, "high") {
 		return "high", nil
