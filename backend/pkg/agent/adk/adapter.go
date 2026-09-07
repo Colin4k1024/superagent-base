@@ -14,17 +14,32 @@
  * limitations under the License.
  */
 
-// Package adk provides an adapter that bridges Google ADK Go's llmagent +
-// runner.Runner to the framework-agnostic pkg/agent.AgentRuntime interface.
+/*
+ * Copyright 2025 superagent-ai Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package adk
 
 import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"iter"
 
-	"google.golang.org/adk/v2/agent/llmagent"
 	"google.golang.org/adk/v2/agent"
+	"google.golang.org/adk/v2/agent/llmagent"
 	adkmodel "google.golang.org/adk/v2/model"
 	"google.golang.org/adk/v2/runner"
 	"google.golang.org/adk/v2/session"
@@ -95,6 +110,34 @@ func NewAgentAdapter(name, description string, llmModel adkmodel.LLM, tools []ac
 func (a *AgentAdapter) Name() string        { return a.name }
 func (a *AgentAdapter) Description() string  { return a.description }
 
+// run executes the runner and returns an EventIterator backed by iter.Pull2.
+func (a *AgentAdapter) run(ctx context.Context, userMessage string) (*aclagent.EventIterator, error) {
+	userContent := genai.NewContentFromText(userMessage, genai.RoleUser)
+	seq := a.runner.Run(ctx, "default", "session-1", userContent, agent.RunConfig{})
+
+	pull, stop := iter.Pull2(seq)
+
+	return aclagent.NewEventIterator(
+		func() (*aclagent.AgentEvent, bool) {
+			for {
+				event, err, ok := pull()
+				if !ok {
+					return nil, false
+				}
+				if err != nil {
+					return &aclagent.AgentEvent{Err: err}, true
+				}
+				ae := fromADKEvent(event)
+				if ae != nil {
+					return ae, true
+				}
+				// Skip nil events and continue pulling.
+			}
+		},
+		func() error { stop(); return nil },
+	), nil
+}
+
 // Run executes the agent with the given input.
 func (a *AgentAdapter) Run(ctx context.Context, input *aclagent.AgentInput) (*aclagent.EventIterator, error) {
 	var lastUserMsg string
@@ -107,47 +150,12 @@ func (a *AgentAdapter) Run(ctx context.Context, input *aclagent.AgentInput) (*ac
 	if lastUserMsg == "" {
 		return nil, fmt.Errorf("adk agent adapter: no user message in input")
 	}
-
-	userContent := genai.NewContentFromText(lastUserMsg, genai.RoleUser)
-	seq := a.runner.Run(ctx, "default", "session-1", userContent, agent.RunConfig{})
-
-	return aclagent.NewEventIterator(
-		func() (*aclagent.AgentEvent, bool) {
-			for event, err := range seq {
-				if err != nil {
-					return &aclagent.AgentEvent{Err: err}, true
-				}
-				ae := fromADKEvent(event)
-				if ae != nil {
-					return ae, true
-				}
-			}
-			return nil, false
-		},
-		nil,
-	), nil
+	return a.run(ctx, lastUserMsg)
 }
 
 // Resume continues a previously interrupted agent run.
 func (a *AgentAdapter) Resume(ctx context.Context, input *aclagent.ResumeInput) (*aclagent.EventIterator, error) {
-	userContent := genai.NewContentFromText(input.UserMessage, genai.RoleUser)
-	seq := a.runner.Run(ctx, "default", "session-1", userContent, agent.RunConfig{})
-
-	return aclagent.NewEventIterator(
-		func() (*aclagent.AgentEvent, bool) {
-			for event, err := range seq {
-				if err != nil {
-					return &aclagent.AgentEvent{Err: err}, true
-				}
-				ae := fromADKEvent(event)
-				if ae != nil {
-					return ae, true
-				}
-			}
-			return nil, false
-		},
-		nil,
-	), nil
+	return a.run(ctx, input.UserMessage)
 }
 
 // fromADKEvent converts a Google ADK Go session.Event to agent.AgentEvent.

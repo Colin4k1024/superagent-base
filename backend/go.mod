@@ -78,7 +78,7 @@ require (
 	gorm.io/driver/sqlite v1.6.0
 	gorm.io/gen v0.3.26
 	gorm.io/gorm v1.31.2
-	gorm.io/plugin/dbresolver v1.5.2
+	gorm.io/plugin/dbresolver v1.6.2
 )
 
 require (
@@ -93,7 +93,6 @@ require (
 	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.18.35 // indirect
 	github.com/aws/aws-sdk-go-v2/internal/configsources v1.4.35 // indirect
 	github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.7.35 // indirect
-	github.com/aws/aws-sdk-go-v2/internal/ini v1.8.3 // indirect
 	github.com/aws/aws-sdk-go-v2/internal/v4a v1.4.36 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/accept-encoding v1.13.15 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/checksum v1.7.5 // indirect
@@ -245,7 +244,6 @@ require (
 	github.com/eino-contrib/jsonschema v1.0.3
 	github.com/eino-contrib/ollama v0.1.0
 	github.com/nats-io/nats.go v1.34.1
-	github.com/wk8/go-ordered-map/v2 v2.1.8
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp v1.45.0
 	google.golang.org/adk/v2 v2.3.0
 )
@@ -284,6 +282,7 @@ require (
 	github.com/nats-io/nkeys v0.4.7 // indirect
 	github.com/nats-io/nuid v1.0.1 // indirect
 	github.com/openai/openai-go/v3 v3.52.0 // indirect
+	github.com/wk8/go-ordered-map/v2 v2.1.8 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.68.0 // indirect
 	go.opentelemetry.io/otel/log v0.21.0 // indirect
 	golang.org/x/term v0.45.0 // indirect

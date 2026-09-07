@@ -47,8 +47,8 @@ import (
 // the eino ToolCallingChatModel for compatibility with eino's adk
 // during the migration transition period.
 //
-// Once the migration to the target framework is complete, this unwrap
-// step will be removed and callers will use llm.ChatModel directly.
+// When framework == "adk", the model is created via the ADK Go registry
+// and returned as an llm.ChatModel (not unwrapped to eino).
 func (b *AgentBuilder) createChatModel(ctx context.Context, protocol, baseURL, apiKey, modelID string) (model.ToolCallingChatModel, error) {
 	if b.modelProviderRegistry == nil {
 		return nil, fmt.Errorf("agentdef: model provider registry is not configured")
@@ -73,7 +73,39 @@ func (b *AgentBuilder) createChatModel(ctx context.Context, protocol, baseURL, a
 	// Unwrap the ACL adapter to get the eino model for adk compatibility.
 	adapter, ok := chatModel.(*einollm.ChatModelAdapter)
 	if !ok {
-		return nil, fmt.Errorf("agentdef: unexpected ChatModel type %T (expected *eino.ChatModelAdapter)", chatModel)
+		// If this is an ADK Go adapter, it can't be unwrapped to eino.
+		// Return nil — the caller should use the ADK Go path instead.
+		return nil, fmt.Errorf("agentdef: unexpected ChatModel type %T (expected *eino.ChatModelAdapter); use framework=adk path", chatModel)
 	}
 	return adapter.UnwrapEinoModel(), nil
 }
+
+// createACLChatModel creates an llm.ChatModel via the ACL registry without
+// unwrapping. Used when framework == "adk" and the caller works directly
+// with the ACL interface (e.g., einoChatAgent for no-tool agents).
+func (b *AgentBuilder) createACLChatModel(ctx context.Context, protocol, baseURL, apiKey, modelID string) (llm.ChatModel, error) {
+	if b.modelProviderRegistry == nil {
+		return nil, fmt.Errorf("agentdef: model provider registry is not configured")
+	}
+
+	effectiveProtocol := protocol
+	if effectiveProtocol == "" {
+		effectiveProtocol = "openai"
+	}
+
+	return b.modelProviderRegistry.Create(ctx, llm.ModelConfig{
+		Protocol: effectiveProtocol,
+		BaseURL:  baseURL,
+		APIKey:   apiKey,
+		ModelID:  modelID,
+	})
+}
+
+// isADKFramework returns true when the builder is configured to use
+// Google ADK Go as the underlying framework.
+func (b *AgentBuilder) isADKFramework() bool {
+	return b.framework == "adk"
+}
+
+// Avoid unused import during partial implementation.
+var _ = einollm.NewDefaultRegistry

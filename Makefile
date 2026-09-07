@@ -2,6 +2,9 @@
 
 # 定义脚本路径
 SCRIPTS_DIR := ./scripts
+
+# Disable inlining and optimization so mockey function-patching works.
+GO_TEST_GCFLAGS := -gcflags="all=-l -N"
 BUILD_FE_SCRIPT := $(SCRIPTS_DIR)/build_fe.sh
 BUILD_SERVER_SCRIPT := $(SCRIPTS_DIR)/setup/server.sh
 SYNC_DB_SCRIPT := $(SCRIPTS_DIR)/setup/db_migrate_apply.sh
@@ -194,10 +197,10 @@ dev-clean: dev-down
 
 # Testing
 test:
-	@cd backend && go test ./pkg/... -count=1
+	@cd backend && go test $(GO_TEST_GCFLAGS) ./pkg/... -count=1
 
 test-all:
-	@cd backend && go test ./... -count=1
+	@cd backend && go test $(GO_TEST_GCFLAGS) ./... -count=1
 
 # Build
 build:
@@ -290,4 +293,3 @@ matrix-fe:
 	 $(MAKE) matrix-fe-python & \
 	 $(MAKE) matrix-fe-java & \
 	 wait
-
