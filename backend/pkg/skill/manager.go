@@ -37,7 +37,6 @@ import (
 	"fmt"
 
 	"github.com/superagent-ai/superagent-base/backend/pkg/llm"
-	einollm "github.com/superagent-ai/superagent-base/backend/pkg/llm/eino"
 )
 
 // Manager handles the lifecycle of skills: installation, lookup, and removal.
@@ -68,14 +67,14 @@ func (m *Manager) Install(ctx context.Context, name, version string) error {
 	return nil
 }
 
-// GetTool returns the named skill wrapped as an Eino InvokableTool.
+// GetTool returns the named skill as a framework-agnostic llm.Tool.
 // Returns (nil, false) if the skill is not installed.
 func (m *Manager) GetTool(name string) (llm.Tool, bool) {
 	inst, ok := m.cache.Get(name)
 	if !ok {
 		return nil, false
 	}
-	return einollm.NewReverseToolAdapter(NewSkillTool(inst.Meta, m.invoker)), true
+	return NewSkillTool(inst.Meta, m.invoker), true
 }
 
 // ListInstalled returns a snapshot of all currently installed SkillInstances.

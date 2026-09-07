@@ -90,6 +90,47 @@ type ParamsOneOf interface {
 	isParamsOneOf()
 }
 
+// DataType is the type of a tool parameter.
+type DataType string
+
+// Supported data types for tool parameters (mirrors JSON Schema types).
+const (
+	DTObject  DataType = "object"
+	DTNumber  DataType = "number"
+	DTInteger DataType = "integer"
+	DTString  DataType = "string"
+	DTArray   DataType = "array"
+	DTNull    DataType = "null"
+	DTBoolean DataType = "boolean"
+)
+
+// ParameterInfo describes a single tool parameter.
+type ParameterInfo struct {
+	Type      DataType             // parameter type
+	ElemInfo *ParameterInfo        // element type, only for array
+	SubParams map[string]*ParameterInfo // sub-parameters, only for object
+	Desc      string               // description
+	Enum      []string             // enum values, only for string
+	Required  bool                // whether the parameter is required
+}
+
+// ParamsOneOfByParams is a concrete ParamsOneOf backed by a map of named parameters.
+type ParamsOneOfByParams struct {
+	params map[string]*ParameterInfo
+}
+
+// NewParamsOneOfByParams creates a ParamsOneOf from a map of named parameters.
+func NewParamsOneOfByParams(params map[string]*ParameterInfo) *ParamsOneOfByParams {
+	return &ParamsOneOfByParams{params: params}
+}
+
+// Params returns the underlying parameter map.
+func (p *ParamsOneOfByParams) Params() map[string]*ParameterInfo {
+	return p.params
+}
+
+func (*ParamsOneOfByParams) isParamsOneOf() {}
+
 // JSONObject is a generic map for JSON data.
 type JSONObject = map[string]any
 

@@ -2,7 +2,7 @@
 
 > **Issue:** #16
 > **Date:** 2026-09-07
-> **Status:** Proposed
+> **Status:** P1 Complete
 > **Owner:** tech-lead / architect
 
 ## 1. Current state
@@ -64,7 +64,7 @@ commit to preserving.
 
 | Phase | Window | Work |
 |---|---|---|
-| **P1 — Stabilize boundary** | Now – 2 wk | Freeze `/api/v2` + A2UI schema as the contract; add contract tests asserting both runtimes emit identical event shapes; document the `runtime:` selector in agent YAML. |
+| **P1 — Stabilize boundary** | ✅ Done | Frozen `/api/v2` + A2UI schema as contract (ADR: `docs/adr/2026-09-07-a2ui-contract-frozen.md`); contract tests in `pkg/a2ui/contract_test.go` assert event shapes, SSE encoding, and ordering invariants; `runtime:` selector documented in agent YAML (`AgentSpec.Runtime`). |
 | **P2 — Execute Python migration** | 2–8 wk | Run the existing DeerFlow migration plan to completion; Go remains the gateway, Python becomes the research-workflow runtime behind it. |
 | **P3 — Lanes harden** | 8–12 wk | Python research pipelines callable from Go workflows as a typed tool node (one new `WorkflowNode` type calling the internal Python endpoint); OTel spans cross both runtimes. |
 | **P4 — Steady state** | 12 wk+ | Routine iteration within lanes; revisit only if one lane's workload clearly fits the other better (track via the P1 contract metrics). |

@@ -20,9 +20,7 @@ import (
 	"context"
 	"log"
 
-	"github.com/cloudwego/eino/components/model"
-	"github.com/cloudwego/eino/schema"
-
+	"github.com/superagent-ai/superagent-base/backend/pkg/llm"
 	"github.com/superagent-ai/superagent-base/backend/pkg/modelrouter"
 	"github.com/superagent-ai/superagent-base/backend/pkg/observe"
 )
@@ -38,9 +36,9 @@ type DynamicModelSelector struct {
 func NewDynamicModelSelector(
 	def *AgentDefinition,
 	analyzer modelrouter.ComplexityAnalyzer,
-	tierModels map[string]model.ToolCallingChatModel,
-	primary model.ToolCallingChatModel,
-	fallback model.ToolCallingChatModel,
+	tierModels map[string]llm.ChatModel,
+	primary llm.ChatModel,
+	fallback llm.ChatModel,
 ) *DynamicModelSelector {
 	poolRouter := modelrouter.NewModelPoolRouter(modelrouter.ModelPoolConfig{
 		Analyzer: analyzer,
@@ -56,7 +54,7 @@ func NewDynamicModelSelector(
 
 // SelectModel picks the best model for the given messages.
 // Returns the selected model and the detected complexity level.
-func (s *DynamicModelSelector) SelectModel(ctx context.Context, messages []*schema.Message) (model.ToolCallingChatModel, string) {
+func (s *DynamicModelSelector) SelectModel(ctx context.Context, messages []*llm.Message) (llm.ChatModel, string) {
 	m, complexity := s.poolRouter.SelectModel(ctx, messages)
 
 	if complexity != "" {
@@ -68,7 +66,7 @@ func (s *DynamicModelSelector) SelectModel(ctx context.Context, messages []*sche
 }
 
 // SelectModelWithFallback returns both primary and fallback models.
-func (s *DynamicModelSelector) SelectModelWithFallback(ctx context.Context, messages []*schema.Message) (model.ToolCallingChatModel, model.ToolCallingChatModel, string) {
+func (s *DynamicModelSelector) SelectModelWithFallback(ctx context.Context, messages []*llm.Message) (llm.ChatModel, llm.ChatModel, string) {
 	primary, fb, complexity := s.poolRouter.SelectModelWithFallback(ctx, messages)
 
 	if complexity != "" {
@@ -85,18 +83,18 @@ func (s *DynamicModelSelector) SelectModelWithFallback(ctx context.Context, mess
 func BuildTierModels(
 	ctx context.Context,
 	def *AgentDefinition,
-	createModel func(ctx context.Context, protocol, baseURL, apiKey, modelID string) (model.ToolCallingChatModel, error),
+	createModel func(ctx context.Context, protocol, baseURL, apiKey, modelID string) (llm.ChatModel, error),
 	defaultBaseURL string,
 	defaultAPIKey string,
 	defaultProtocol string,
 	providers map[string]ProviderEndpoint,
-) (map[string]model.ToolCallingChatModel, error) {
+) (map[string]llm.ChatModel, error) {
 	tiers := def.Spec.Model.Models
 	if len(tiers) == 0 {
 		return nil, nil
 	}
 
-	result := make(map[string]model.ToolCallingChatModel, len(tiers))
+	result := make(map[string]llm.ChatModel, len(tiers))
 	for _, tier := range tiers {
 		protocol := defaultProtocol
 		if tier.Protocol != "" {

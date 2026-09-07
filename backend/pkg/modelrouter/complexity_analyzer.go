@@ -40,8 +40,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/cloudwego/eino/schema"
-
 	"github.com/superagent-ai/superagent-base/backend/pkg/llm"
 	einollm "github.com/superagent-ai/superagent-base/backend/pkg/llm/eino"
 )
@@ -49,7 +47,7 @@ import (
 // ComplexityAnalyzer evaluates the complexity of a user request.
 type ComplexityAnalyzer interface {
 	// Analyze returns the complexity level ("low", "medium", "high") for the given messages.
-	Analyze(ctx context.Context, messages []*schema.Message) (string, error)
+	Analyze(ctx context.Context, messages []*llm.Message) (string, error)
 }
 
 // ComplexityConfig configures the LLM-based complexity analyzer.
@@ -111,7 +109,7 @@ Respond with ONLY a JSON object, no other text:
 {"complexity": "low"} or {"complexity": "medium"} or {"complexity": "high"}`
 
 // Analyze classifies the complexity of the given messages.
-func (a *LLMComplexityAnalyzer) Analyze(ctx context.Context, messages []*schema.Message) (string, error) {
+func (a *LLMComplexityAnalyzer) Analyze(ctx context.Context, messages []*llm.Message) (string, error) {
 	if len(messages) == 0 {
 		return a.fallback, nil
 	}
@@ -203,10 +201,10 @@ func parseComplexityResponse(content string) (string, error) {
 }
 
 // extractRecentUserMessages extracts the last n user message contents.
-func extractRecentUserMessages(messages []*schema.Message, n int) []string {
+func extractRecentUserMessages(messages []*llm.Message, n int) []string {
 	var userMsgs []string
 	for i := len(messages) - 1; i >= 0 && len(userMsgs) < n; i-- {
-		if messages[i].Role == schema.User && messages[i].Content != "" {
+		if messages[i].Role == llm.RoleUser && messages[i].Content != "" {
 			userMsgs = append([]string{messages[i].Content}, userMsgs...)
 		}
 	}

@@ -37,10 +37,7 @@ import (
 	"fmt"
 	"sync"
 
-	einotool "github.com/cloudwego/eino/components/tool"
-
 	"github.com/superagent-ai/superagent-base/backend/pkg/llm"
-	einollm "github.com/superagent-ai/superagent-base/backend/pkg/llm/eino"
 	"github.com/superagent-ai/superagent-base/backend/pkg/tool/builtin"
 )
 
@@ -83,13 +80,6 @@ func (m *Manager) Register(t llm.Tool) error {
 	return nil
 }
 
-// RegisterEino wraps an eino InvokableTool as llm.Tool via ReverseToolAdapter
-// and registers it. This is the bridge for eino-native builtin tools during
-// the migration transition period.
-func (m *Manager) RegisterEino(t einotool.InvokableTool) error {
-	return m.Register(einollm.NewReverseToolAdapter(t))
-}
-
 // Unregister removes the tool identified by name.
 func (m *Manager) Unregister(name string) error {
 	m.mu.Lock()
@@ -120,12 +110,11 @@ func (m *Manager) List() []llm.Tool {
 	return out
 }
 
-// RegisterBuiltins registers all built-in tools. Each eino-native builtin
-// tool is wrapped via RegisterEino so the manager stores llm.Tool instances.
+// RegisterBuiltins registers all built-in tools as framework-agnostic llm.Tool instances.
 func (m *Manager) RegisterBuiltins() error {
 	var errs []error
 	for _, t := range builtin.GetAllBuiltinTools() {
-		if err := m.RegisterEino(t); err != nil {
+		if err := m.Register(t); err != nil {
 			errs = append(errs, err)
 		}
 	}

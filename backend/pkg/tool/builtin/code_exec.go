@@ -1,4 +1,20 @@
 /*
+ * Copyright 2025 coze-dev Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+/*
  * Copyright 2025 superagent-ai Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -25,14 +41,12 @@ import (
 	"os/exec"
 	"time"
 
-	"github.com/cloudwego/eino/components/tool"
-	"github.com/cloudwego/eino/schema"
-
 	"github.com/superagent-ai/superagent-base/backend/infra/coderunner"
+	"github.com/superagent-ai/superagent-base/backend/pkg/llm"
 )
 
 // Compile-time assertion.
-var _ tool.InvokableTool = (*CodeExecTool)(nil)
+var _ llm.Tool = (*CodeExecTool)(nil)
 
 // supportedLanguages lists languages accepted by code_execute.
 var supportedLanguages = map[string]bool{
@@ -89,31 +103,31 @@ func newCodeExecTool() *CodeExecTool {
 	return &CodeExecTool{}
 }
 
-func (c *CodeExecTool) Info(_ context.Context) (*schema.ToolInfo, error) {
-	return &schema.ToolInfo{
+func (c *CodeExecTool) Info(_ context.Context) (*llm.ToolInfo, error) {
+	return &llm.ToolInfo{
 		Name: "code_execute",
 		Desc: "Execute a snippet of code in the specified language (python, javascript, or bash) and return stdout, stderr, and exit code.",
-		ParamsOneOf: schema.NewParamsOneOfByParams(map[string]*schema.ParameterInfo{
+		ParamsOneOf: llm.NewParamsOneOfByParams(map[string]*llm.ParameterInfo{
 			"language": {
 				Desc:     "Programming language: python, javascript, or bash.",
-				Type:     schema.String,
+				Type:     llm.DTString,
 				Required: true,
 			},
 			"code": {
 				Desc:     "The source code to execute.",
-				Type:     schema.String,
+				Type:     llm.DTString,
 				Required: true,
 			},
 			"timeout_seconds": {
 				Desc:     "Maximum execution time in seconds (default 30).",
-				Type:     schema.Integer,
+				Type:     llm.DTInteger,
 				Required: false,
 			},
 		}),
 	}, nil
 }
 
-func (c *CodeExecTool) InvokableRun(ctx context.Context, argumentsInJSON string, _ ...tool.Option) (string, error) {
+func (c *CodeExecTool) Run(ctx context.Context, argumentsInJSON string, _ ...llm.ToolOption) (string, error) {
 	var args struct {
 		Language       string `json:"language"`
 		Code           string `json:"code"`

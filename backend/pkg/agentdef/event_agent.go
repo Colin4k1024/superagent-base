@@ -1,4 +1,20 @@
 /*
+ * Copyright 2025 coze-dev Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+/*
  * Copyright 2025 superagent-ai Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -21,7 +37,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/cloudwego/eino/callbacks"
 	"github.com/superagent-ai/superagent-base/backend/pkg/a2ui"
 )
 
@@ -50,12 +65,10 @@ func NewEventAgent(inner Agent) EventAgent {
 func (e *eventAgentWrapper) ChatWithEvents(ctx context.Context, sessionID string, message string) (*a2ui.EventStream, error) {
 	stream := a2ui.NewEventStream(200)
 
-	// Attach the EventStream to context so the A2UI callback can emit
-	// tool_call/tool_result events during internal ReAct processing.
+	// Attach the EventStream to context so tool lifecycle events can be
+	// emitted during ReAct processing. Google ADK Go tool events are
+	// translated to A2UI events by the consuming goroutine below.
 	ctx = a2ui.WithEventStream(ctx, stream)
-
-	// Register the A2UI callback handler to intercept tool lifecycle events.
-	ctx = callbacks.InitCallbacks(ctx, &callbacks.RunInfo{Name: "a2ui-event-agent"}, a2ui.NewA2UICallback())
 
 	ch, err := e.Agent.Chat(ctx, sessionID, message)
 	if err != nil {

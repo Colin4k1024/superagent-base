@@ -37,9 +37,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/cloudwego/eino/components/tool"
 	"github.com/superagent-ai/superagent-base/backend/pkg/llm"
-	"github.com/cloudwego/eino/schema"
 )
 
 // SkillBridge provides runtime access to the skill system.
@@ -73,37 +71,37 @@ func InitSkillBridge(bridge SkillBridge) {
 // ---------------------------------------------------------------------------
 
 // Compile-time assertion.
-var _ tool.InvokableTool = (*InvokeSkillTool)(nil)
+var _ llm.Tool = (*InvokeSkillTool)(nil)
 
 // InvokeSkillTool dynamically invokes an installed skill at runtime.
 type InvokeSkillTool struct{}
 
-func newInvokeSkillTool() tool.InvokableTool {
+func newInvokeSkillTool() llm.Tool {
 	if skillBridge == nil {
 		return nil
 	}
 	return &InvokeSkillTool{}
 }
 
-func (t *InvokeSkillTool) Info(ctx context.Context) (*schema.ToolInfo, error) {
-	return &schema.ToolInfo{
+func (t *InvokeSkillTool) Info(ctx context.Context) (*llm.ToolInfo, error) {
+	return &llm.ToolInfo{
 		Name: "invoke_skill",
 		Desc: "Invoke an installed skill by name at runtime. Use this to dynamically call skills that were discovered via find-skills or installed via install_skill. The skill must already be installed before invoking.",
-		ParamsOneOf: schema.NewParamsOneOfByParams(map[string]*schema.ParameterInfo{
+		ParamsOneOf: llm.NewParamsOneOfByParams(map[string]*llm.ParameterInfo{
 			"skill_name": {
-				Type:     "string",
+				Type:     llm.DTString,
 				Desc:     "Name of the installed skill to invoke",
 				Required: true,
 			},
 			"parameters": {
-				Type: "object",
+				Type: llm.DTObject,
 				Desc: "Parameters to pass to the skill as key-value pairs. Check the skill's documentation for expected parameters.",
 			},
 		}),
 	}, nil
 }
 
-func (t *InvokeSkillTool) InvokableRun(ctx context.Context, args string, opts ...tool.Option) (string, error) {
+func (t *InvokeSkillTool) Run(ctx context.Context, args string, _ ...llm.ToolOption) (string, error) {
 	var input struct {
 		SkillName  string         `json:"skill_name"`
 		Parameters map[string]any `json:"parameters"`
@@ -127,7 +125,7 @@ func (t *InvokeSkillTool) InvokableRun(ctx context.Context, args string, opts ..
 		return string(result), nil
 	}
 
-	// Marshal parameters to JSON for the skill's InvokableRun.
+	// Marshal parameters to JSON for the skill's Run.
 	skillArgs := "{}"
 	if input.Parameters != nil {
 		b, err := json.Marshal(input.Parameters)
@@ -155,27 +153,27 @@ func (t *InvokeSkillTool) InvokableRun(ctx context.Context, args string, opts ..
 // list_skills
 // ---------------------------------------------------------------------------
 
-var _ tool.InvokableTool = (*ListSkillsTool)(nil)
+var _ llm.Tool = (*ListSkillsTool)(nil)
 
 // ListSkillsTool lists all currently installed skills.
 type ListSkillsTool struct{}
 
-func newListSkillsTool() tool.InvokableTool {
+func newListSkillsTool() llm.Tool {
 	if skillBridge == nil {
 		return nil
 	}
 	return &ListSkillsTool{}
 }
 
-func (t *ListSkillsTool) Info(ctx context.Context) (*schema.ToolInfo, error) {
-	return &schema.ToolInfo{
+func (t *ListSkillsTool) Info(ctx context.Context) (*llm.ToolInfo, error) {
+	return &llm.ToolInfo{
 		Name:        "list_skills",
 		Desc:        "List all currently installed skills with their name, version, description, and status. Use this to check what skills are available before invoking them.",
-		ParamsOneOf: schema.NewParamsOneOfByParams(map[string]*schema.ParameterInfo{}),
+		ParamsOneOf: llm.NewParamsOneOfByParams(map[string]*llm.ParameterInfo{}),
 	}, nil
 }
 
-func (t *ListSkillsTool) InvokableRun(ctx context.Context, args string, opts ...tool.Option) (string, error) {
+func (t *ListSkillsTool) Run(ctx context.Context, args string, _ ...llm.ToolOption) (string, error) {
 	installed := skillBridge.ListInstalled()
 
 	type skillEntry struct {
@@ -207,37 +205,37 @@ func (t *ListSkillsTool) InvokableRun(ctx context.Context, args string, opts ...
 // install_skill
 // ---------------------------------------------------------------------------
 
-var _ tool.InvokableTool = (*InstallSkillTool)(nil)
+var _ llm.Tool = (*InstallSkillTool)(nil)
 
 // InstallSkillTool installs a skill from the marketplace.
 type InstallSkillTool struct{}
 
-func newInstallSkillTool() tool.InvokableTool {
+func newInstallSkillTool() llm.Tool {
 	if skillBridge == nil {
 		return nil
 	}
 	return &InstallSkillTool{}
 }
 
-func (t *InstallSkillTool) Info(ctx context.Context) (*schema.ToolInfo, error) {
-	return &schema.ToolInfo{
+func (t *InstallSkillTool) Info(ctx context.Context) (*llm.ToolInfo, error) {
+	return &llm.ToolInfo{
 		Name: "install_skill",
 		Desc: "Install a skill from the skills.sh marketplace. After installation, the skill can be invoked with invoke_skill. Use find_skills first to discover available skills.",
-		ParamsOneOf: schema.NewParamsOneOfByParams(map[string]*schema.ParameterInfo{
+		ParamsOneOf: llm.NewParamsOneOfByParams(map[string]*llm.ParameterInfo{
 			"skill_name": {
-				Type:     "string",
+				Type:     llm.DTString,
 				Desc:     "Name of the skill to install (from find-skills results)",
 				Required: true,
 			},
 			"version": {
-				Type: "string",
+				Type: llm.DTString,
 				Desc: "Version to install (default: 'latest')",
 			},
 		}),
 	}, nil
 }
 
-func (t *InstallSkillTool) InvokableRun(ctx context.Context, args string, opts ...tool.Option) (string, error) {
+func (t *InstallSkillTool) Run(ctx context.Context, args string, _ ...llm.ToolOption) (string, error) {
 	var input struct {
 		SkillName string `json:"skill_name"`
 		Version   string `json:"version"`

@@ -19,7 +19,7 @@ package modelrouter
 import (
 	"testing"
 
-	"github.com/cloudwego/eino/schema"
+	"github.com/superagent-ai/superagent-base/backend/pkg/llm"
 )
 
 func TestParseComplexityResponse(t *testing.T) {
@@ -54,13 +54,13 @@ func TestParseComplexityResponse(t *testing.T) {
 }
 
 func TestExtractRecentUserMessages(t *testing.T) {
-	msgs := []*schema.Message{
-		{Role: schema.System, Content: "system"},
-		{Role: schema.User, Content: "hello"},
-		{Role: schema.Assistant, Content: "hi there"},
-		{Role: schema.User, Content: "help me code"},
-		{Role: schema.Assistant, Content: "sure"},
-		{Role: schema.User, Content: "write a parser"},
+	msgs := []*llm.Message{
+		{Role: llm.RoleSystem, Content: "system"},
+		{Role: llm.RoleUser, Content: "hello"},
+		{Role: llm.RoleAssistant, Content: "hi there"},
+		{Role: llm.RoleUser, Content: "help me code"},
+		{Role: llm.RoleAssistant, Content: "sure"},
+		{Role: llm.RoleUser, Content: "write a parser"},
 	}
 
 	got := extractRecentUserMessages(msgs, 3)
@@ -76,11 +76,11 @@ func TestExtractRecentUserMessages(t *testing.T) {
 }
 
 func TestExtractRecentUserMessages_LimitN(t *testing.T) {
-	msgs := []*schema.Message{
-		{Role: schema.User, Content: "a"},
-		{Role: schema.User, Content: "b"},
-		{Role: schema.User, Content: "c"},
-		{Role: schema.User, Content: "d"},
+	msgs := []*llm.Message{
+		{Role: llm.RoleUser, Content: "a"},
+		{Role: llm.RoleUser, Content: "b"},
+		{Role: llm.RoleUser, Content: "c"},
+		{Role: llm.RoleUser, Content: "d"},
 	}
 
 	got := extractRecentUserMessages(msgs, 2)
@@ -93,8 +93,8 @@ func TestExtractRecentUserMessages_LimitN(t *testing.T) {
 }
 
 func TestExtractRecentUserMessages_Empty(t *testing.T) {
-	msgs := []*schema.Message{
-		{Role: schema.Assistant, Content: "only assistant"},
+	msgs := []*llm.Message{
+		{Role: llm.RoleAssistant, Content: "only assistant"},
 	}
 	got := extractRecentUserMessages(msgs, 3)
 	if len(got) != 0 {
