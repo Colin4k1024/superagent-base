@@ -88,3 +88,28 @@ func (a *ReverseToolAdapter) Run(ctx context.Context, argsJSON string, _ ...llm.
 }
 
 var _ llm.Tool = (*ReverseToolAdapter)(nil)
+
+// UnwrapEinoTool returns the underlying eino InvokableTool from a
+// ReverseToolAdapter. Returns nil if the tool is not a ReverseToolAdapter.
+// This is used during the migration transition period where eino's adk
+// still requires the raw eino tool type.
+func UnwrapEinoTool(t llm.Tool) einotool.InvokableTool {
+	if rta, ok := t.(*ReverseToolAdapter); ok {
+		return rta.tool
+	}
+	// If it's a ToolAdapter (forward direction), the underlying is already llm.Tool;
+	// wrap it as an eino InvokableTool.
+	return NewToolAdapter(t)
+}
+
+// UnwrapEinoToolFromSlice converts a slice of llm.Tool to eino InvokableTool,
+// unwrapping ReverseToolAdapters and wrapping plain llm.Tools via ToolAdapter.
+func UnwrapEinoToolFromSlice(tools []llm.Tool) []einotool.InvokableTool {
+	result := make([]einotool.InvokableTool, 0, len(tools))
+	for _, t := range tools {
+		if unwrapped := UnwrapEinoTool(t); unwrapped != nil {
+			result = append(result, unwrapped)
+		}
+	}
+	return result
+}
