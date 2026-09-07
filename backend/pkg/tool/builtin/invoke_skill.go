@@ -1,4 +1,20 @@
 /*
+ * Copyright 2025 coze-dev Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+/*
  * Copyright 2025 superagent-ai Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -22,6 +38,7 @@ import (
 	"fmt"
 
 	"github.com/cloudwego/eino/components/tool"
+	"github.com/superagent-ai/superagent-base/backend/pkg/llm"
 	"github.com/cloudwego/eino/schema"
 )
 
@@ -29,7 +46,7 @@ import (
 // Defined here to avoid circular dependency (tool/builtin → skill).
 // The skill package provides an implementation via BridgeAdapter.
 type SkillBridge interface {
-	GetTool(name string) (tool.InvokableTool, bool)
+	GetTool(name string) (llm.Tool, bool)
 	ListInstalled() []SkillInstanceInfo
 	Install(ctx context.Context, name, version string) error
 }
@@ -121,7 +138,7 @@ func (t *InvokeSkillTool) InvokableRun(ctx context.Context, args string, opts ..
 	}
 
 	// Invoke the skill.
-	out, err := skillTool.InvokableRun(ctx, skillArgs)
+	out, err := skillTool.Run(ctx, skillArgs)
 	if err != nil {
 		result, _ := json.Marshal(map[string]any{
 			"error":   true,
