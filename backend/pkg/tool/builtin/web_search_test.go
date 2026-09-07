@@ -1,4 +1,20 @@
 /*
+ * Copyright 2025 coze-dev Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+/*
  * Copyright 2025 superagent-ai Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -38,22 +54,22 @@ func TestWebSearchTool_Info(t *testing.T) {
 	}
 }
 
-// TestWebSearchTool_InvokableRun_EmptyQuery verifies that an empty query
-// returns an error (not a panic). The contract is that InvokableRun returns
+// TestWebSearchTool_Run_EmptyQuery verifies that an empty query
+// returns an error (not a panic). The contract is that Run returns
 // a non-nil error when the required "query" field is absent.
-func TestWebSearchTool_InvokableRun_EmptyQuery(t *testing.T) {
+func TestWebSearchTool_Run_EmptyQuery(t *testing.T) {
 	tool := newWebSearchTool()
-	_, err := tool.InvokableRun(context.Background(), `{"query":""}`)
+	_, err := tool.Run(context.Background(), `{"query":""}`)
 	if err == nil {
 		t.Error("expected error for empty query, got nil")
 	}
 }
 
-// TestWebSearchTool_InvokableRun_MalformedJSON verifies that malformed JSON
+// TestWebSearchTool_Run_MalformedJSON verifies that malformed JSON
 // input returns an error without panicking.
-func TestWebSearchTool_InvokableRun_MalformedJSON(t *testing.T) {
+func TestWebSearchTool_Run_MalformedJSON(t *testing.T) {
 	tool := newWebSearchTool()
-	_, err := tool.InvokableRun(context.Background(), `not-json`)
+	_, err := tool.Run(context.Background(), `not-json`)
 	if err == nil {
 		t.Error("expected error for malformed JSON, got nil")
 	}

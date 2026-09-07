@@ -1,4 +1,20 @@
 /*
+ * Copyright 2025 coze-dev Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+/*
  * Copyright 2025 superagent-ai Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -28,13 +44,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cloudwego/eino/components/tool"
-	"github.com/cloudwego/eino/schema"
+	"github.com/superagent-ai/superagent-base/backend/pkg/llm"
 	"golang.org/x/net/html"
 )
 
 // Compile-time assertion.
-var _ tool.InvokableTool = (*WebSearchTool)(nil)
+var _ llm.Tool = (*WebSearchTool)(nil)
 
 const webSearchTimeout = 10 * time.Second
 
@@ -271,26 +286,26 @@ func textContent(n *html.Node) string {
 	return sb.String()
 }
 
-func (w *WebSearchTool) Info(_ context.Context) (*schema.ToolInfo, error) {
-	return &schema.ToolInfo{
+func (w *WebSearchTool) Info(_ context.Context) (*llm.ToolInfo, error) {
+	return &llm.ToolInfo{
 		Name: "web_search",
 		Desc: "Search the web for a query and return a list of results with title, URL, and snippet.",
-		ParamsOneOf: schema.NewParamsOneOfByParams(map[string]*schema.ParameterInfo{
+		ParamsOneOf: llm.NewParamsOneOfByParams(map[string]*llm.ParameterInfo{
 			"query": {
 				Desc:     "The search query string.",
-				Type:     schema.String,
+				Type:     llm.DTString,
 				Required: true,
 			},
 			"max_results": {
 				Desc:     "Maximum number of results to return (default: 5).",
-				Type:     schema.Integer,
+				Type:     llm.DTInteger,
 				Required: false,
 			},
 		}),
 	}, nil
 }
 
-func (w *WebSearchTool) InvokableRun(ctx context.Context, argumentsInJSON string, _ ...tool.Option) (string, error) {
+func (w *WebSearchTool) Run(ctx context.Context, argumentsInJSON string, _ ...llm.ToolOption) (string, error) {
 	var args struct {
 		Query      string `json:"query"`
 		MaxResults int    `json:"max_results"`

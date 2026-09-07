@@ -40,12 +40,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cloudwego/eino/adk"
 
 	"github.com/superagent-ai/superagent-base/backend/pkg/llm"
 	aclagent "github.com/superagent-ai/superagent-base/backend/pkg/agent"
 	adkagent "github.com/superagent-ai/superagent-base/backend/pkg/agent/adk"
-	einollm "github.com/superagent-ai/superagent-base/backend/pkg/llm/eino"
 	"github.com/superagent-ai/superagent-base/backend/pkg/memory"
 	"github.com/superagent-ai/superagent-base/backend/pkg/modelrouter"
 	"github.com/superagent-ai/superagent-base/backend/pkg/observe"
@@ -121,11 +119,9 @@ func (a *einoChatAgent) Chat(ctx context.Context, sessionID string, message stri
 	activeModel := a.chatModel
 	activeModelID := a.modelID
 	if a.modelSelector != nil {
-		// Convert to eino messages for the model selector (still eino-coupled).
-		einoMsgs := einollm.ToEinoMessages(msgs)
-		selected, complexity := a.modelSelector.SelectModel(ctx, einoMsgs)
+		selected, complexity := a.modelSelector.SelectModel(ctx, msgs)
 		if selected != nil {
-			activeModel = einollm.NewChatModelAdapter(selected, activeModelID)
+			activeModel = selected
 			if tierDef, ok := findModelTier(a.def, complexity); ok {
 				activeModelID = tierDef.ModelID
 			}
@@ -180,45 +176,6 @@ func (a *einoChatAgent) Chat(ctx context.Context, sessionID string, message stri
 	return ch, nil
 }
 
-// adkChatModelAgent wraps an eino ADK ChatModelAgent for tool-using interactions.
-type adkChatModelAgent struct {
-	def          *AgentDefinition
-	modelID      string
-	provider     string
-	memBackend   memory.Backend
-	agent        *adk.ChatModelAgent
-	systemPrompt string
-}
-
-func (a *adkChatModelAgent) Name() string                    { return a.def.Metadata.Name }
-func (a *adkChatModelAgent) Description() string             { return a.systemPrompt }
-func (a *adkChatModelAgent) GetDefinition() *AgentDefinition { return a.def }
-
-func (a *adkChatModelAgent) Chat(ctx context.Context, sessionID string, message string) (<-chan string, error) {
-	// Build history BEFORE persisting so the current message isn't loaded twice.
-	msgs := buildMessageHistory(ctx, a.systemPrompt, sessionID, a.memBackend)
-	msgs = append(msgs, llm.UserMessage(message))
-	persistUserMessage(ctx, sessionID, message, a.memBackend)
-
-	ctx = observe.WithModelInfo(ctx, a.modelID, a.provider)
-	// Convert ACL messages to eino format for the adk agent (transition period).
-	einoMsgs := einollm.ToEinoMessages(msgs)
-	iter := a.agent.Run(ctx, &adk.AgentInput{
-		Messages:       einoMsgs,
-		EnableStreaming: true,
-	})
-
-	ch := make(chan string, 64)
-	params := streamConsumerParams{
-		sessionID:  sessionID,
-		modelID:    a.modelID,
-		provider:   a.provider,
-		memBackend: a.memBackend,
-	}
-	go consumeADKIterator(ctx, params, iter, ch, nil)
-	return ch, nil
-}
-
 // findModelTier returns the ModelTier definition for the given complexity level.
 func findModelTier(def *AgentDefinition, complexity string) (ModelTier, bool) {
 	for _, tier := range def.Spec.Model.Models {
@@ -230,8 +187,7 @@ func findModelTier(def *AgentDefinition, complexity string) (ModelTier, bool) {
 }
 
 // adkRunnerAgent wraps a Google ADK Go AgentAdapter for tool-using interactions.
-// This is the target implementation that replaces adkChatModelAgent once
-// the eino runtime is fully removed.
+// This is the sole tool-using agent runtime after the eino removal.
 type adkRunnerAgent struct {
 	def          *AgentDefinition
 	modelID      string

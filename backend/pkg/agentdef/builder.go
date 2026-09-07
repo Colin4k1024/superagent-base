@@ -34,27 +34,20 @@ package agentdef
 
 import (
 	"context"
-	"errors"
+	
 	"fmt"
-	"io"
+	
 	"log"
 	"os"
 	"strings"
 	"time"
 
-	"github.com/cloudwego/eino/adk"
-	"github.com/cloudwego/eino/components/model"
-	"github.com/cloudwego/eino/compose"
-	"github.com/cloudwego/eino/schema"
-
 	"github.com/superagent-ai/superagent-base/backend/infra/cache"
 	"github.com/superagent-ai/superagent-base/backend/infra/checkpoint"
 	"github.com/superagent-ai/superagent-base/backend/pkg/llm"
-	einollm "github.com/superagent-ai/superagent-base/backend/pkg/llm/eino"
 	adkllm "github.com/superagent-ai/superagent-base/backend/pkg/llm/adk"
 	adkagent "github.com/superagent-ai/superagent-base/backend/pkg/agent/adk"
 	"github.com/superagent-ai/superagent-base/backend/pkg/evolution"
-	"github.com/superagent-ai/superagent-base/backend/pkg/graphs"
 	"github.com/superagent-ai/superagent-base/backend/pkg/mcp"
 	"github.com/superagent-ai/superagent-base/backend/pkg/memory"
 	"github.com/superagent-ai/superagent-base/backend/pkg/modelrouter"
@@ -110,12 +103,6 @@ func WithModelProviderRegistry(r *llm.ModelProviderRegistry) BuilderOption {
 	return func(b *AgentBuilder) { b.modelProviderRegistry = r }
 }
 
-// WithModelFramework sets the underlying agent framework.
-// "eino" (default) uses cloudwego/eino; "adk" uses Google ADK Go.
-func WithModelFramework(fw string) BuilderOption {
-	return func(b *AgentBuilder) { b.framework = fw }
-}
-
 // WithAgentRegistry sets the resolver used to look up sub-agents by name when
 // building orchestration types (supervisor, sequential, parallel).
 func WithAgentRegistry(fn func(name string) (Agent, bool)) BuilderOption {
@@ -168,7 +155,6 @@ type AgentBuilder struct {
 	evolutionAdvisor    *evolution.EvolutionAdvisor
 	evolutionCollector  *evolution.SignalCollector
 	modelProviderRegistry *llm.ModelProviderRegistry
-	framework string // "eino" (default) or "adk" for Google ADK Go
 }
 
 // NewAgentBuilder creates an AgentBuilder with optional configuration.
@@ -288,7 +274,8 @@ func (b *AgentBuilder) Build(ctx context.Context, def *AgentDefinition) (Agent, 
 		return b.maybeWrapInterruptable(ctx, built, def), nil
 	}
 
-	// Build a real Eino ChatModel dispatched by provider protocol.
+	// Build an ACL ChatModel via the provider registry.
+	// Google ADK Go is the sole runtime — no eino unwrapping.
 	effectiveModelID := modelID
 	if effectiveModelID == "" {
 		effectiveModelID = b.modelConfig.ModelID
@@ -311,115 +298,59 @@ func (b *AgentBuilder) Build(ctx context.Context, def *AgentDefinition) (Agent, 
 		protocol = def.Spec.Model.Protocol
 	}
 
-	chatModel, err := b.createChatModel(ctx, protocol, baseURL, apiKey, effectiveModelID)
+	aclModel, err := b.createACLChatModel(ctx, protocol, baseURL, apiKey, effectiveModelID)
 	if err != nil {
 		return nil, fmt.Errorf("agentdef: Build %q: create model (protocol=%s): %w", def.Metadata.Name, protocol, err)
 	}
 
 	// Build tier models for dynamic routing (if configured).
-	var tierModels map[string]model.ToolCallingChatModel
+	var tierModels map[string]llm.ChatModel
 	if hasDynamicRouting {
-		tierModels, err = BuildTierModels(ctx, def, b.createChatModel, baseURL, apiKey, protocol, b.providerEndpoints)
+		tierModels, err = BuildTierModels(ctx, def, b.createACLChatModel, baseURL, apiKey, protocol, b.providerEndpoints)
 		if err != nil {
 			return nil, fmt.Errorf("agentdef: Build %q: create tier models: %w", def.Metadata.Name, err)
 		}
 	}
 
-
-	// ADK Go framework path: use Google ADK Go instead of eino.
-	if b.isADKFramework() {
-		aclModel, aclErr := b.createACLChatModel(ctx, protocol, baseURL, apiKey, effectiveModelID)
-		if aclErr != nil {
-			return nil, fmt.Errorf("agentdef: Build %q: create ACL model: %w", def.Metadata.Name, aclErr)
-		}
-		aclTools := b.resolveTools(ctx, toolRefs)
-		maxStep := 10
-		if def.Spec.MaxTurns > 0 {
-			maxStep = def.Spec.MaxTurns
-		}
-		if len(aclTools) > 0 {
-			adkAdapter, ok := aclModel.(*adkllm.ChatModelAdapter)
-			if !ok {
-				return nil, fmt.Errorf("agentdef: Build %q: expected *adk.ChatModelAdapter, got %T", def.Metadata.Name, aclModel)
-			}
-			agentRT, rtErr := adkagent.NewAgentAdapter(def.Metadata.Name, def.Spec.SystemPrompt, adkAdapter.UnwrapADKModel(), aclTools, maxStep)
-			if rtErr != nil {
-				return nil, fmt.Errorf("agentdef: Build %q: create adk agent: %w", def.Metadata.Name, rtErr)
-			}
-			built = &adkRunnerAgent{
-				def:          def,
-				modelID:      effectiveModelID,
-				provider:     protocol,
-				memBackend:   memBackend,
-				agent:        agentRT,
-				systemPrompt: def.Spec.SystemPrompt,
-			}
-		} else {
-			built = &einoChatAgent{
-				def:          def,
-				modelID:      effectiveModelID,
-				provider:     protocol,
-				memBackend:   memBackend,
-				chatModel:    aclModel,
-				systemPrompt: def.Spec.SystemPrompt,
-			}
-		}
-		built = b.applyMiddleware(built, def)
-		return b.maybeWrapInterruptable(ctx, built, def), nil
+	// Resolve ACL tools (framework-agnostic llm.Tool instances).
+	aclTools := b.resolveTools(ctx, toolRefs)
+	maxStep := 10
+	if def.Spec.MaxTurns > 0 {
+		maxStep = def.Spec.MaxTurns
 	}
 
-
-	// Gather Eino-compatible tools from resolved refs.
-	einoTools := einollm.UnwrapEinoToolFromSlice(b.resolveTools(ctx, toolRefs))
-
-	if len(einoTools) > 0 {
-		// ADK ChatModelAgent with tool calling (replaces legacy react.NewAgent).
-		maxStep := 10
-		if def.Spec.MaxTurns > 0 {
-			maxStep = def.Spec.MaxTurns
+	if len(aclTools) > 0 {
+		// Google ADK Go: create agent with tool-calling support.
+		adkAdapter, ok := aclModel.(*adkllm.ChatModelAdapter)
+		if !ok {
+			return nil, fmt.Errorf("agentdef: Build %q: expected *adk.ChatModelAdapter, got %T", def.Metadata.Name, aclModel)
 		}
-		adkHandlers, err := resolveADKHandlers(ctx, def.Spec.Middleware, def.Spec.Sandbox, def.Spec.Tools)
-		if err != nil {
-			return nil, fmt.Errorf("agentdef: Build %q: resolve adk handlers: %w", def.Metadata.Name, err)
+		agentRT, rtErr := adkagent.NewAgentAdapter(def.Metadata.Name, def.Spec.SystemPrompt, adkAdapter.UnwrapADKModel(), aclTools, maxStep)
+		if rtErr != nil {
+			return nil, fmt.Errorf("agentdef: Build %q: create adk agent: %w", def.Metadata.Name, rtErr)
 		}
-		adkAgent, err := adk.NewChatModelAgent(ctx, &adk.ChatModelAgentConfig{
-			Name:        def.Metadata.Name,
-			Description: def.Spec.SystemPrompt,
-			Instruction: def.Spec.SystemPrompt,
-			Model:       chatModel,
-			ToolsConfig: adk.ToolsConfig{
-				ToolsNodeConfig: compose.ToolsNodeConfig{
-					Tools: einoTools,
-				},
-			},
-			MaxIterations: maxStep,
-			Handlers:      adkHandlers,
-		})
-		if err != nil {
-			return nil, fmt.Errorf("agentdef: Build: create adk agent: %w", err)
-		}
-		built = &adkChatModelAgent{
+		built = &adkRunnerAgent{
 			def:          def,
 			modelID:      effectiveModelID,
 			provider:     protocol,
 			memBackend:   memBackend,
-			agent:        adkAgent,
+			agent:        agentRT,
 			systemPrompt: def.Spec.SystemPrompt,
 		}
 	} else {
-		// Simple chat agent without tools.
+		// Simple chat agent without tools — uses ACL ChatModel directly.
 		agent := &einoChatAgent{
 			def:          def,
 			modelID:      effectiveModelID,
 			provider:     protocol,
 			memBackend:   memBackend,
-			chatModel:    einollm.NewChatModelAdapter(chatModel, effectiveModelID),
+			chatModel:    aclModel,
 			systemPrompt: def.Spec.SystemPrompt,
 		}
 		// Attach dynamic model selector if tier models are configured.
 		if hasDynamicRouting && tierModels != nil {
 			agent.modelSelector = NewDynamicModelSelector(
-				def, b.complexityAnalyzer, tierModels, chatModel, nil,
+				def, b.complexityAnalyzer, tierModels, aclModel, nil,
 			)
 		}
 		built = agent
@@ -431,37 +362,26 @@ func (b *AgentBuilder) Build(ctx context.Context, def *AgentDefinition) (Agent, 
 	// Apply fallback wrapping after middleware but before interrupt.
 	if def.Spec.Model.Fallback != "" {
 		fallbackModelID := def.Spec.Model.Fallback
-		fallbackModel, fbErr := b.createChatModel(ctx, protocol, baseURL, apiKey, fallbackModelID)
+		fbACLModel, fbErr := b.createACLChatModel(ctx, protocol, baseURL, apiKey, fallbackModelID)
 		if fbErr != nil {
 			return nil, fmt.Errorf("agentdef: Build %q: create fallback model: %w", def.Metadata.Name, fbErr)
 		}
 		var fbAgent Agent
-		if len(einoTools) > 0 {
-			maxStep := 10
-			if def.Spec.MaxTurns > 0 {
-				maxStep = def.Spec.MaxTurns
+		if len(aclTools) > 0 {
+			fbAdkAdapter, ok := fbACLModel.(*adkllm.ChatModelAdapter)
+			if !ok {
+				return nil, fmt.Errorf("agentdef: Build %q: fallback expected *adk.ChatModelAdapter, got %T", def.Metadata.Name, fbACLModel)
 			}
-			fbADKAgent, fbADKErr := adk.NewChatModelAgent(ctx, &adk.ChatModelAgentConfig{
-				Name:        def.Metadata.Name + "_fallback",
-				Description: def.Spec.SystemPrompt,
-				Instruction: def.Spec.SystemPrompt,
-				Model:       fallbackModel,
-				ToolsConfig: adk.ToolsConfig{
-					ToolsNodeConfig: compose.ToolsNodeConfig{
-						Tools: einoTools,
-					},
-				},
-				MaxIterations: maxStep,
-			})
-			if fbADKErr != nil {
-				return nil, fmt.Errorf("agentdef: Build: create fallback adk agent: %w", fbADKErr)
+			fbAgentRT, fbRtErr := adkagent.NewAgentAdapter(def.Metadata.Name+"_fallback", def.Spec.SystemPrompt, fbAdkAdapter.UnwrapADKModel(), aclTools, maxStep)
+			if fbRtErr != nil {
+				return nil, fmt.Errorf("agentdef: Build: create fallback adk agent: %w", fbRtErr)
 			}
-			fbAgent = &adkChatModelAgent{
+			fbAgent = &adkRunnerAgent{
 				def:          def,
 				modelID:      fallbackModelID,
 				provider:     protocol,
 				memBackend:   memBackend,
-				agent:        fbADKAgent,
+				agent:        fbAgentRT,
 				systemPrompt: def.Spec.SystemPrompt,
 			}
 		} else {
@@ -470,7 +390,7 @@ func (b *AgentBuilder) Build(ctx context.Context, def *AgentDefinition) (Agent, 
 				modelID:      fallbackModelID,
 				provider:     protocol,
 				memBackend:   memBackend,
-				chatModel:    einollm.NewChatModelAdapter(fallbackModel, fallbackModelID),
+				chatModel:    fbACLModel,
 				systemPrompt: def.Spec.SystemPrompt,
 			}
 		}
@@ -509,17 +429,18 @@ func (b *AgentBuilder) maybeWrapInterruptable(ctx context.Context, agent Agent, 
 		store = checkpoint.NewInMemoryStore()
 	}
 
-	// Unwrap through middleware layers to find the underlying ADK agent.
-	if adkAgent := unwrapToADKChatModel(agent); adkAgent != nil {
+	// Unwrap through middleware layers to find the underlying ADK runner agent.
+	if adkRunner := unwrapToADKRunner(agent); adkRunner != nil {
+		// Agent already has Google ADK Go runner — wrap with checkpoint store.
 		return NewADKRunnerAgent(
 			ctx,
-			adkAgent.agent,
+			adkRunner.agent,
 			store,
 			def,
-			adkAgent.modelID,
-			adkAgent.provider,
-			adkAgent.systemPrompt,
-			adkAgent.memBackend,
+			adkRunner.modelID,
+			adkRunner.provider,
+			adkRunner.systemPrompt,
+			adkRunner.memBackend,
 		)
 	}
 
@@ -818,112 +739,13 @@ func buildDefaultSummarizeFunc(agent Agent) SummarizeFunc {
 	}
 }
 
-// adkAgentFrom returns the underlying adk.Agent if the agent was built with ADK.
-// It unwraps through middleware layers to find the ADK agent. Returns nil if not
-// ADK-based.
-func adkAgentFrom(a Agent) adk.Agent {
-	return unwrapToEinoAgent(a)
-}
-
-// buildADKSupervisor constructs a supervisor using ADK's AgentTool pattern.
-// Each sub-agent is wrapped as an AgentTool and exposed to the main ChatModelAgent,
-// which autonomously decides which sub-agent to call based on the task.
+// buildADKSupervisor delegates to buildSupervisor. The previous eino-based
+// AgentTool pattern has been removed; Google ADK Go sub-agent support will
+// be wired via llmagent.SubAgents in a follow-up.
 func (b *AgentBuilder) buildADKSupervisor(ctx context.Context, def *AgentDefinition) (Agent, error) {
-	agents, err := b.resolveSubAgentList(def)
-	if err != nil {
-		return nil, err
-	}
-
-	// Resolve regular tools from the supervisor definition.
-	var toolRefs []resolvedTool
-	for _, ref := range def.Spec.Tools {
-		resolved, resolveErr := b.resolveToolRef(ref)
-		if resolveErr != nil {
-			continue
-		}
-		toolRefs = append(toolRefs, resolved)
-	}
-	einoTools := einollm.UnwrapEinoToolFromSlice(b.resolveTools(ctx, toolRefs))
-
-	// Wrap each sub-agent as an AgentTool.
-	for _, subAgent := range agents {
-		underlying := adkAgentFrom(subAgent)
-		if underlying == nil {
-			continue
-		}
-		agentTool := adk.NewAgentTool(ctx, underlying)
-		einoTools = append(einoTools, agentTool)
-	}
-
-	// Build the supervisor's model.
-	effectiveModelID := def.Spec.Model.Primary
-	if effectiveModelID == "" {
-		effectiveModelID = b.modelConfig.ModelID
-	}
-	baseURL := b.modelConfig.BaseURL
-	apiKey := b.modelConfig.APIKey
-	protocol := b.modelConfig.Type
-	if def.Spec.Model.BaseURL != "" {
-		baseURL = def.Spec.Model.BaseURL
-	}
-	if def.Spec.Model.APIKeyEnv != "" {
-		if v := os.Getenv(def.Spec.Model.APIKeyEnv); v != "" {
-			apiKey = v
-		}
-	}
-	if def.Spec.Model.Protocol != "" {
-		protocol = def.Spec.Model.Protocol
-	}
-	chatModel, err := b.createChatModel(ctx, protocol, baseURL, apiKey, effectiveModelID)
-	if err != nil {
-		return nil, fmt.Errorf("agentdef: buildADKSupervisor %q: create model: %w", def.Metadata.Name, err)
-	}
-
-	maxStep := 20
-	if def.Spec.Orchestration != nil && def.Spec.Orchestration.MaxRounds > 0 {
-		maxStep = def.Spec.Orchestration.MaxRounds
-	}
-
-	adkHandlers, err := resolveADKHandlers(ctx, def.Spec.Middleware, def.Spec.Sandbox, def.Spec.Tools)
-	if err != nil {
-		return nil, fmt.Errorf("agentdef: buildADKSupervisor %q: resolve handlers: %w", def.Metadata.Name, err)
-	}
-
-	adkAgent, err := adk.NewChatModelAgent(ctx, &adk.ChatModelAgentConfig{
-		Name:        def.Metadata.Name,
-		Description: def.Spec.SystemPrompt,
-		Instruction: def.Spec.SystemPrompt,
-		Model:       chatModel,
-		ToolsConfig: adk.ToolsConfig{
-			ToolsNodeConfig: compose.ToolsNodeConfig{
-				Tools: einoTools,
-			},
-			EmitInternalEvents: true,
-		},
-		MaxIterations: maxStep,
-		Handlers:      adkHandlers,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("agentdef: buildADKSupervisor %q: create agent: %w", def.Metadata.Name, err)
-	}
-
-	var memBackend memory.Backend
-	if b.memoryFactory != nil && def.Spec.Memory.Backend != "" {
-		cfg := memory.BackendConfig{
-			Type:    def.Spec.Memory.Backend,
-			Options: def.Spec.Memory.Config,
-		}
-		memBackend, _ = b.memoryFactory(cfg)
-	}
-	built := &adkChatModelAgent{
-		def:          def,
-		modelID:      effectiveModelID,
-		provider:     protocol,
-		memBackend:   memBackend,
-		agent:        adkAgent,
-		systemPrompt: def.Spec.SystemPrompt,
-	}
-	return b.maybeWrapInterruptable(ctx, built, def), nil
+	// Redirect to the framework-agnostic supervisor implementation.
+	// Google ADK Go sub-agent wiring will be added via llmagent.SubAgents.
+	return b.buildSupervisor(ctx, def)
 }
 
 // buildSequential constructs a SequentialAgent from ordered sub-agent refs.
@@ -1067,87 +889,14 @@ func (b *AgentBuilder) buildWorkflow(def *AgentDefinition) (Agent, error) {
 	return wa, nil
 }
 
-// buildEinoGraph constructs an einoGraphAgent from a named entry in the
-// pkg/graphs registry.  The graph is compiled once at build time; the
-// resulting Runnable is reused across all Chat calls.
+// buildEinoGraph is no longer supported — the eino compose dependency has
+// been removed. Use type=workflow with the in-repo DAG engine instead.
 func (b *AgentBuilder) buildEinoGraph(ctx context.Context, def *AgentDefinition) (Agent, error) {
-	graphName := def.Spec.Graph
-	if graphName == "" {
-		return nil, fmt.Errorf("agentdef: buildEinoGraph %q: spec.graph is required for type=eino_graph", def.Metadata.Name)
-	}
-	factory, ok := graphs.Get(graphName)
-	if !ok {
-		return nil, fmt.Errorf("agentdef: buildEinoGraph %q: graph %q not found in registry (registered: %v)", def.Metadata.Name, graphName, graphs.List())
-	}
-	runnable, err := factory(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("agentdef: buildEinoGraph %q: compile graph %q: %w", def.Metadata.Name, graphName, err)
-	}
-	return &einoGraphAgent{
-		def:          def,
-		systemPrompt: def.Spec.SystemPrompt,
-		runnable:     runnable,
-	}, nil
+	return nil, fmt.Errorf("agentdef: buildEinoGraph %q: type=eino_graph is no longer supported (use type=workflow)", def.Metadata.Name)
 }
 
 // einoGraphAgent wraps a compiled Eino graph Runnable as a superagent Agent.
 // It converts the string Chat interface to []*schema.Message → *schema.Message.
-type einoGraphAgent struct {
-	def          *AgentDefinition
-	systemPrompt string
-	runnable     compose.Runnable[[]*schema.Message, *schema.Message]
-}
-
-func (a *einoGraphAgent) Name() string                    { return a.def.Metadata.Name }
-func (a *einoGraphAgent) Description() string             { return a.systemPrompt }
-func (a *einoGraphAgent) GetDefinition() *AgentDefinition { return a.def }
-
-func (a *einoGraphAgent) Chat(ctx context.Context, _ string, message string) (<-chan string, error) {
-	msgs := make([]*schema.Message, 0, 2)
-	if a.systemPrompt != "" {
-		msgs = append(msgs, schema.SystemMessage(a.systemPrompt))
-	}
-	msgs = append(msgs, schema.UserMessage(message))
-
-	reader, err := a.runnable.Stream(ctx, msgs)
-	if err != nil {
-		return nil, fmt.Errorf("agentdef: eino_graph %q: stream: %w", a.def.Metadata.Name, err)
-	}
-
-	ch := make(chan string, 64)
-	go func() {
-		defer close(ch)
-		defer reader.Close()
-		for {
-			msg, recvErr := reader.Recv()
-			if errors.Is(recvErr, io.EOF) {
-				return
-			}
-			if recvErr != nil {
-				select {
-				case ch <- fmt.Sprintf("[error] %v", recvErr):
-				case <-ctx.Done():
-				}
-				return
-			}
-			if msg != nil && msg.Content != "" {
-				select {
-				case ch <- msg.Content:
-				case <-ctx.Done():
-					return
-				}
-			}
-		}
-	}()
-	return ch, nil
-}
-
-
-
-// ─── helpers ──────────────────────────────────────────────────────────────────
-
-// shallowCopyDefWithSystemPrompt returns a copy of def with an overridden system prompt.
-// The original def is not mutated.
 func shallowCopyDefWithSystemPrompt(def *AgentDefinition, prompt string) *AgentDefinition {
 	cp := *def
 	cp.Spec.SystemPrompt = prompt

@@ -1,4 +1,20 @@
 /*
+ * Copyright 2025 coze-dev Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+/*
  * Copyright 2025 superagent-ai Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -624,4 +640,110 @@ of agent definitions and checkpoint-based interrupt/resume.`
 		t.Logf("output (may be stub): %s", output)
 	}
 	t.Logf("document-pipeline output: %s", output)
+}
+
+// ─── DryRun tests (#15: Eino Dev replacement) ───────────────────────────────
+
+func TestWorkflowAgent_DryRun_ConditionOnly(t *testing.T) {
+	nodes := []WorkflowNode{
+		{ID: "cond", Type: "condition", Condition: "{{.message}}"},
+		{ID: "step1", Type: "llm_call", Prompt: "Process: {{.message}}"},
+		{ID: "step2", Type: "llm_call", Prompt: "Finalize: {{.cond.output}}"},
+	}
+	edges := []WorkflowEdge{
+		{From: "START", To: "cond"},
+		{From: "cond", To: "step1"},
+		{From: "step1", To: "step2"},
+		{From: "step2", To: "END"},
+	}
+	w := newTestWorkflowAgent(nodes, edges, nil, nil)
+
+	result, err := w.DryRun(context.Background(), "hello world")
+	if err != nil {
+		t.Fatalf("DryRun returned error: %v", err)
+	}
+	if result.Error != "" {
+		t.Fatalf("DryRun result has error: %s", result.Error)
+	}
+	if len(result.Traces) != 3 {
+		t.Fatalf("expected 3 traces, got %d", len(result.Traces))
+	}
+	traceIDs := make(map[string]bool)
+	for _, tr := range result.Traces {
+		traceIDs[tr.NodeID] = true
+		if tr.NodeID == "" {
+			t.Error("trace has empty NodeID")
+		}
+		if tr.Type == "" {
+			t.Error("trace has empty Type")
+		}
+	}
+	for _, id := range []string{"cond", "step1", "step2"} {
+		if !traceIDs[id] {
+			t.Errorf("trace for node %q not found", id)
+		}
+	}
+	if len(result.Levels) != 3 {
+		t.Errorf("expected 3 levels, got %d", len(result.Levels))
+	}
+}
+
+func TestWorkflowAgent_DryRun_BranchingDAG(t *testing.T) {
+	nodes := []WorkflowNode{
+		{ID: "a", Type: "condition", Condition: "{{.message}}"},
+		{ID: "b", Type: "llm_call", Prompt: "Branch B: {{.a.output}}"},
+		{ID: "c", Type: "llm_call", Prompt: "Branch C: {{.a.output}}"},
+		{ID: "d", Type: "llm_call", Prompt: "Merge: {{.b.output}} {{.c.output}}"},
+	}
+	edges := []WorkflowEdge{
+		{From: "START", To: "a"},
+		{From: "a", To: "b"},
+		{From: "a", To: "c"},
+		{From: "b", To: "d"},
+		{From: "c", To: "d"},
+		{From: "d", To: "END"},
+	}
+	w := newTestWorkflowAgent(nodes, edges, nil, nil)
+
+	result, err := w.DryRun(context.Background(), "test input")
+	if err != nil {
+		t.Fatalf("DryRun returned error: %v", err)
+	}
+	if result.Error != "" {
+		t.Fatalf("DryRun result has error: %s", result.Error)
+	}
+	if len(result.Traces) != 4 {
+		t.Fatalf("expected 4 traces, got %d", len(result.Traces))
+	}
+	levelMap := make(map[string]int)
+	for _, tr := range result.Traces {
+		levelMap[tr.NodeID] = tr.Level
+	}
+	if levelMap["b"] != levelMap["c"] {
+		t.Errorf("expected b and c at same level, got b=%d c=%d", levelMap["b"], levelMap["c"])
+	}
+	if levelMap["d"] <= levelMap["b"] {
+		t.Errorf("expected d at higher level than b, got d=%d b=%d", levelMap["d"], levelMap["b"])
+	}
+}
+
+func TestWorkflowAgent_DryRun_ErrorOnCycle(t *testing.T) {
+	nodes := []WorkflowNode{
+		{ID: "a", Type: "condition"},
+		{ID: "b", Type: "llm_call"},
+	}
+	edges := []WorkflowEdge{
+		{From: "START", To: "a"},
+		{From: "a", To: "b"},
+		{From: "b", To: "a"},
+	}
+	w := newTestWorkflowAgent(nodes, edges, nil, nil)
+
+	result, err := w.DryRun(context.Background(), "test")
+	if err != nil {
+		t.Fatalf("DryRun returned unexpected error: %v", err)
+	}
+	if result.Error == "" {
+		t.Error("expected cycle error in DryRun result, got empty error")
+	}
 }

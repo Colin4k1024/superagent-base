@@ -40,16 +40,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cloudwego/eino/adk"
-	"github.com/cloudwego/eino/schema"
-
+	aclagent "github.com/superagent-ai/superagent-base/backend/pkg/agent"
 	"github.com/superagent-ai/superagent-base/backend/pkg/llm"
-	einollm "github.com/superagent-ai/superagent-base/backend/pkg/llm/eino"
 	"github.com/superagent-ai/superagent-base/backend/pkg/memory"
 	"github.com/superagent-ai/superagent-base/backend/pkg/modelrouter"
 )
 
-// streamConsumerParams holds the common parameters for consuming an ADK iterator.
+// streamConsumerParams carries context for streaming consumption.
 type streamConsumerParams struct {
 	sessionID  string
 	modelID    string
@@ -57,29 +54,17 @@ type streamConsumerParams struct {
 	memBackend memory.Backend
 }
 
-// interruptHandler is called when an interrupt event is detected during iteration.
-// It should emit the interrupt data to the channel and return true to signal early exit.
-type interruptHandler func(ctx context.Context, event *adk.AgentEvent, ch chan<- string) bool
-
-// consumeADKIterator drains an ADK AsyncIterator, streaming text content to ch.
-// It handles both streaming and non-streaming message outputs, records latency
-// metrics, persists the full assistant response to memory, and drains the
-// iterator on context cancellation to prevent goroutine leaks.
-func consumeADKIterator(
+// consumeGoogleADKIterator drains a Google ADK Go EventIterator,
+// streaming text content to ch. It handles both streaming and non-streaming
+// message outputs, records latency metrics, persists the full assistant
+// response to memory, and drains the iterator on context cancellation.
+func consumeGoogleADKIterator(
 	ctx context.Context,
 	params streamConsumerParams,
-	iter *adk.AsyncIterator[*adk.AgentEvent],
+	iter *aclagent.EventIterator,
 	ch chan<- string,
-	onInterrupt interruptHandler,
 ) {
 	defer close(ch)
-
-	earlyExit := true
-	defer func() {
-		if earlyExit {
-			drainIterator(iter)
-		}
-	}()
 
 	streamStart := time.Now()
 	firstToken := true
@@ -88,7 +73,6 @@ func consumeADKIterator(
 	for {
 		event, ok := iter.Next()
 		if !ok {
-			earlyExit = false
 			break
 		}
 		if event.Err != nil {
@@ -100,19 +84,13 @@ func consumeADKIterator(
 			return
 		}
 
-		if onInterrupt != nil && event.Action != nil && event.Action.Interrupted != nil {
-			if onInterrupt(ctx, event, ch) {
-				return
-			}
-		}
-
-		if event.Output == nil || event.Output.MessageOutput == nil {
+		if event.MessageOutput == nil {
 			continue
 		}
-		mv := event.Output.MessageOutput
+		mv := event.MessageOutput
 
 		if mv.IsStreaming && mv.MessageStream != nil {
-			consumeMessageStream(ctx, mv.MessageStream, params, &fullResponse, &firstToken, streamStart, ch)
+			consumeACLMessageStream(ctx, mv.MessageStream, params, &fullResponse, &firstToken, streamStart, ch)
 			if ctx.Err() != nil {
 				return
 			}
@@ -139,10 +117,10 @@ func consumeADKIterator(
 	}
 }
 
-// consumeMessageStream reads chunks from a streaming message and forwards them.
-func consumeMessageStream(
+// consumeACLMessageStream reads chunks from an ACL StreamReader and forwards them.
+func consumeACLMessageStream(
 	ctx context.Context,
-	stream *schema.StreamReader[*schema.Message],
+	stream *llm.StreamReader,
 	params streamConsumerParams,
 	fullResponse *strings.Builder,
 	firstToken *bool,
@@ -177,23 +155,8 @@ func consumeMessageStream(
 	}
 }
 
-// drainIterator consumes remaining events from an iterator to allow its
-// internal goroutines to exit cleanly. Called when the consumer exits early.
-func drainIterator(iter *adk.AsyncIterator[*adk.AgentEvent]) {
-	go func() {
-		for {
-			if _, ok := iter.Next(); !ok {
-				break
-			}
-		}
-	}()
-}
-
 // buildMessageHistory constructs the LLM message slice from system prompt and
 // memory history using the framework-agnostic llm.Message type.
-// The current user message is NOT included — the caller appends it separately
-// after this call. persistUserMessage should be called AFTER this function
-// to avoid the current message appearing twice.
 func buildMessageHistory(ctx context.Context, systemPrompt, sessionID string, memBackend memory.Backend) []*llm.Message {
 	msgs := make([]*llm.Message, 0, 8)
 	if systemPrompt != "" {
@@ -226,6 +189,3 @@ func persistUserMessage(ctx context.Context, sessionID, message string, memBacke
 		})
 	}
 }
-
-// Avoid unused import warning for einollm (used by callers, not directly here).
-var _ = einollm.ToEinoMessages

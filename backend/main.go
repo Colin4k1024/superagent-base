@@ -21,6 +21,7 @@ package main
 import (
 	"context"
 	"crypto/tls"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -29,8 +30,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cloudwego/eino-ext/devops"
-	"github.com/cloudwego/eino/callbacks"
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/app/server"
 	"github.com/cloudwego/hertz/pkg/common/config"
@@ -45,7 +44,7 @@ import (
 	"github.com/superagent-ai/superagent-base/backend/infra/cache/impl/redis"
 	mysqlpkg "github.com/superagent-ai/superagent-base/backend/infra/orm/impl/mysql"
 	"github.com/superagent-ai/superagent-base/backend/pkg/agentdef"
-	einollm "github.com/superagent-ai/superagent-base/backend/pkg/llm/eino"
+	adkllm "github.com/superagent-ai/superagent-base/backend/pkg/llm/adk"
 	"github.com/superagent-ai/superagent-base/backend/pkg/evolution"
 	"github.com/superagent-ai/superagent-base/backend/pkg/lang/conv"
 	"github.com/superagent-ai/superagent-base/backend/pkg/lang/ternary"
@@ -94,9 +93,8 @@ func main() {
 		panic("InitializeInfra failed, err=" + err.Error())
 	}
 
-	// OBS-001: Register Eino observability callback globally so all model/tool
-	// invocations automatically report Prometheus metrics and OTel spans.
-	callbacks.AppendGlobalHandlers(observe.NewEinoObserveCallback())
+	// OBS-001: Observability is wired via Google ADK Go callbacks (not eino).
+	// The eino global callback registration has been removed.
 
 	// OBS-002: Local trace store + daily metrics bucketer (zero external dependency).
 	traceStore := observe.NewTraceStore(envIntOr("TRACE_BUFFER_SIZE", 500))
@@ -118,17 +116,14 @@ func main() {
 				logs.Warnf("evolution engine init failed (disabled): %v", initErr)
 			} else {
 				evoEngine = eng
-				callbacks.AppendGlobalHandlers(evolution.NewEvolutionCallback(evoEngine))
+				// Evolution signals will be wired via Google ADK Go callbacks (not eino).
 				logs.Infof("evolution engine enabled (local MySQL)")
 			}
 		}
 	}
 
-	// DEV-001: Start Eino DevOps server for IDE graph visualization and debugging.
-	// Listens on 127.0.0.1:52538 (local only). Requires "Eino Dev" plugin in VS Code 1.97.x+.
-	if err := devops.Init(ctx); err != nil {
-		logs.Warnf("eino devops server failed to start (IDE plugin unavailable): %v", err)
-	}
+	// DEV-001: In-repo dev surface (#15) replaces Eino DevOps server.
+	// Dry-run and node inspector endpoints are registered in startHttpServer.
 
 	// Initialize SkillManager with marketplace clients + builtin skills.
 	var skillMgr *skill.Manager
@@ -305,7 +300,7 @@ func main() {
 		builderOpts = append(builderOpts, agentdef.WithProviderEndpoints(providerEPs))
 	}
 	// Create ACL model provider registry with all 7 eino-ext providers.
-	modelProviderReg := einollm.NewDefaultRegistry(getEnv("MODEL_BASE_URL_0", "http://127.0.0.1:8000/v1"))
+	modelProviderReg := adkllm.NewDefaultRegistry()
 	builderOpts = append(builderOpts, agentdef.WithModelProviderRegistry(modelProviderReg))
 
 	agentBuilder := agentdef.NewAgentBuilder(builderOpts...)
@@ -567,6 +562,73 @@ func startHttpServer(agentRT *agentdef.AgentRuntime, skillMgr *skill.Manager, to
 
 	// V2 canonical API — same handlers, no deprecation headers.
 	registerV2Routes(s, chatSSE, adminH, agentAdmin, userAdmin, mcpAdmin, evoAdmin, webhookH, sessionH, fileH, skillMgr, toolMgr, memH, userStore)
+
+	// Workflow dev surface (#15): dry-run + node inspector.
+	// These replace Eino Dev's step debugger with in-repo endpoints that
+	// reuse the existing DAG engine — no external orchestration platform.
+	if agentRT != nil {
+		// POST /api/v2/workflows/dry_run — executes a workflow against a
+		// user-supplied message and returns per-node traces (input, output,
+		// duration, error) without persisting side effects.
+		s.POST("/api/v2/workflows/dry_run", func(c context.Context, ctx *app.RequestContext) {
+			var req struct {
+				AgentName string `json:"agent_name"`
+				Message   string `json:"message"`
+			}
+			if err := json.Unmarshal(ctx.Request.Body(), &req); err != nil {
+				ctx.JSON(400, map[string]any{"error": "invalid request body: " + err.Error()})
+				return
+			}
+			if req.AgentName == "" {
+				ctx.JSON(400, map[string]any{"error": "agent_name is required"})
+				return
+			}
+			agent, ok := agentRT.GetAgent(req.AgentName)
+			if !ok {
+				ctx.JSON(404, map[string]any{"error": "agent not found: " + req.AgentName})
+				return
+			}
+			wfAgent, ok := agent.(*agentdef.WorkflowAgent)
+			if !ok {
+				ctx.JSON(400, map[string]any{"error": "agent is not a workflow type"})
+				return
+			}
+			result, err := wfAgent.DryRun(c, req.Message)
+			if err != nil {
+				ctx.JSON(500, map[string]any{"error": err.Error()})
+				return
+			}
+			ctx.JSON(200, result)
+		})
+
+		// GET /api/v2/admin/workflows/:agent_name/nodes — node inspector.
+		// Returns the workflow's node graph structure (IDs, types, edges)
+		// so the editor property panel can render the canvas layout.
+		adminGroup.GET("/workflows/:agent_name/nodes", func(c context.Context, ctx *app.RequestContext) {
+			agentName := ctx.Param("agent_name")
+			agent, ok := agentRT.GetAgent(agentName)
+			if !ok {
+				ctx.JSON(404, map[string]any{"error": "agent not found: " + agentName})
+				return
+			}
+			wfAgent, ok := agent.(*agentdef.WorkflowAgent)
+			if !ok {
+				ctx.JSON(400, map[string]any{"error": "agent is not a workflow type"})
+				return
+			}
+			def := wfAgent.GetDefinition()
+			if def == nil || def.Spec.Workflow == nil {
+				ctx.JSON(200, map[string]any{"nodes": []any{}, "edges": []any{}})
+				return
+			}
+			ctx.JSON(200, map[string]any{
+				"agent_name": agentName,
+				"nodes":      def.Spec.Workflow.Nodes,
+				"edges":      def.Spec.Workflow.Edges,
+				"variables":  def.Spec.Workflow.Variables,
+			})
+		})
+	}
 
 	s.Spin()
 }

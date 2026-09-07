@@ -76,6 +76,15 @@ type AgentSpec struct {
 	// Stable:      chat_model_agent, workflow, supervisor, sequential, parallel, agentloop, eino_graph.
 	// Experimental: deep_agent (no long-term memory integration), plan_execute (planner/executor split unstable).
 	Type         string           `yaml:"type"                    json:"type"`
+	// Runtime selects which execution backend owns this agent.
+	// "go" (default): the Go backend (ADK Go / eino DAG engine) handles the
+	//   full chat/tool/workflow hot path and is the only externally exposed
+	//   entrypoint via /api/v2.
+	// "python": the agent is delegated to the internal Python lane
+	//   (DeerFlow/LangGraph) reached via a private Go-side proxy. Python
+	//   services are never exposed directly to clients.
+	// When empty, defaults to "go".
+	Runtime      string           `yaml:"runtime,omitempty"       json:"runtime,omitempty"`
 	// Model configures model selection and routing.
 	Model        ModelSpec        `yaml:"model"                   json:"model"`
 	// SystemPrompt is the system-level instruction for the agent.

@@ -44,11 +44,45 @@ func (a *ToolAdapter) Info(ctx context.Context) (*schema.ToolInfo, error) {
 	if err != nil {
 		return nil, fmt.Errorf("eino tool adapter: get info: %w", err)
 	}
-	return &schema.ToolInfo{
-		Name:        info.Name,
-		Desc:        info.Desc,
-		ParamsOneOf: schema.NewParamsOneOfByParams(nil),
-	}, nil
+	ei := &schema.ToolInfo{
+		Name:  info.Name,
+		Desc:  info.Desc,
+		Extra: info.Extra,
+	}
+	if pp, ok := info.ParamsOneOf.(*llm.ParamsOneOfByParams); ok && pp != nil {
+		ei.ParamsOneOf = schema.NewParamsOneOfByParams(aclParamsToEino(pp.Params()))
+	}
+	return ei, nil
+}
+
+// aclParamsToEino converts ACL ParameterInfo map to eino ParameterInfo map.
+func aclParamsToEino(params map[string]*llm.ParameterInfo) map[string]*schema.ParameterInfo {
+	if len(params) == 0 {
+		return nil
+	}
+	out := make(map[string]*schema.ParameterInfo, len(params))
+	for name, p := range params {
+		if p == nil {
+			continue
+		}
+		ep := &schema.ParameterInfo{
+			Type:      schema.DataType(p.Type),
+			Desc:      p.Desc,
+			Enum:      p.Enum,
+			Required:  p.Required,
+			SubParams: aclParamsToEino(p.SubParams),
+		}
+		if p.ElemInfo != nil {
+			ep.ElemInfo = &schema.ParameterInfo{
+				Type:     schema.DataType(p.ElemInfo.Type),
+				Desc:     p.ElemInfo.Desc,
+				Enum:     p.ElemInfo.Enum,
+				Required: p.ElemInfo.Required,
+			}
+		}
+		out[name] = ep
+	}
+	return out
 }
 
 // InvokableRun executes the underlying llm.Tool.
@@ -76,11 +110,15 @@ func (a *ReverseToolAdapter) Info(ctx context.Context) (*llm.ToolInfo, error) {
 	if err != nil {
 		return nil, fmt.Errorf("eino reverse adapter: get info: %w", err)
 	}
-	return &llm.ToolInfo{
+	ti := &llm.ToolInfo{
 		Name:  einoInfo.Name,
 		Desc:  einoInfo.Desc,
 		Extra: einoInfo.Extra,
-	}, nil
+	}
+	if einoInfo.ParamsOneOf != nil {
+		ti.ParamsOneOf = llm.NewParamsOneOfByParams(einoParamsToACL(einoInfo.ParamsOneOf))
+	}
+	return ti, nil
 }
 
 // Run executes the underlying eino InvokableTool.
@@ -89,6 +127,41 @@ func (a *ReverseToolAdapter) Run(ctx context.Context, argsJSON string, _ ...llm.
 }
 
 var _ llm.Tool = (*ReverseToolAdapter)(nil)
+
+// einoParamsToACL converts eino ParamsOneOf to ACL ParameterInfo map.
+// Uses the ParamsOneOf.ToJSONSchema method to extract params when available.
+func einoParamsToACL(p *schema.ParamsOneOf) map[string]*llm.ParameterInfo {
+	if p == nil {
+		return nil
+	}
+	js, err := p.ToJSONSchema()
+	if err != nil || js == nil || js.Properties == nil {
+		return nil
+	}
+	requiredSet := make(map[string]bool, len(js.Required))
+	for _, r := range js.Required {
+		requiredSet[r] = true
+	}
+	out := make(map[string]*llm.ParameterInfo)
+	for pair := js.Properties.Oldest(); pair != nil; pair = pair.Next() {
+		v := pair.Value
+		if v == nil {
+			continue
+		}
+		pi := &llm.ParameterInfo{
+			Desc:     v.Description,
+			Required: requiredSet[pair.Key],
+		}
+		if len(v.Type) > 0 {
+			pi.Type = llm.DataType(v.Type)
+		}
+		out[pair.Key] = pi
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
+}
 
 // UnwrapEinoTool returns the underlying eino InvokableTool from a
 // ReverseToolAdapter. Returns nil if the tool is not a ReverseToolAdapter.

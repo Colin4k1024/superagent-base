@@ -34,16 +34,28 @@ package agentdef
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"time"
 
-	"github.com/cloudwego/eino/adk"
+	aclagent "github.com/superagent-ai/superagent-base/backend/pkg/agent"
+	adkagent "github.com/superagent-ai/superagent-base/backend/pkg/agent/adk"
 	"github.com/superagent-ai/superagent-base/backend/pkg/llm"
-	einollm "github.com/superagent-ai/superagent-base/backend/pkg/llm/eino"
-
 	"github.com/superagent-ai/superagent-base/backend/pkg/memory"
 )
+
+// ADKRunnerAgent wraps a Google ADK Go AgentAdapter for native
+// interrupt/resume and checkpoint support. It implements both the Agent
+// and Interruptable interfaces.
+//
+// This replaces the previous eino-based ADKRunnerAgent. The Google ADK Go
+// runner provides session-based checkpointing via session.Service.
+type ADKRunnerAgent struct {
+	def          *AgentDefinition
+	modelID      string
+	provider     string
+	memBackend   memory.Backend
+	agent        *adkagent.AgentAdapter
+	systemPrompt string
+}
 
 // Compile-time interface assertions.
 var (
@@ -51,42 +63,22 @@ var (
 	_ Interruptable = (*ADKRunnerAgent)(nil)
 )
 
-// ADKRunnerAgent wraps an ADK ChatModelAgent with adk.Runner for native
-// interrupt/resume and checkpoint support. It implements both the Agent
-// and Interruptable interfaces.
-type ADKRunnerAgent struct {
-	def          *AgentDefinition
-	modelID      string
-	provider     string
-	memBackend   memory.Backend
-	agent        *adk.ChatModelAgent
-	runner       *adk.Runner
-	store        adk.CheckPointStore
-	systemPrompt string
-}
-
-// NewADKRunnerAgent creates an agent with ADK Runner-based interrupt/resume.
+// NewADKRunnerAgent creates an agent with Google ADK Go runner for
+// interrupt/resume support.
 func NewADKRunnerAgent(
-	ctx context.Context,
-	agent *adk.ChatModelAgent,
-	store adk.CheckPointStore,
+	_ context.Context,
+	agentAdapter *adkagent.AgentAdapter,
+	_ CheckpointStore,
 	def *AgentDefinition,
 	modelID, provider, systemPrompt string,
 	memBackend memory.Backend,
 ) *ADKRunnerAgent {
-	runner := adk.NewRunner(ctx, adk.RunnerConfig{
-		Agent:           agent,
-		EnableStreaming:  true,
-		CheckPointStore: store,
-	})
 	return &ADKRunnerAgent{
 		def:          def,
 		modelID:      modelID,
 		provider:     provider,
 		memBackend:   memBackend,
-		agent:        agent,
-		runner:       runner,
-		store:        store,
+		agent:        agentAdapter,
 		systemPrompt: systemPrompt,
 	}
 }
@@ -95,89 +87,61 @@ func (a *ADKRunnerAgent) Name() string                    { return a.def.Metadat
 func (a *ADKRunnerAgent) Description() string             { return a.systemPrompt }
 func (a *ADKRunnerAgent) GetDefinition() *AgentDefinition { return a.def }
 
-// Chat executes the agent with Runner.Run(). If an interrupt occurs, it emits
-// a JSON-encoded interrupt event on the channel using the interruptPrefix sentinel.
+// Chat executes the agent via Google ADK Go runner.
 func (a *ADKRunnerAgent) Chat(ctx context.Context, sessionID string, message string) (<-chan string, error) {
-	// Build history BEFORE persisting so the current message isn't loaded twice.
 	msgs := buildMessageHistory(ctx, a.systemPrompt, sessionID, a.memBackend)
 	msgs = append(msgs, llm.UserMessage(message))
 	persistUserMessage(ctx, sessionID, message, a.memBackend)
 
-	opts := []adk.AgentRunOption{adk.WithCheckPointID(sessionID)}
-	einoMsgs := einollm.ToEinoMessages(msgs)
-	iter := a.runner.Run(ctx, einoMsgs, opts...)
+	iter, err := a.agent.Run(ctx, &aclagent.AgentInput{
+		Messages:       msgs,
+		EnableStreaming: true,
+		MaxIterations:  10,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("agentdef: ADKRunnerAgent.Chat: %w", err)
+	}
 
 	ch := make(chan string, 64)
-	params := streamConsumerParams{
+	go consumeGoogleADKIterator(ctx, streamConsumerParams{
 		sessionID:  sessionID,
 		modelID:    a.modelID,
 		provider:   a.provider,
 		memBackend: a.memBackend,
-	}
-	go consumeADKIterator(ctx, params, iter, ch, a.handleInterrupt(sessionID))
+	}, iter, ch)
 	return ch, nil
 }
 
-// Resume continues an interrupted execution using ADK's native checkpoint resume.
+// Resume continues an interrupted execution.
 func (a *ADKRunnerAgent) Resume(ctx context.Context, sessionID string, input map[string]any) (<-chan string, error) {
-	var iter *adk.AsyncIterator[*adk.AgentEvent]
-	var err error
-
-	if len(input) > 0 {
-		params := &adk.ResumeParams{Targets: input}
-		iter, err = a.runner.ResumeWithParams(ctx, sessionID, params)
-	} else {
-		iter, err = a.runner.Resume(ctx, sessionID)
+	userMsg := ""
+	if v, ok := input["message"]; ok {
+		if s, ok := v.(string); ok {
+			userMsg = s
+		}
 	}
+
+	iter, err := a.agent.Resume(ctx, &aclagent.ResumeInput{
+		SessionID:   sessionID,
+		UserMessage: userMsg,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("agentdef: ADKRunnerAgent.Resume: %w", err)
 	}
 
 	ch := make(chan string, 64)
-	p := streamConsumerParams{
+	go consumeGoogleADKIterator(ctx, streamConsumerParams{
 		sessionID:  sessionID,
 		modelID:    a.modelID,
 		provider:   a.provider,
 		memBackend: a.memBackend,
-	}
-	go consumeADKIterator(ctx, p, iter, ch, a.handleInterrupt(sessionID))
+	}, iter, ch)
 	return ch, nil
 }
 
-// GetInterruptState checks if there is a pending interrupt for this session
-// by querying the checkpoint store.
-func (a *ADKRunnerAgent) GetInterruptState(ctx context.Context, sessionID string) (*InterruptState, bool) {
-	if a.store == nil || sessionID == "" {
-		return nil, false
-	}
-	_, exists, err := a.store.Get(ctx, sessionID)
-	if err != nil || !exists {
-		return nil, false
-	}
-	return &InterruptState{
-		SessionID: sessionID,
-		AgentName: a.def.Metadata.Name,
-		Reason:    "Agent has a pending checkpoint.",
-		Fields:    []InputField{{Name: "confirm", Type: "confirm", Label: "Confirm action", Required: true}},
-		Timestamp: time.Now().Unix(),
-	}, true
-}
-
-// handleInterrupt returns an interruptHandler closure for the given session.
-func (a *ADKRunnerAgent) handleInterrupt(sessionID string) interruptHandler {
-	return func(ctx context.Context, event *adk.AgentEvent, ch chan<- string) bool {
-		interruptData := &InterruptState{
-			SessionID: sessionID,
-			AgentName: a.def.Metadata.Name,
-			Reason:    "Agent requested confirmation before proceeding.",
-			Fields:    []InputField{{Name: "confirm", Type: "confirm", Label: "Confirm action", Required: true}},
-			Timestamp: time.Now().Unix(),
-		}
-		data, _ := json.Marshal(interruptData)
-		select {
-		case ch <- interruptPrefix + string(data):
-		case <-ctx.Done():
-		}
-		return true
-	}
+// GetInterruptState checks if there is a pending interrupt for this session.
+func (a *ADKRunnerAgent) GetInterruptState(_ context.Context, _ string) (*InterruptState, bool) {
+	// Google ADK Go session-based interrupt detection will be wired
+	// in a follow-up. For now, no pending interrupts are reported.
+	return nil, false
 }
