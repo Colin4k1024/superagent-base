@@ -1,3 +1,35 @@
+/*
+ * Copyright 2025 coze-dev Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+/*
+ * Copyright 2025 superagent-ai Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package agentdef
 
 import (
@@ -5,36 +37,31 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/cloudwego/eino/adk"
-	"github.com/cloudwego/eino/schema"
+	aclagent "github.com/superagent-ai/superagent-base/backend/pkg/agent"
+	"github.com/superagent-ai/superagent-base/backend/pkg/llm"
 )
 
-var _ adk.ChatModelAgentMiddleware = (*contextInjectionMiddleware)(nil)
-
 type contextInjectionMiddleware struct {
-	*adk.BaseChatModelAgentMiddleware
+	aclagent.BaseMiddleware
 	injectTimestamp       bool
 	injectSessionMetadata bool
 	staticContext         string
 }
 
-func (m *contextInjectionMiddleware) BeforeModelRewriteState(ctx context.Context, state *adk.ChatModelAgentState, mc *adk.ModelContext) (context.Context, *adk.ChatModelAgentState, error) {
+func (m *contextInjectionMiddleware) BeforeModel(ctx context.Context, mState *aclagent.MiddlewareState) (context.Context, error) {
 	var injections []string
-
 	if m.injectTimestamp {
 		injections = append(injections, fmt.Sprintf("[current_time: %s]", time.Now().Format(time.RFC3339)))
 	}
 	if m.staticContext != "" {
 		injections = append(injections, m.staticContext)
 	}
-
 	if len(injections) == 0 {
-		return ctx, state, nil
+		return ctx, nil
 	}
-
-	contextMsg := schema.SystemMessage("[context_injection]\n" + joinStrings(injections, "\n"))
-	state.Messages = append([]*schema.Message{contextMsg}, state.Messages...)
-	return ctx, state, nil
+	contextMsg := llm.SystemMessage("[context_injection]\n" + joinStrings(injections, "\n"))
+	mState.Messages = append([]*llm.Message{contextMsg}, mState.Messages...)
+	return ctx, nil
 }
 
 func joinStrings(ss []string, sep string) string {
@@ -48,10 +75,8 @@ func joinStrings(ss []string, sep string) string {
 	return result
 }
 
-func buildContextInjectionHandler(_ context.Context, cfg map[string]any) (adk.ChatModelAgentMiddleware, error) {
-	m := &contextInjectionMiddleware{
-		BaseChatModelAgentMiddleware: &adk.BaseChatModelAgentMiddleware{},
-	}
+func buildContextInjectionHandler(_ context.Context, cfg map[string]any) (aclagent.Middleware, error) {
+	m := &contextInjectionMiddleware{}
 	if v, ok := cfg["inject_timestamp"]; ok {
 		if b, ok := v.(bool); ok {
 			m.injectTimestamp = b

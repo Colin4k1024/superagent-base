@@ -32,43 +32,20 @@
 
 package observe
 
-import (
-	"context"
-	"time"
-
-	"go.opentelemetry.io/otel/trace"
+// defaultTraceStore and defaultBucketer are set during startup for local trace collection.
+var (
+	defaultTraceStore *TraceStore
+	defaultBucketer   *MetricsBucketer
 )
 
-// resolveTraceID extracts a trace ID, preferring our custom context key,
-// falling back to the OTel span context.
-func resolveTraceID(ctx context.Context) string {
-	if id := TraceIDFromCtx(ctx); id != "" {
-		return id
-	}
-	sc := trace.SpanFromContext(ctx).SpanContext()
-	if sc.HasTraceID() {
-		return sc.TraceID().String()
-	}
-	return ""
-}
+// SetTraceStore sets the global trace store for span collection.
+func SetTraceStore(ts *TraceStore) { defaultTraceStore = ts }
 
-// spanIDFromCtx extracts the current OTel span ID for correlation.
-func spanIDFromCtx(ctx context.Context) string {
-	sc := trace.SpanFromContext(ctx).SpanContext()
-	if sc.HasSpanID() {
-		return sc.SpanID().String()
-	}
-	return ""
-}
+// SetMetricsBucketer sets the global daily metrics bucketer.
+func SetMetricsBucketer(mb *MetricsBucketer) { defaultBucketer = mb }
 
-// resolveModelInfoFromCtx extracts provider and model ID from context.
-// This is the framework-agnostic version used by trace_helpers.
-func resolveModelInfoFromCtx(ctx context.Context) (provider, modelID string) {
-	return modelInfoFromCtx(ctx)
-}
+// GetTraceStore returns the global trace store.
+func GetTraceStore() *TraceStore { return defaultTraceStore }
 
-// recordSpanToTraceStore writes a completed span to the local TraceStore
-// using ACL types.  This replaces the old eino-dependent recordSpanToStore.
-func recordSpanToTraceStore(ctx context.Context, info CallbackRunInfo, start time.Time, status, errMsg string) {
-	aclRecordSpanToStore(ctx, info, start, status, errMsg, 0, 0)
-}
+// GetMetricsBucketer returns the global metrics bucketer.
+func GetMetricsBucketer() *MetricsBucketer { return defaultBucketer }

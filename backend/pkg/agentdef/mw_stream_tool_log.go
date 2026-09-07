@@ -1,3 +1,35 @@
+/*
+ * Copyright 2025 coze-dev Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+/*
+ * Copyright 2025 superagent-ai Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package agentdef
 
 import (
@@ -5,54 +37,50 @@ import (
 	"log"
 	"time"
 
-	"github.com/cloudwego/eino/adk"
-	"github.com/cloudwego/eino/components/tool"
-	"github.com/cloudwego/eino/schema"
+	aclagent "github.com/superagent-ai/superagent-base/backend/pkg/agent"
+	"github.com/superagent-ai/superagent-base/backend/pkg/llm"
 )
 
-var _ adk.ChatModelAgentMiddleware = (*streamToolLogMiddleware)(nil)
-
 type streamToolLogMiddleware struct {
-	*adk.BaseChatModelAgentMiddleware
+	aclagent.BaseMiddleware
 	logChunks bool
 }
 
-func (m *streamToolLogMiddleware) WrapStreamableToolCall(ctx context.Context, endpoint adk.StreamableToolCallEndpoint, tCtx *adk.ToolContext) (adk.StreamableToolCallEndpoint, error) {
-	return func(ctx context.Context, args string, opts ...tool.Option) (*schema.StreamReader[string], error) {
-		start := time.Now()
-		log.Printf("[stream_tool_log] tool=%s call_id=%s started", tCtx.Name, tCtx.CallID)
-
-		reader, err := endpoint(ctx, args, opts...)
-		if err != nil {
-			log.Printf("[stream_tool_log] tool=%s call_id=%s error=%v duration=%s", tCtx.Name, tCtx.CallID, err, time.Since(start))
-			return nil, err
-		}
-
-		log.Printf("[stream_tool_log] tool=%s call_id=%s stream_opened duration=%s", tCtx.Name, tCtx.CallID, time.Since(start))
-		return reader, nil
+func (m *streamToolLogMiddleware) WrapTool(ctx context.Context, tool llm.Tool) (llm.Tool, error) {
+	return &loggingToolWrapper{
+		inner:     tool,
+		logChunks: m.logChunks,
 	}, nil
 }
 
-func (m *streamToolLogMiddleware) WrapEnhancedStreamableToolCall(ctx context.Context, endpoint adk.EnhancedStreamableToolCallEndpoint, tCtx *adk.ToolContext) (adk.EnhancedStreamableToolCallEndpoint, error) {
-	return func(ctx context.Context, arg *schema.ToolArgument, opts ...tool.Option) (*schema.StreamReader[*schema.ToolResult], error) {
-		start := time.Now()
-		log.Printf("[stream_tool_log] enhanced tool=%s call_id=%s started", tCtx.Name, tCtx.CallID)
-
-		reader, err := endpoint(ctx, arg, opts...)
-		if err != nil {
-			log.Printf("[stream_tool_log] enhanced tool=%s call_id=%s error=%v duration=%s", tCtx.Name, tCtx.CallID, err, time.Since(start))
-			return nil, err
-		}
-
-		log.Printf("[stream_tool_log] enhanced tool=%s call_id=%s stream_opened duration=%s", tCtx.Name, tCtx.CallID, time.Since(start))
-		return reader, nil
-	}, nil
+type loggingToolWrapper struct {
+	inner     llm.Tool
+	logChunks bool
 }
 
-func buildStreamToolLogHandler(_ context.Context, cfg map[string]any) (adk.ChatModelAgentMiddleware, error) {
-	m := &streamToolLogMiddleware{
-		BaseChatModelAgentMiddleware: &adk.BaseChatModelAgentMiddleware{},
+func (w *loggingToolWrapper) Info(ctx context.Context) (*llm.ToolInfo, error) {
+	return w.inner.Info(ctx)
+}
+
+func (w *loggingToolWrapper) Run(ctx context.Context, args string, opts ...llm.ToolOption) (string, error) {
+	start := time.Now()
+	info, _ := w.inner.Info(ctx)
+	name := ""
+	if info != nil {
+		name = info.Name
 	}
+	log.Printf("[stream_tool_log] tool=%s started", name)
+	result, err := w.inner.Run(ctx, args, opts...)
+	if err != nil {
+		log.Printf("[stream_tool_log] tool=%s error=%v duration=%s", name, err, time.Since(start))
+	} else {
+		log.Printf("[stream_tool_log] tool=%s completed duration=%s", name, time.Since(start))
+	}
+	return result, err
+}
+
+func buildStreamToolLogHandler(_ context.Context, cfg map[string]any) (aclagent.Middleware, error) {
+	m := &streamToolLogMiddleware{}
 	if v, ok := cfg["log_chunks"]; ok {
 		if b, ok := v.(bool); ok {
 			m.logChunks = b
