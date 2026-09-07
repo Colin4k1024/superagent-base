@@ -1,4 +1,20 @@
 /*
+ * Copyright 2025 coze-dev Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+/*
  * Copyright 2025 superagent-ai Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -23,7 +39,8 @@ import (
 	"time"
 
 	"github.com/cloudwego/eino/adk"
-	"github.com/cloudwego/eino/schema"
+	"github.com/superagent-ai/superagent-base/backend/pkg/llm"
+	einollm "github.com/superagent-ai/superagent-base/backend/pkg/llm/eino"
 
 	"github.com/superagent-ai/superagent-base/backend/pkg/memory"
 )
@@ -83,11 +100,12 @@ func (a *ADKRunnerAgent) GetDefinition() *AgentDefinition { return a.def }
 func (a *ADKRunnerAgent) Chat(ctx context.Context, sessionID string, message string) (<-chan string, error) {
 	// Build history BEFORE persisting so the current message isn't loaded twice.
 	msgs := buildMessageHistory(ctx, a.systemPrompt, sessionID, a.memBackend)
-	msgs = append(msgs, schema.UserMessage(message))
+	msgs = append(msgs, llm.UserMessage(message))
 	persistUserMessage(ctx, sessionID, message, a.memBackend)
 
 	opts := []adk.AgentRunOption{adk.WithCheckPointID(sessionID)}
-	iter := a.runner.Run(ctx, msgs, opts...)
+	einoMsgs := einollm.ToEinoMessages(msgs)
+	iter := a.runner.Run(ctx, einoMsgs, opts...)
 
 	ch := make(chan string, 64)
 	params := streamConsumerParams{

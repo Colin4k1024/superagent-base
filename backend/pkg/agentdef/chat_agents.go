@@ -41,9 +41,9 @@ import (
 	"time"
 
 	"github.com/cloudwego/eino/adk"
-	"github.com/cloudwego/eino/components/model"
-	"github.com/cloudwego/eino/schema"
 
+	"github.com/superagent-ai/superagent-base/backend/pkg/llm"
+	einollm "github.com/superagent-ai/superagent-base/backend/pkg/llm/eino"
 	"github.com/superagent-ai/superagent-base/backend/pkg/memory"
 	"github.com/superagent-ai/superagent-base/backend/pkg/modelrouter"
 	"github.com/superagent-ai/superagent-base/backend/pkg/observe"
@@ -69,14 +69,15 @@ func (a *chatAgent) Chat(_ context.Context, _ string, message string) (<-chan st
 	return ch, nil
 }
 
-// einoChatAgent calls an Eino ChatModel directly (no tool loop).
+// einoChatAgent calls a ChatModel directly (no tool loop).
+// Uses the framework-agnostic llm.ChatModel interface via the ACL.
 type einoChatAgent struct {
-	def          *AgentDefinition
-	modelID      string
-	provider     string
-	memBackend   memory.Backend
-	chatModel    model.ToolCallingChatModel
-	systemPrompt string
+	def           *AgentDefinition
+	modelID       string
+	provider      string
+	memBackend    memory.Backend
+	chatModel     llm.ChatModel
+	systemPrompt  string
 	modelSelector *DynamicModelSelector // nil when dynamic routing is not configured
 }
 
@@ -85,9 +86,9 @@ func (a *einoChatAgent) Description() string             { return a.systemPrompt
 func (a *einoChatAgent) GetDefinition() *AgentDefinition { return a.def }
 
 func (a *einoChatAgent) Chat(ctx context.Context, sessionID string, message string) (<-chan string, error) {
-	msgs := make([]*schema.Message, 0, 8)
+	msgs := make([]*llm.Message, 0, 8)
 	if a.systemPrompt != "" {
-		msgs = append(msgs, schema.SystemMessage(a.systemPrompt))
+		msgs = append(msgs, llm.SystemMessage(a.systemPrompt))
 	}
 
 	if a.memBackend != nil && sessionID != "" {
@@ -96,15 +97,15 @@ func (a *einoChatAgent) Chat(ctx context.Context, sessionID string, message stri
 			for _, m := range history {
 				switch m.Role {
 				case "user":
-					msgs = append(msgs, schema.UserMessage(m.Content))
+					msgs = append(msgs, llm.UserMessage(m.Content))
 				case "assistant":
-					msgs = append(msgs, schema.AssistantMessage(m.Content, nil))
+					msgs = append(msgs, llm.AssistantMessage(m.Content, nil))
 				}
 			}
 		}
 	}
 
-	msgs = append(msgs, schema.UserMessage(message))
+	msgs = append(msgs, llm.UserMessage(message))
 
 	if a.memBackend != nil && sessionID != "" {
 		_ = a.memBackend.AddMessage(ctx, sessionID, memory.Message{
@@ -118,10 +119,11 @@ func (a *einoChatAgent) Chat(ctx context.Context, sessionID string, message stri
 	activeModel := a.chatModel
 	activeModelID := a.modelID
 	if a.modelSelector != nil {
-		selected, complexity := a.modelSelector.SelectModel(ctx, msgs)
+		// Convert to eino messages for the model selector (still eino-coupled).
+		einoMsgs := einollm.ToEinoMessages(msgs)
+		selected, complexity := a.modelSelector.SelectModel(ctx, einoMsgs)
 		if selected != nil {
-			activeModel = selected
-			// Update modelID for observability if the complexity changed the model.
+			activeModel = einollm.NewChatModelAdapter(selected, activeModelID)
 			if tierDef, ok := findModelTier(a.def, complexity); ok {
 				activeModelID = tierDef.ModelID
 			}
@@ -176,7 +178,7 @@ func (a *einoChatAgent) Chat(ctx context.Context, sessionID string, message stri
 	return ch, nil
 }
 
-// adkChatModelAgent wraps an ADK ChatModelAgent for tool-using interactions.
+// adkChatModelAgent wraps an eino ADK ChatModelAgent for tool-using interactions.
 type adkChatModelAgent struct {
 	def          *AgentDefinition
 	modelID      string
@@ -193,12 +195,14 @@ func (a *adkChatModelAgent) GetDefinition() *AgentDefinition { return a.def }
 func (a *adkChatModelAgent) Chat(ctx context.Context, sessionID string, message string) (<-chan string, error) {
 	// Build history BEFORE persisting so the current message isn't loaded twice.
 	msgs := buildMessageHistory(ctx, a.systemPrompt, sessionID, a.memBackend)
-	msgs = append(msgs, schema.UserMessage(message))
+	msgs = append(msgs, llm.UserMessage(message))
 	persistUserMessage(ctx, sessionID, message, a.memBackend)
 
 	ctx = observe.WithModelInfo(ctx, a.modelID, a.provider)
+	// Convert ACL messages to eino format for the adk agent (transition period).
+	einoMsgs := einollm.ToEinoMessages(msgs)
 	iter := a.agent.Run(ctx, &adk.AgentInput{
-		Messages:       msgs,
+		Messages:       einoMsgs,
 		EnableStreaming: true,
 	})
 

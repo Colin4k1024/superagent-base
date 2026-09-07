@@ -44,13 +44,13 @@ import (
 
 	"github.com/cloudwego/eino/adk"
 	"github.com/cloudwego/eino/components/model"
-	einotool "github.com/cloudwego/eino/components/tool"
 	"github.com/cloudwego/eino/compose"
 	"github.com/cloudwego/eino/schema"
 
 	"github.com/superagent-ai/superagent-base/backend/infra/cache"
 	"github.com/superagent-ai/superagent-base/backend/infra/checkpoint"
 	"github.com/superagent-ai/superagent-base/backend/pkg/llm"
+	einollm "github.com/superagent-ai/superagent-base/backend/pkg/llm/eino"
 	"github.com/superagent-ai/superagent-base/backend/pkg/evolution"
 	"github.com/superagent-ai/superagent-base/backend/pkg/graphs"
 	"github.com/superagent-ai/superagent-base/backend/pkg/mcp"
@@ -317,7 +317,7 @@ func (b *AgentBuilder) Build(ctx context.Context, def *AgentDefinition) (Agent, 
 	}
 
 	// Gather Eino-compatible tools from resolved refs.
-	einoTools := b.resolveEinoTools(ctx, toolRefs)
+	einoTools := einollm.UnwrapEinoToolFromSlice(b.resolveTools(ctx, toolRefs))
 
 	if len(einoTools) > 0 {
 		// ADK ChatModelAgent with tool calling (replaces legacy react.NewAgent).
@@ -360,7 +360,7 @@ func (b *AgentBuilder) Build(ctx context.Context, def *AgentDefinition) (Agent, 
 			modelID:      effectiveModelID,
 			provider:     protocol,
 			memBackend:   memBackend,
-			chatModel:    chatModel,
+			chatModel:    einollm.NewChatModelAdapter(chatModel, effectiveModelID),
 			systemPrompt: def.Spec.SystemPrompt,
 		}
 		// Attach dynamic model selector if tier models are configured.
@@ -417,7 +417,7 @@ func (b *AgentBuilder) Build(ctx context.Context, def *AgentDefinition) (Agent, 
 				modelID:      fallbackModelID,
 				provider:     protocol,
 				memBackend:   memBackend,
-				chatModel:    fallbackModel,
+				chatModel:    einollm.NewChatModelAdapter(fallbackModel, fallbackModelID),
 				systemPrompt: def.Spec.SystemPrompt,
 			}
 		}
@@ -550,11 +550,13 @@ func (b *AgentBuilder) applyMiddleware(agent Agent, def *AgentDefinition) Agent 
 }
 
 
-// resolveEinoTools converts resolved tool refs to Eino einotool.BaseTool instances.
+// resolveTools converts resolved tool refs to framework-agnostic llm.Tool instances.
 // Supports builtin (via tool.Manager), skill:// (via skill.Manager), and
 // mcp:// (via MCP Registry + MCPToolAdapter) refs.
-func (b *AgentBuilder) resolveEinoTools(ctx context.Context, refs []resolvedTool) []einotool.BaseTool {
-	var result []einotool.BaseTool
+// Each source tool is wrapped in a ReverseToolAdapter so business code
+// never imports eino tool types directly.
+func (b *AgentBuilder) resolveTools(ctx context.Context, refs []resolvedTool) []llm.Tool {
+	var result []llm.Tool
 	for _, ref := range refs {
 		switch ref.scheme {
 		case "builtin":
@@ -565,7 +567,7 @@ func (b *AgentBuilder) resolveEinoTools(ctx context.Context, refs []resolvedTool
 			if !ok {
 				continue
 			}
-			result = append(result, t)
+			result = append(result, einollm.NewReverseToolAdapter(t))
 		case "skill":
 			if b.skillManager == nil {
 				continue
@@ -574,7 +576,7 @@ func (b *AgentBuilder) resolveEinoTools(ctx context.Context, refs []resolvedTool
 			if !ok {
 				continue
 			}
-			result = append(result, t)
+			result = append(result, einollm.NewReverseToolAdapter(t))
 		case "mcp":
 			if b.mcpRegistry == nil {
 				continue
@@ -595,7 +597,7 @@ func (b *AgentBuilder) resolveEinoTools(ctx context.Context, refs []resolvedTool
 			}
 			for _, td := range tools {
 				if td.Name == toolName {
-					result = append(result, mcp.NewMCPToolAdapter(client, td))
+					result = append(result, einollm.NewReverseToolAdapter(mcp.NewMCPToolAdapter(client, td)))
 					break
 				}
 			}
@@ -788,7 +790,7 @@ func (b *AgentBuilder) buildADKSupervisor(ctx context.Context, def *AgentDefinit
 		}
 		toolRefs = append(toolRefs, resolved)
 	}
-	einoTools := b.resolveEinoTools(ctx, toolRefs)
+	einoTools := einollm.UnwrapEinoToolFromSlice(b.resolveTools(ctx, toolRefs))
 
 	// Wrap each sub-agent as an AgentTool.
 	for _, subAgent := range agents {

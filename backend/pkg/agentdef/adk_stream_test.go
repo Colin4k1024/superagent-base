@@ -1,4 +1,20 @@
 /*
+ * Copyright 2025 coze-dev Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+/*
  * Copyright 2025 superagent-ai Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -21,9 +37,9 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/cloudwego/eino/schema"
 
 	"github.com/superagent-ai/superagent-base/backend/pkg/memory"
+	"github.com/superagent-ai/superagent-base/backend/pkg/llm"
 )
 
 // inMemoryBackend is a test memory backend that records messages in order.
@@ -108,12 +124,12 @@ func TestBuildMessageHistory_DoesNotIncludeCurrentMessage(t *testing.T) {
 	persistUserMessage(ctx, sessionID, "what's 2+2?", backend)
 
 	// Append the new message to the slice (as Chat() does).
-	msgs = append(msgs, schema.UserMessage("what's 2+2?"))
+	msgs = append(msgs, llm.UserMessage("what's 2+2?"))
 
 	// Verify: the new message appears exactly once in the slice.
 	count := 0
 	for _, m := range msgs {
-		if m.Role == schema.User && m.Content == "what's 2+2?" {
+		if m.Role == llm.RoleUser && m.Content == "what's 2+2?" {
 			count++
 		}
 	}
@@ -134,7 +150,7 @@ func TestBuildMessageHistory_NoDuplicationOnNextCall(t *testing.T) {
 	// Second turn: build history, then persist. Simulates the fixed Chat() flow.
 	msgs := buildMessageHistory(ctx, "", sessionID, backend)
 	persistUserMessage(ctx, sessionID, "second question", backend)
-	msgs = append(msgs, schema.UserMessage("second question"))
+	msgs = append(msgs, llm.UserMessage("second question"))
 
 	// History should have: user("first question") + assistant("first answer") = 2
 	// Then appended: user("second question") = 1
@@ -146,7 +162,7 @@ func TestBuildMessageHistory_NoDuplicationOnNextCall(t *testing.T) {
 	// Verify "second question" appears exactly once.
 	count := 0
 	for _, m := range msgs {
-		if m.Role == schema.User && m.Content == "second question" {
+		if m.Role == llm.RoleUser && m.Content == "second question" {
 			count++
 		}
 	}
@@ -163,7 +179,7 @@ func TestBuildMessageHistory_EmptySession(t *testing.T) {
 	if len(msgs) != 1 {
 		t.Fatalf("expected 1 message (system only), got %d", len(msgs))
 	}
-	if msgs[0].Role != schema.System {
+	if msgs[0].Role != llm.RoleSystem {
 		t.Errorf("expected system message, got role=%v", msgs[0].Role)
 	}
 }
@@ -179,7 +195,7 @@ func TestBuildMessageHistory_NoSystemPrompt(t *testing.T) {
 	if len(msgs) != 1 {
 		t.Fatalf("expected 1 message (user only, no system), got %d", len(msgs))
 	}
-	if msgs[0].Role != schema.User {
+	if msgs[0].Role != llm.RoleUser {
 		t.Errorf("expected user message, got role=%v", msgs[0].Role)
 	}
 }

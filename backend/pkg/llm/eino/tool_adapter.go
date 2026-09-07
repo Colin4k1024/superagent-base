@@ -93,7 +93,7 @@ var _ llm.Tool = (*ReverseToolAdapter)(nil)
 // ReverseToolAdapter. Returns nil if the tool is not a ReverseToolAdapter.
 // This is used during the migration transition period where eino's adk
 // still requires the raw eino tool type.
-func UnwrapEinoTool(t llm.Tool) einotool.InvokableTool {
+func UnwrapEinoTool(t llm.Tool) einotool.BaseTool {
 	if rta, ok := t.(*ReverseToolAdapter); ok {
 		return rta.tool
 	}
@@ -104,8 +104,8 @@ func UnwrapEinoTool(t llm.Tool) einotool.InvokableTool {
 
 // UnwrapEinoToolFromSlice converts a slice of llm.Tool to eino InvokableTool,
 // unwrapping ReverseToolAdapters and wrapping plain llm.Tools via ToolAdapter.
-func UnwrapEinoToolFromSlice(tools []llm.Tool) []einotool.InvokableTool {
-	result := make([]einotool.InvokableTool, 0, len(tools))
+func UnwrapEinoToolFromSlice(tools []llm.Tool) []einotool.BaseTool {
+	result := make([]einotool.BaseTool, 0, len(tools))
 	for _, t := range tools {
 		if unwrapped := UnwrapEinoTool(t); unwrapped != nil {
 			result = append(result, unwrapped)
