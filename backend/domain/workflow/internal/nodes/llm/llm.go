@@ -49,6 +49,8 @@ import (
 	"github.com/superagent-ai/superagent-base/backend/domain/workflow/internal/nodes"
 	schema2 "github.com/superagent-ai/superagent-base/backend/domain/workflow/internal/schema"
 	wrapPlugin "github.com/superagent-ai/superagent-base/backend/domain/workflow/plugin"
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose"
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	"github.com/superagent-ai/superagent-base/backend/pkg/ctxcache"
 	"github.com/superagent-ai/superagent-base/backend/pkg/lang/ptr"
 	"github.com/superagent-ai/superagent-base/backend/pkg/lang/slices"
@@ -1157,19 +1159,19 @@ func (l *LLM) Invoke(ctx context.Context, in map[string]any, opts ...nodes.NodeO
 	return out, nil
 }
 
-func (l *LLM) Stream(ctx context.Context, in map[string]any, opts ...nodes.NodeOption) (out *schema.StreamReader[map[string]any], err error) {
+func (l *LLM) Stream(ctx context.Context, in map[string]any, opts ...nodes.NodeOption) (out *wfcompose.StreamReader[map[string]any], err error) {
 	composeOpts, resumingEvent, err := l.prepare(ctx, in, opts...)
 	if err != nil {
 		return nil, err
 	}
 
-	out, err = l.r.Stream(ctx, in, composeOpts...)
+	einoOut, err := l.r.Stream(ctx, in, composeOpts...)
 	if err != nil {
 		err = l.handleInterrupt(ctx, err, resumingEvent)
 		return nil, err
 	}
 
-	return out, nil
+	return einobridge.WrapStreamReader[map[string]any](einoOut), nil
 }
 
 func injectKnowledgeTool(_ context.Context, g *compose.Graph[map[string]any, map[string]any], userPrompt string, cfg *KnowledgeRecallConfig) error {

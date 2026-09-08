@@ -43,11 +43,9 @@ import (
 	"context"
 	"io"
 
-	"github.com/cloudwego/eino/schema"
-
 	"github.com/superagent-ai/superagent-base/backend/domain/workflow/internal/nodes"
 	"github.com/superagent-ai/superagent-base/backend/pkg/dag"
-	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose"
 )
 
 // Wrap converts a workflow node into a dag.NodeExecutor. It inspects
@@ -105,7 +103,7 @@ func (a *streamAdapter) Execute(ctx context.Context, input map[string]any) (map[
 	if err != nil {
 		return nil, err
 	}
-	return drainEinoStream(sr)
+	return drainStream(sr)
 }
 
 func (a *streamAdapter) Stream(ctx context.Context, input map[string]any) (<-chan dag.StreamChunk, error) {
@@ -113,7 +111,7 @@ func (a *streamAdapter) Stream(ctx context.Context, input map[string]any) (<-cha
 	if err != nil {
 		return nil, err
 	}
-	return einoStreamToChan(sr), nil
+	return streamToChan(sr), nil
 }
 
 // streamWOptAdapter wraps a StreamableNodeWOpt as a dag.StreamingNodeExecutor.
@@ -127,7 +125,7 @@ func (a *streamWOptAdapter) Execute(ctx context.Context, input map[string]any) (
 	if err != nil {
 		return nil, err
 	}
-	return drainEinoStream(sr)
+	return drainStream(sr)
 }
 
 func (a *streamWOptAdapter) Stream(ctx context.Context, input map[string]any) (<-chan dag.StreamChunk, error) {
@@ -135,12 +133,12 @@ func (a *streamWOptAdapter) Stream(ctx context.Context, input map[string]any) (<
 	if err != nil {
 		return nil, err
 	}
-	return einoStreamToChan(sr), nil
+	return streamToChan(sr), nil
 }
 
-// drainEinoStream consumes an eino StreamReader and returns the merged
+// drainStream consumes an eino StreamReader and returns the merged
 // final output map.
-func drainEinoStream(sr *schema.StreamReader[map[string]any]) (map[string]any, error) {
+func drainStream(sr *wfcompose.StreamReader[map[string]any]) (map[string]any, error) {
 	if sr == nil {
 		return nil, nil
 	}
@@ -167,12 +165,12 @@ func drainEinoStream(sr *schema.StreamReader[map[string]any]) (map[string]any, e
 	}
 }
 
-// einoStreamToChan converts an eino StreamReader into a dag.StreamChunk
+// streamToChan converts an eino StreamReader into a dag.StreamChunk
 // channel. The channel is closed when the stream is exhausted.
-func einoStreamToChan(sr *schema.StreamReader[map[string]any]) <-chan dag.StreamChunk {
+func streamToChan(sr *wfcompose.StreamReader[map[string]any]) <-chan dag.StreamChunk {
 	// Wrap to wfcompose for potential lossless unwrap, then use as a
 	// plain reader — we just need Recv/Close.
-	_ = einobridge.WrapStreamReader[map[string]any](sr)
+	_ = sr
 
 	ch := make(chan dag.StreamChunk, 10)
 	go func() {

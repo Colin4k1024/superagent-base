@@ -20,8 +20,9 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose"
+
 	"github.com/cloudwego/eino/compose"
-	einoschema "github.com/cloudwego/eino/schema"
 
 	"github.com/superagent-ai/superagent-base/backend/domain/workflow/entity"
 	"github.com/superagent-ai/superagent-base/backend/domain/workflow/entity/vo"
@@ -53,7 +54,7 @@ type InvokableNodeWOpt interface {
 // A potential example would be streamable plugin for NodeTypePlugin.
 type StreamableNode interface {
 	Stream(ctx context.Context, in map[string]any) (
-		*einoschema.StreamReader[map[string]any], error)
+		*wfcompose.StreamReader[map[string]any], error)
 }
 
 // StreamableNodeWOpt is a workflow node that can Stream.
@@ -62,7 +63,7 @@ type StreamableNode interface {
 // e.g. NodeTypeLLM implement this.
 type StreamableNodeWOpt interface {
 	Stream(ctx context.Context, in map[string]any, opts ...NodeOption) (
-		*einoschema.StreamReader[map[string]any], error)
+		*wfcompose.StreamReader[map[string]any], error)
 }
 
 // CollectableNode is a workflow node that can Collect.
@@ -72,7 +73,7 @@ type StreamableNodeWOpt interface {
 // A potential example would be a new condition node that makes decisions
 // based on streaming input.
 type CollectableNode interface {
-	Collect(ctx context.Context, in *einoschema.StreamReader[map[string]any]) (
+	Collect(ctx context.Context, in *wfcompose.StreamReader[map[string]any]) (
 		map[string]any, error)
 }
 
@@ -83,7 +84,7 @@ type CollectableNode interface {
 // A potential example would be a new batch node that accepts streaming input,
 // process them, and finally returns non-stream aggregation of results.
 type CollectableNodeWOpt interface {
-	Collect(ctx context.Context, in *einoschema.StreamReader[map[string]any], opts ...NodeOption) (
+	Collect(ctx context.Context, in *wfcompose.StreamReader[map[string]any], opts ...NodeOption) (
 		map[string]any, error)
 }
 
@@ -93,8 +94,8 @@ type CollectableNodeWOpt interface {
 // e.g.
 // NodeTypeVariableAggregator implements TransformableNode.
 type TransformableNode interface {
-	Transform(ctx context.Context, in *einoschema.StreamReader[map[string]any]) (
-		*einoschema.StreamReader[map[string]any], error)
+	Transform(ctx context.Context, in *wfcompose.StreamReader[map[string]any]) (
+		*wfcompose.StreamReader[map[string]any], error)
 }
 
 // TransformableNodeWOpt is a workflow node that can Transform.
@@ -106,8 +107,8 @@ type TransformableNode interface {
 // composed by Eino, and the audio processing node needs to carry
 // options for this inner graph.
 type TransformableNodeWOpt interface {
-	Transform(ctx context.Context, in *einoschema.StreamReader[map[string]any], opts ...NodeOption) (
-		*einoschema.StreamReader[map[string]any], error)
+	Transform(ctx context.Context, in *wfcompose.StreamReader[map[string]any], opts ...NodeOption) (
+		*wfcompose.StreamReader[map[string]any], error)
 }
 
 // CallbackInputConverted converts node input to a form better suited for UI.
