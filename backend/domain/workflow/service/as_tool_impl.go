@@ -20,40 +20,42 @@ import (
 	"context"
 
 	einoCompose "github.com/cloudwego/eino/compose"
-	"github.com/cloudwego/eino/schema"
 
 	workflowModel "github.com/superagent-ai/superagent-base/backend/crossdomain/workflow/model"
 	"github.com/superagent-ai/superagent-base/backend/domain/workflow"
 	"github.com/superagent-ai/superagent-base/backend/domain/workflow/entity"
 	"github.com/superagent-ai/superagent-base/backend/domain/workflow/entity/vo"
 	"github.com/superagent-ai/superagent-base/backend/domain/workflow/internal/execute"
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose"
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 )
 
 type asToolImpl struct {
 	repo workflow.Repository
 }
 
-func (a *asToolImpl) WithMessagePipe() (einoCompose.Option, *schema.StreamReader[*entity.Message], func()) {
-	return execute.WithMessagePipe()
+func (a *asToolImpl) WithMessagePipe() (wfcompose.Option, *wfcompose.StreamReader[*entity.Message], func()) {
+	opt, sr, closer := execute.WithMessagePipe()
+	return einobridge.WrapOption(opt), einobridge.WrapStreamReader[*entity.Message](sr), closer
 }
 
-func (a *asToolImpl) WithExecuteConfig(cfg workflowModel.ExecuteConfig) einoCompose.Option {
-	return einoCompose.WithToolsNodeOption(einoCompose.WithToolOption(execute.WithExecuteConfig(cfg)))
+func (a *asToolImpl) WithExecuteConfig(cfg workflowModel.ExecuteConfig) wfcompose.Option {
+	return einobridge.WrapOption(einoCompose.WithToolsNodeOption(einoCompose.WithToolOption(execute.WithExecuteConfig(cfg))))
 }
 
 func (a *asToolImpl) WithResumeToolWorkflow(resumingEvent *entity.ToolInterruptEvent, resumeData string,
-	allInterruptEvents map[string]*entity.ToolInterruptEvent) einoCompose.Option {
+	allInterruptEvents map[string]*entity.ToolInterruptEvent) wfcompose.Option {
 	toolCallID2ExeID := make(map[string]int64, len(allInterruptEvents))
 	for callID, event := range allInterruptEvents {
 		toolCallID2ExeID[callID] = event.ExecuteID
 	}
-	return einoCompose.WithToolsNodeOption(
+	return einobridge.WrapOption(einoCompose.WithToolsNodeOption(
 		einoCompose.WithToolOption(
 			execute.WithResume(&entity.ResumeRequest{
 				ExecuteID:  resumingEvent.ExecuteID,
 				EventID:    resumingEvent.ID,
 				ResumeData: resumeData,
-			}, toolCallID2ExeID)))
+			}, toolCallID2ExeID))))
 }
 
 func (a *asToolImpl) WorkflowAsModelTool(ctx context.Context, policies []*vo.GetPolicy) (tools []workflow.ToolFromWorkflow, err error) {

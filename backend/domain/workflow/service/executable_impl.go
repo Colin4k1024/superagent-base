@@ -26,6 +26,8 @@ import (
 
 	einoCompose "github.com/cloudwego/eino/compose"
 	"github.com/cloudwego/eino/schema"
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose"
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 
 	workflowapimodel "github.com/superagent-ai/superagent-base/backend/api/model/workflow"
 	crossmessage "github.com/superagent-ai/superagent-base/backend/crossdomain/message"
@@ -448,7 +450,7 @@ func (i *impl) AsyncExecuteNode(ctx context.Context, nodeID string, config workf
 
 // StreamExecute executes the specified workflow, returning a stream of execution events.
 // The caller is expected to receive from the returned stream immediately.
-func (i *impl) StreamExecute(ctx context.Context, config workflowModel.ExecuteConfig, input map[string]any) (*schema.StreamReader[*entity.Message], error) {
+func (i *impl) StreamExecute(ctx context.Context, config workflowModel.ExecuteConfig, input map[string]any) (*wfcompose.StreamReader[*entity.Message], error) {
 	var (
 		err      error
 		wfEntity *entity.Workflow
@@ -553,7 +555,7 @@ func (i *impl) StreamExecute(ctx context.Context, config workflowModel.ExecuteCo
 
 	wf.AsyncRun(cancelCtx, input, opts...)
 
-	return sr, nil
+	return einobridge.WrapStreamReader[*entity.Message](sr), nil
 }
 
 func (i *impl) GetExecution(ctx context.Context, wfExe *entity.WorkflowExecution, includeNodes bool) (*entity.WorkflowExecution, error) {
@@ -910,7 +912,7 @@ func (i *impl) AsyncResume(ctx context.Context, req *entity.ResumeRequest, confi
 // Intermediate results during the resuming run are emitted using the returned StreamReader.
 // Caller is expected to poll the execution status using the GetExecution method.
 func (i *impl) StreamResume(ctx context.Context, req *entity.ResumeRequest, config workflowModel.ExecuteConfig) (
-	*schema.StreamReader[*entity.Message], error) {
+	*wfcompose.StreamReader[*entity.Message], error) {
 	// must get the interrupt event
 	// generate the state modifier
 	wfExe, found, err := i.repo.GetWorkflowExecution(ctx, req.ExecuteID)
@@ -990,7 +992,7 @@ func (i *impl) StreamResume(ctx context.Context, req *entity.ResumeRequest, conf
 
 	wf.AsyncRun(cancelCtx, nil, opts...)
 
-	return sr, nil
+	return einobridge.WrapStreamReader[*entity.Message](sr), nil
 }
 
 func (i *impl) Cancel(ctx context.Context, wfExeID int64, wfID, spaceID int64) error {

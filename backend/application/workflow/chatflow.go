@@ -28,6 +28,7 @@ import (
 	"time"
 
 	"github.com/cloudwego/eino/schema"
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 
 	"github.com/superagent-ai/superagent-base/backend/api/model/workflow"
 	"github.com/superagent-ai/superagent-base/backend/application/base/ctxutil"
@@ -701,7 +702,7 @@ func (w *ApplicationService) OpenAPIChatFlowRun(ctx context.Context, req *workfl
 			}
 			return nil, err
 		}
-		return schema.StreamReaderWithConvert(sr, w.convertToChatFlowRunResponseList(ctx, convertToChatFlowInfo{
+		return schema.StreamReaderWithConvert(einobridge.UnwrapStreamReader(sr), w.convertToChatFlowRunResponseList(ctx, convertToChatFlowInfo{
 			bizID:            bizID,
 			conversationID:   conversationID,
 			roundID:          roundID,
@@ -775,7 +776,7 @@ func (w *ApplicationService) OpenAPIChatFlowRun(ctx context.Context, req *workfl
 		return nil, err
 	}
 
-	return schema.StreamReaderWithConvert(sr, w.convertToChatFlowRunResponseList(ctx, convertToChatFlowInfo{
+	return schema.StreamReaderWithConvert(einobridge.UnwrapStreamReader(sr), w.convertToChatFlowRunResponseList(ctx, convertToChatFlowInfo{
 		bizID:            bizID,
 		conversationID:   conversationID,
 		roundID:          roundID,

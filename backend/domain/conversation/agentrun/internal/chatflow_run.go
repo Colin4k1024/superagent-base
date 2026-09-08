@@ -24,7 +24,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/cloudwego/eino/schema"
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose"
 
 	agentrun "github.com/superagent-ai/superagent-base/backend/crossdomain/agentrun/model"
 	message "github.com/superagent-ai/superagent-base/backend/crossdomain/message/model"
@@ -52,7 +52,7 @@ func (art *AgentRuntime) ChatflowRun(ctx context.Context, imagex imagex.ImageX) 
 		mh.handlerErr(ctx, errorx.New(errno.ErrAgentRunWorkflowNotFound))
 		return
 	}
-	var wfStreamer *schema.StreamReader[*crossworkflow.WorkflowMessage]
+	var wfStreamer *wfcompose.StreamReader[*crossworkflow.WorkflowMessage]
 
 	executeConfig := crossworkflow.ExecuteConfig{
 		ID:           wfID,
@@ -117,7 +117,7 @@ func concatWfInput(rtDependence *AgentRuntime) string {
 	return strings.Trim(input, ",")
 }
 
-func (art *AgentRuntime) pullWfStream(ctx context.Context, events *schema.StreamReader[*crossworkflow.WorkflowMessage], mh *MessageEventHandler) {
+func (art *AgentRuntime) pullWfStream(ctx context.Context, events *wfcompose.StreamReader[*crossworkflow.WorkflowMessage], mh *MessageEventHandler) {
 
 	fullAnswerContent := bytes.NewBuffer([]byte{})
 	var usage *msgEntity.UsageExt

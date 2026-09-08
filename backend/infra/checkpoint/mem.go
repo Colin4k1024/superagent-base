@@ -21,7 +21,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/cloudwego/eino/compose"
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose"
 )
 
 const (
@@ -86,7 +86,7 @@ func (i *inMemoryStore) Set(_ context.Context, checkPointID string, checkPoint [
 	return nil
 }
 
-func NewInMemoryStore() compose.CheckPointStore {
+func NewInMemoryStore() wfcompose.CheckPointStore {
 	return &inMemoryStore{
 		m: make(map[string]memEntry),
 	}

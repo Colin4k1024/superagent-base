@@ -19,9 +19,9 @@ package workflow
 import (
 	"context"
 
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose"
+
 	"github.com/cloudwego/eino/components/tool"
-	"github.com/cloudwego/eino/compose"
-	"github.com/cloudwego/eino/schema"
 
 	workflowModel "github.com/superagent-ai/superagent-base/backend/crossdomain/workflow/model"
 	conventity "github.com/superagent-ai/superagent-base/backend/domain/conversation/conversation/entity"
@@ -35,9 +35,9 @@ type Executable interface {
 	AsyncExecute(ctx context.Context, config workflowModel.ExecuteConfig, input map[string]any) (int64, error)
 	AsyncExecuteNode(ctx context.Context, nodeID string, config workflowModel.ExecuteConfig, input map[string]any) (int64, error)
 	AsyncResume(ctx context.Context, req *entity.ResumeRequest, config workflowModel.ExecuteConfig) error
-	StreamExecute(ctx context.Context, config workflowModel.ExecuteConfig, input map[string]any) (*schema.StreamReader[*entity.Message], error)
+	StreamExecute(ctx context.Context, config workflowModel.ExecuteConfig, input map[string]any) (*wfcompose.StreamReader[*entity.Message], error)
 	StreamResume(ctx context.Context, req *entity.ResumeRequest, config workflowModel.ExecuteConfig) (
-		*schema.StreamReader[*entity.Message], error)
+		*wfcompose.StreamReader[*entity.Message], error)
 
 	GetExecution(ctx context.Context, wfExe *entity.WorkflowExecution, includeNodes bool) (*entity.WorkflowExecution, error)
 	GetNodeExecution(ctx context.Context, exeID int64, nodeID string) (*entity.NodeExecution, *entity.NodeExecution, error)
@@ -50,10 +50,10 @@ type Executable interface {
 
 type AsTool interface {
 	WorkflowAsModelTool(ctx context.Context, policies []*vo.GetPolicy) ([]ToolFromWorkflow, error)
-	WithMessagePipe() (compose.Option, *schema.StreamReader[*entity.Message], func())
-	WithExecuteConfig(cfg workflowModel.ExecuteConfig) compose.Option
+	WithMessagePipe() (wfcompose.Option, *wfcompose.StreamReader[*entity.Message], func())
+	WithExecuteConfig(cfg workflowModel.ExecuteConfig) wfcompose.Option
 	WithResumeToolWorkflow(resumingEvent *entity.ToolInterruptEvent, resumeData string,
-		allInterruptEvents map[string]*entity.ToolInterruptEvent) compose.Option
+		allInterruptEvents map[string]*entity.ToolInterruptEvent) wfcompose.Option
 }
 
 type ChatFlowRole interface {

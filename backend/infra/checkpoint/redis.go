@@ -22,9 +22,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/cloudwego/eino/compose"
 
 	"github.com/superagent-ai/superagent-base/backend/infra/cache"
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose"
 )
 
 type redisStore struct {
@@ -51,6 +51,6 @@ func (r *redisStore) Set(ctx context.Context, checkPointID string, checkPoint []
 	return r.client.Set(ctx, fmt.Sprintf(checkpointKeyTpl, checkPointID), checkPoint, checkpointExpire).Err()
 }
 
-func NewRedisStore(client cache.Cmdable) compose.CheckPointStore {
+func NewRedisStore(client cache.Cmdable) wfcompose.CheckPointStore {
 	return &redisStore{client: client}
 }

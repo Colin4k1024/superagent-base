@@ -25,7 +25,8 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/cloudwego/eino/callbacks"
-	"github.com/cloudwego/eino/compose"
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose"
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	"gorm.io/gorm"
 
 	"github.com/superagent-ai/superagent-base/backend/bizpkg/llm/modelbuilder"
@@ -56,7 +57,7 @@ type ServiceComponents struct {
 	DomainNotifier           search.ResourceEventBus
 	Tos                      storage.Storage
 	ImageX                   imagex.ImageX
-	CPStore                  compose.CheckPointStore
+	CPStore                  wfcompose.CheckPointStore
 	CodeRunner               coderunner.Runner
 	WorkflowBuildInChatModel modelbuilder.BaseChatModel
 }
@@ -87,7 +88,7 @@ func InitService(_ context.Context, components *ServiceComponents) (*Application
 	}
 
 	workflowRepo, err := service.NewWorkflowRepository(components.IDGen, components.DB, components.Cache,
-		components.Tos, components.CPStore, components.WorkflowBuildInChatModel, cfg)
+		components.Tos, einobridge.AdaptCheckPointStore(components.CPStore), components.WorkflowBuildInChatModel, cfg)
 	if err != nil {
 		return nil, err
 	}

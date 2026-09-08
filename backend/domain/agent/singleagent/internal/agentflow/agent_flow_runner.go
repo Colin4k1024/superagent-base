@@ -25,6 +25,8 @@ import (
 
 	"github.com/cloudwego/eino/compose"
 	"github.com/cloudwego/eino/schema"
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose"
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 
 	"github.com/superagent-ai/superagent-base/backend/bizpkg/config/modelmgr"
 	singleagent "github.com/superagent-ai/superagent-base/backend/crossdomain/agent/model"
@@ -36,6 +38,18 @@ import (
 	"github.com/superagent-ai/superagent-base/backend/pkg/safego"
 	"github.com/superagent-ai/superagent-base/backend/pkg/urltobase64url"
 )
+
+// einoOpt unwraps a framework-agnostic wfcompose.Option into the eino
+// compose.Option expected by this package's own eino runner. Empty options are
+// dropped. This is the single conversion point between the workflow service's
+// framework-agnostic API and the agent flow's eino compose runner.
+func einoOpt(o wfcompose.Option) compose.Option {
+	eo, ok := einobridge.UnwrapOption(o)
+	if !ok {
+		return compose.Option{}
+	}
+	return eo
+}
 
 type AgentState struct {
 	Messages                 []*schema.Message
@@ -72,8 +86,8 @@ func (r *AgentRunner) StreamExecute(ctx context.Context, req *AgentRequest) (
 	hdl, sr, sw := newReplyCallback(ctx, executeID.String(), r.returnDirectlyTools)
 
 	var composeOpts []compose.Option
-	var pipeMsgOpt compose.Option
-	var workflowMsgSr *schema.StreamReader[*crossworkflow.WorkflowMessage]
+	var pipeMsgOpt wfcompose.Option
+	var workflowMsgSr *wfcompose.StreamReader[*crossworkflow.WorkflowMessage]
 	var workflowMsgCloser func()
 	if r.containWfTool {
 		cfReq := crossworkflow.ExecuteConfig{
@@ -88,9 +102,9 @@ func (r *AgentRunner) StreamExecute(ctx context.Context, req *AgentRequest) (
 			cfReq.Mode = crossworkflow.ExecuteModeRelease
 		}
 		wfConfig := crossworkflow.DefaultSVC().WithExecuteConfig(cfReq)
-		composeOpts = append(composeOpts, wfConfig)
+		composeOpts = append(composeOpts, einoOpt(wfConfig))
 		pipeMsgOpt, workflowMsgSr, workflowMsgCloser = crossworkflow.DefaultSVC().WithMessagePipe()
-		composeOpts = append(composeOpts, pipeMsgOpt)
+		composeOpts = append(composeOpts, einoOpt(pipeMsgOpt))
 	}
 
 	composeOpts = append(composeOpts, compose.WithCallbacks(hdl))
@@ -103,7 +117,7 @@ func (r *AgentRunner) StreamExecute(ctx context.Context, req *AgentRequest) (
 			if resumeInfo.InterruptType != singleagent.InterruptEventType_OauthPlugin {
 				defaultCheckPointID = resumeInfo.InterruptID
 				opts := crossworkflow.DefaultSVC().WithResumeToolWorkflow(resumeInfo.AllWfInterruptData[resumeInfo.ToolCallID], req.Input.Content, resumeInfo.AllWfInterruptData)
-				composeOpts = append(composeOpts, opts)
+				composeOpts = append(composeOpts, einoOpt(opts))
 			}
 		}
 
@@ -132,7 +146,7 @@ func (r *AgentRunner) StreamExecute(ctx context.Context, req *AgentRequest) (
 	return sr, nil
 }
 
-func (r *AgentRunner) processWfMidAnswerStream(_ context.Context, sw *schema.StreamWriter[*entity.AgentEvent], wfStream *schema.StreamReader[*crossworkflow.WorkflowMessage]) {
+func (r *AgentRunner) processWfMidAnswerStream(_ context.Context, sw *schema.StreamWriter[*entity.AgentEvent], wfStream *wfcompose.StreamReader[*crossworkflow.WorkflowMessage]) {
 	streamInitialized := false
 	var srT *schema.StreamReader[*schema.Message]
 	var swT *schema.StreamWriter[*schema.Message]
