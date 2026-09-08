@@ -34,6 +34,7 @@ import (
 	"github.com/superagent-ai/superagent-base/backend/domain/workflow/internal/execute"
 	"github.com/superagent-ai/superagent-base/backend/domain/workflow/internal/nodes"
 	schema2 "github.com/superagent-ai/superagent-base/backend/domain/workflow/internal/schema"
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	"github.com/superagent-ai/superagent-base/backend/pkg/ctxcache"
 	"github.com/superagent-ai/superagent-base/backend/pkg/errorx"
 	exec "github.com/superagent-ai/superagent-base/backend/pkg/execute"
@@ -258,15 +259,31 @@ func toNode(ns *schema2.NodeSchema, r any) *Node {
 		}
 
 		if sWOpt != nil {
-			s = sWOpt.Stream
+			s = func(ctx context.Context, in map[string]any, opts ...nodes.NodeOption) (*schema.StreamReader[map[string]any], error) {
+				wfSR, err := sWOpt.Stream(ctx, in, opts...)
+				if err != nil {
+					return nil, err
+				}
+				return einobridge.UnwrapStreamReader[map[string]any](wfSR), nil
+			}
 		}
 
 		if cWOpt != nil {
-			c = cWOpt.Collect
+			c = func(ctx context.Context, in *schema.StreamReader[map[string]any], opts ...nodes.NodeOption) (map[string]any, error) {
+				wfIn := einobridge.WrapStreamReader[map[string]any](in)
+				return cWOpt.Collect(ctx, wfIn, opts...)
+			}
 		}
 
 		if tWOpt != nil {
-			t = tWOpt.Transform
+			t = func(ctx context.Context, in *schema.StreamReader[map[string]any], opts ...nodes.NodeOption) (*schema.StreamReader[map[string]any], error) {
+				wfIn := einobridge.WrapStreamReader[map[string]any](in)
+				wfOut, err := tWOpt.Transform(ctx, wfIn, opts...)
+				if err != nil {
+					return nil, err
+				}
+				return einobridge.UnwrapStreamReader[map[string]any](wfOut), nil
+			}
 		}
 
 		return newNodeRunConfig(ns, i, s, c, t, options).toNode()
@@ -284,15 +301,31 @@ func toNode(ns *schema2.NodeSchema, r any) *Node {
 	}
 
 	if sWOOpt != nil {
-		s = sWOOpt.Stream
+		s = func(ctx context.Context, in map[string]any) (*schema.StreamReader[map[string]any], error) {
+			wfSR, err := sWOOpt.Stream(ctx, in)
+			if err != nil {
+				return nil, err
+			}
+			return einobridge.UnwrapStreamReader[map[string]any](wfSR), nil
+		}
 	}
 
 	if cWOOpt != nil {
-		c = cWOOpt.Collect
+		c = func(ctx context.Context, in *schema.StreamReader[map[string]any]) (map[string]any, error) {
+			wfIn := einobridge.WrapStreamReader[map[string]any](in)
+			return cWOOpt.Collect(ctx, wfIn)
+		}
 	}
 
 	if tWOOpt != nil {
-		t = tWOOpt.Transform
+		t = func(ctx context.Context, in *schema.StreamReader[map[string]any]) (*schema.StreamReader[map[string]any], error) {
+			wfIn := einobridge.WrapStreamReader[map[string]any](in)
+			wfOut, err := tWOOpt.Transform(ctx, wfIn)
+			if err != nil {
+				return nil, err
+			}
+			return einobridge.UnwrapStreamReader[map[string]any](wfOut), nil
+		}
 	}
 
 	return newNodeRunConfigWOOpt(ns, i, s, c, t, options).toNode()

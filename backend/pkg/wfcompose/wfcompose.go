@@ -194,3 +194,8 @@ type CheckPointStore interface {
 type CheckPointDeleter interface {
 	Delete(ctx context.Context, checkPointID string) error
 }
+
+// FieldPath represents a path into a nested map, mirroring
+// compose.FieldPath from eino. It is a simple []string that
+// names successive map keys.
+type FieldPath []string

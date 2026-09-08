@@ -21,9 +21,9 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/cloudwego/eino/compose"
 	"github.com/cloudwego/eino/schema"
 
+	"github.com/cloudwego/eino/compose"
 	"github.com/superagent-ai/superagent-base/backend/bizpkg/debugutil"
 	"github.com/superagent-ai/superagent-base/backend/pkg/errorx"
 	"github.com/superagent-ai/superagent-base/backend/pkg/sonic"

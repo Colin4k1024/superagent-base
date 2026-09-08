@@ -22,7 +22,6 @@ import (
 	"strconv"
 
 	"github.com/cloudwego/eino/compose"
-	"github.com/cloudwego/eino/schema"
 
 	"github.com/superagent-ai/superagent-base/backend/domain/workflow/entity"
 	"github.com/superagent-ai/superagent-base/backend/domain/workflow/entity/vo"
@@ -30,6 +29,8 @@ import (
 	"github.com/superagent-ai/superagent-base/backend/domain/workflow/internal/nodes"
 	"github.com/superagent-ai/superagent-base/backend/domain/workflow/internal/nodes/exit"
 	schema2 "github.com/superagent-ai/superagent-base/backend/domain/workflow/internal/schema"
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose"
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 )
 
 type Config struct {
@@ -95,13 +96,13 @@ func (s *SubWorkflow) Invoke(ctx context.Context, in map[string]any, opts ...nod
 	return out, nil
 }
 
-func (s *SubWorkflow) Stream(ctx context.Context, in map[string]any, opts ...nodes.NodeOption) (*schema.StreamReader[map[string]any], error) {
+func (s *SubWorkflow) Stream(ctx context.Context, in map[string]any, opts ...nodes.NodeOption) (*wfcompose.StreamReader[map[string]any], error) {
 	nestedOpts, nodeKey, err := prepareOptions(ctx, opts...)
 	if err != nil {
 		return nil, err
 	}
 
-	out, err := s.Runner.Stream(ctx, in, nestedOpts...)
+	einoOut, err := s.Runner.Stream(ctx, in, nestedOpts...)
 	if err != nil {
 		interruptInfo, ok := compose.ExtractInterruptInfo(err)
 		if !ok {
@@ -117,7 +118,7 @@ func (s *SubWorkflow) Stream(ctx context.Context, in map[string]any, opts ...nod
 		return nil, compose.NewInterruptAndRerunErr(iEvent)
 	}
 
-	return out, nil
+	return einobridge.WrapStreamReader[map[string]any](einoOut), nil
 }
 
 func prepareOptions(ctx context.Context, opts ...nodes.NodeOption) ([]compose.Option, vo.NodeKey, error) {

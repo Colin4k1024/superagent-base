@@ -32,6 +32,8 @@ import (
 	"github.com/superagent-ai/superagent-base/backend/domain/workflow/internal/canvas/convert"
 	"github.com/superagent-ai/superagent-base/backend/domain/workflow/internal/nodes"
 	schema2 "github.com/superagent-ai/superagent-base/backend/domain/workflow/internal/schema"
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose"
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	"github.com/superagent-ai/superagent-base/backend/pkg/ctxcache"
 	"github.com/superagent-ai/superagent-base/backend/pkg/lang/ptr"
 	"github.com/superagent-ai/superagent-base/backend/pkg/logs"
@@ -330,7 +332,8 @@ func merge(a, b any) any {
 
 const outputKey = "output"
 
-func (e *OutputEmitter) Transform(ctx context.Context, in *schema.StreamReader[map[string]any]) (out *schema.StreamReader[map[string]any], err error) {
+func (e *OutputEmitter) Transform(ctx context.Context, in *wfcompose.StreamReader[map[string]any]) (out *wfcompose.StreamReader[map[string]any], err error) {
+	einoIn := einobridge.UnwrapStreamReader[map[string]any](in)
 	var resolvedSources map[string]*schema2.SourceInfo
 	_ = compose.ProcessState(ctx, func(_ context.Context, state nodes.DynamicStreamContainer) error {
 		resolvedSources = state.GetFullSources(e.NodeKey)
@@ -349,7 +352,7 @@ func (e *OutputEmitter) Transform(ctx context.Context, in *schema.StreamReader[m
 				sw.Send(map[string]any{outputKey: nodes.KeyIsFinished}, nil)
 			}
 			sw.Close()
-			in.Close()
+			einoIn.Close()
 		}()
 
 		caches := newCacheStore(resolvedSources)
@@ -404,7 +407,7 @@ func (e *OutputEmitter) Transform(ctx context.Context, in *schema.StreamReader[m
 
 				shouldChangePart := false
 
-				chunk, err := in.Recv()
+				chunk, err := einoIn.Recv()
 				if err != nil {
 					if err == io.EOF {
 						// current part is not fulfilled, emit the literal part content and move on to next part
@@ -512,7 +515,7 @@ func (e *OutputEmitter) Transform(ctx context.Context, in *schema.StreamReader[m
 		}
 	})
 
-	return sr, nil
+	return einobridge.WrapStreamReader[map[string]any](sr), nil
 }
 
 func (e *OutputEmitter) Invoke(ctx context.Context, in map[string]any) (output map[string]any, err error) {

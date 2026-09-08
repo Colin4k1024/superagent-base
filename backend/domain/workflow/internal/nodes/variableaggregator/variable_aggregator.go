@@ -38,6 +38,8 @@ import (
 	"github.com/superagent-ai/superagent-base/backend/domain/workflow/internal/canvas/convert"
 	"github.com/superagent-ai/superagent-base/backend/domain/workflow/internal/nodes"
 	schema2 "github.com/superagent-ai/superagent-base/backend/domain/workflow/internal/schema"
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose"
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	"github.com/superagent-ai/superagent-base/backend/pkg/ctxcache"
 	"github.com/superagent-ai/superagent-base/backend/pkg/lang/ptr"
 	"github.com/superagent-ai/superagent-base/backend/pkg/safego"
@@ -248,9 +250,10 @@ const (
 )
 
 // Transform picks the first non-nil value from each group from a stream of map[group]items.
-func (v *VariableAggregator) Transform(ctx context.Context, input *schema.StreamReader[map[string]any]) (
-	_ *schema.StreamReader[map[string]any], err error) {
-	inStream := streamInputConverter(input)
+func (v *VariableAggregator) Transform(ctx context.Context, input *wfcompose.StreamReader[map[string]any]) (
+	_ *wfcompose.StreamReader[map[string]any], err error) {
+	einoInput := einobridge.UnwrapStreamReader[map[string]any](input)
+	inStream := streamInputConverter(einoInput)
 
 	var resolvedSources map[string]*schema2.SourceInfo
 	_ = compose.ProcessState(ctx, func(_ context.Context, state nodes.DynamicStreamContainer) error {
@@ -371,7 +374,7 @@ func (v *VariableAggregator) Transform(ctx context.Context, input *schema.Stream
 				state.SetIntermediateResult(v.nodeKey, groupToChoice)
 				return nil
 			})
-			return schema.StreamReaderFromArray([]map[string]any{result}), nil
+			return einobridge.WrapStreamReader[map[string]any](schema.StreamReaderFromArray([]map[string]any{result})), nil
 		}
 	}
 
@@ -503,10 +506,11 @@ func (v *VariableAggregator) Transform(ctx context.Context, input *schema.Stream
 	}
 	if len(nullGroups) > 0 {
 		nullStream := schema.StreamReaderFromArray([]map[string]any{nullGroups})
-		return schema.MergeStreamReaders([]*schema.StreamReader[map[string]any]{actualStream, nullStream}), nil
+		merged := schema.MergeStreamReaders([]*schema.StreamReader[map[string]any]{actualStream, nullStream})
+		return einobridge.WrapStreamReader[map[string]any](merged), nil
 	}
 
-	return actualStream, nil
+	return einobridge.WrapStreamReader[map[string]any](actualStream), nil
 }
 
 func inputConverter(in map[string]any) (converted map[string]map[int]any, err error) {
