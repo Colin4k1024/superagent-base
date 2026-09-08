@@ -19,15 +19,12 @@ package workflow
 import (
 	"context"
 
-	"github.com/cloudwego/eino/compose"
-	einoCompose "github.com/cloudwego/eino/compose"
-	"github.com/cloudwego/eino/schema"
+	"github.com/superagent-ai/superagent-base/backend/domain/workflow/entity"
+	workflowEntity "github.com/superagent-ai/superagent-base/backend/domain/workflow/entity"
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose"
 
 	workflowModel "github.com/superagent-ai/superagent-base/backend/crossdomain/workflow/model"
 	"github.com/superagent-ai/superagent-base/backend/domain/workflow"
-	"github.com/superagent-ai/superagent-base/backend/domain/workflow/entity"
-	workflowEntity "github.com/superagent-ai/superagent-base/backend/domain/workflow/entity"
-
 	"github.com/superagent-ai/superagent-base/backend/domain/workflow/entity/vo"
 )
 
@@ -35,15 +32,15 @@ import (
 type Workflow interface {
 	WorkflowAsModelTool(ctx context.Context, policies []*vo.GetPolicy) ([]workflow.ToolFromWorkflow, error)
 	WithResumeToolWorkflow(resumingEvent *workflowEntity.ToolInterruptEvent, resumeData string,
-		allInterruptEvents map[string]*workflowEntity.ToolInterruptEvent) einoCompose.Option
+		allInterruptEvents map[string]*workflowEntity.ToolInterruptEvent) wfcompose.Option
 	ReleaseApplicationWorkflows(ctx context.Context, appID int64, config *ReleaseWorkflowConfig) ([]*vo.ValidateIssue, error)
 	GetWorkflowIDsByAppID(ctx context.Context, appID int64) ([]int64, error)
 
 	SyncExecuteWorkflow(ctx context.Context, config workflowModel.ExecuteConfig, input map[string]any) (*workflowEntity.WorkflowExecution, vo.TerminatePlan, error)
-	StreamExecute(ctx context.Context, config workflowModel.ExecuteConfig, input map[string]any) (*schema.StreamReader[*workflowEntity.Message], error)
-	WithExecuteConfig(cfg workflowModel.ExecuteConfig) einoCompose.Option
-	WithMessagePipe() (compose.Option, *schema.StreamReader[*entity.Message], func())
-	StreamResume(ctx context.Context, req *entity.ResumeRequest, config workflowModel.ExecuteConfig) (*schema.StreamReader[*entity.Message], error)
+	StreamExecute(ctx context.Context, config workflowModel.ExecuteConfig, input map[string]any) (*wfcompose.StreamReader[*workflowEntity.Message], error)
+	WithExecuteConfig(cfg workflowModel.ExecuteConfig) wfcompose.Option
+	WithMessagePipe() (wfcompose.Option, *wfcompose.StreamReader[*entity.Message], func())
+	StreamResume(ctx context.Context, req *entity.ResumeRequest, config workflowModel.ExecuteConfig) (*wfcompose.StreamReader[*entity.Message], error)
 	InitApplicationDefaultConversationTemplate(ctx context.Context, spaceID int64, appID int64, userID int64) error
 	MGet(ctx context.Context, policy *vo.MGetPolicy) ([]*entity.Workflow, int64, error)
 }

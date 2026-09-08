@@ -23,7 +23,8 @@ import (
 
 	"github.com/jinzhu/copier"
 
-	"github.com/cloudwego/eino/compose"
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose"
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	"github.com/cloudwego/eino/schema"
 
 	"github.com/superagent-ai/superagent-base/backend/api/model/app/bot_common"
@@ -49,7 +50,7 @@ type Components struct {
 	PublishInfoRepo  *kvstore.KVStore[entity.PublishInfo]
 	CounterRepo      repository.CounterRepository
 
-	CPStore compose.CheckPointStore
+	CPStore wfcompose.CheckPointStore
 }
 
 func NewService(c *Components) SingleAgent {
@@ -104,7 +105,7 @@ func (s *singleAgentImpl) StreamExecute(ctx context.Context, req *entity.Execute
 		Agent:    ae,
 		UserID:   req.UserID,
 		Identity: req.Identity,
-		CPStore:  s.CPStore,
+		CPStore:  einobridge.AdaptCheckPointStore(s.CPStore),
 
 		CustomVariables: req.CustomVariables,
 

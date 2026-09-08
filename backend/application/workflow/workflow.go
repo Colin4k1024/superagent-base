@@ -27,6 +27,7 @@ import (
 	"time"
 
 	"github.com/cloudwego/eino/schema"
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	xmaps "golang.org/x/exp/maps"
 	"golang.org/x/sync/errgroup"
 
@@ -1597,7 +1598,7 @@ func (w *ApplicationService) OpenAPIStreamRun(ctx context.Context, req *workflow
 
 	convert := convertStreamRunEvent(meta.ID)
 
-	return schema.StreamReaderWithConvert(sr, convert), nil
+	return schema.StreamReaderWithConvert(einobridge.UnwrapStreamReader(sr), convert), nil
 }
 
 func (w *ApplicationService) OpenAPIStreamResume(ctx context.Context, req *workflow.OpenAPIStreamResumeFlowRequest) (
@@ -1687,7 +1688,7 @@ func (w *ApplicationService) OpenAPIStreamResume(ctx context.Context, req *workf
 
 	convert := convertStreamRunEvent(workflowID)
 
-	return schema.StreamReaderWithConvert(sr, convert), nil
+	return schema.StreamReaderWithConvert(einobridge.UnwrapStreamReader(sr), convert), nil
 }
 
 func (w *ApplicationService) OpenAPIRun(ctx context.Context, req *workflow.OpenAPIRunFlowRequest) (

@@ -19,7 +19,7 @@ package workflow
 import (
 	"context"
 
-	"github.com/cloudwego/eino/compose"
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose"
 
 	"github.com/superagent-ai/superagent-base/backend/api/model/workflow"
 	"github.com/superagent-ai/superagent-base/backend/bizpkg/llm/modelbuilder"
@@ -113,7 +113,7 @@ type Repository interface {
 
 	GetObjectUrl(ctx context.Context, objectKey string, opts ...storage.GetOptFn) (string, error)
 
-	compose.CheckPointStore
+	wfcompose.CheckPointStore
 	idgen.IDGenerator
 
 	GetKnowledgeRecallChatModel() modelbuilder.BaseChatModel

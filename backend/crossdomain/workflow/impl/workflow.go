@@ -19,9 +19,7 @@ package impl
 import (
 	"context"
 
-	"github.com/cloudwego/eino/compose"
-	einoCompose "github.com/cloudwego/eino/compose"
-	"github.com/cloudwego/eino/schema"
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose"
 
 	crossworkflow "github.com/superagent-ai/superagent-base/backend/crossdomain/workflow"
 	workflowModel "github.com/superagent-ai/superagent-base/backend/crossdomain/workflow/model"
@@ -55,21 +53,21 @@ func (i *impl) ReleaseApplicationWorkflows(ctx context.Context, appID int64, con
 	return i.DomainSVC.ReleaseApplicationWorkflows(ctx, appID, config)
 }
 
-func (i *impl) WithResumeToolWorkflow(resumingEvent *workflowEntity.ToolInterruptEvent, resumeData string, allInterruptEvents map[string]*workflowEntity.ToolInterruptEvent) einoCompose.Option {
+func (i *impl) WithResumeToolWorkflow(resumingEvent *workflowEntity.ToolInterruptEvent, resumeData string, allInterruptEvents map[string]*workflowEntity.ToolInterruptEvent) wfcompose.Option {
 	return i.DomainSVC.WithResumeToolWorkflow(resumingEvent, resumeData, allInterruptEvents)
 }
 func (i *impl) SyncExecuteWorkflow(ctx context.Context, config workflowModel.ExecuteConfig, input map[string]any) (*workflowEntity.WorkflowExecution, vo.TerminatePlan, error) {
 	return i.DomainSVC.SyncExecute(ctx, config, input)
 }
 
-func (i *impl) WithExecuteConfig(cfg workflowModel.ExecuteConfig) einoCompose.Option {
+func (i *impl) WithExecuteConfig(cfg workflowModel.ExecuteConfig) wfcompose.Option {
 	return i.DomainSVC.WithExecuteConfig(cfg)
 }
 
-func (i *impl) StreamResume(ctx context.Context, req *entity.ResumeRequest, config workflowModel.ExecuteConfig) (*schema.StreamReader[*entity.Message], error) {
+func (i *impl) StreamResume(ctx context.Context, req *entity.ResumeRequest, config workflowModel.ExecuteConfig) (*wfcompose.StreamReader[*entity.Message], error) {
 	return i.DomainSVC.StreamResume(ctx, req, config)
 }
-func (i *impl) StreamExecute(ctx context.Context, config workflowModel.ExecuteConfig, input map[string]any) (*schema.StreamReader[*workflowEntity.Message], error) {
+func (i *impl) StreamExecute(ctx context.Context, config workflowModel.ExecuteConfig, input map[string]any) (*wfcompose.StreamReader[*workflowEntity.Message], error) {
 	return i.DomainSVC.StreamExecute(ctx, config, input)
 }
 
@@ -77,7 +75,7 @@ func (i *impl) InitApplicationDefaultConversationTemplate(ctx context.Context, s
 	return i.DomainSVC.InitApplicationDefaultConversationTemplate(ctx, spaceID, appID, userID)
 }
 
-func (i *impl) WithMessagePipe() (compose.Option, *schema.StreamReader[*entity.Message], func()) {
+func (i *impl) WithMessagePipe() (wfcompose.Option, *wfcompose.StreamReader[*entity.Message], func()) {
 	return i.DomainSVC.WithMessagePipe()
 }
 

@@ -17,7 +17,7 @@
 package singleagent
 
 import (
-	"github.com/cloudwego/eino/compose"
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose"
 	"gorm.io/gorm"
 
 	"github.com/superagent-ai/superagent-base/backend/domain/agent/singleagent/entity"
@@ -62,7 +62,7 @@ type ServiceComponents struct {
 	ConnectorDomainSVC   connector.Connector
 	DatabaseDomainSVC    database.Database
 	ShortcutCMDDomainSVC shortcutCmd.ShortcutCmd
-	CPStore              compose.CheckPointStore
+	CPStore              wfcompose.CheckPointStore
 }
 
 func InitService(c *ServiceComponents) (*SingleAgentApplicationService, error) {
