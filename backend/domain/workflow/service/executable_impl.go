@@ -25,7 +25,11 @@ import (
 	"github.com/superagent-ai/superagent-base/backend/types/consts"
 
 	"github.com/cloudwego/eino/schema"
+	"os"
+	"strings"
+
 	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose"
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 
 	workflowapimodel "github.com/superagent-ai/superagent-base/backend/api/model/workflow"
 	crossmessage "github.com/superagent-ai/superagent-base/backend/crossdomain/message"
@@ -35,12 +39,15 @@ import (
 	"github.com/superagent-ai/superagent-base/backend/domain/workflow/entity/vo"
 	"github.com/superagent-ai/superagent-base/backend/domain/workflow/internal/canvas/adaptor"
 	"github.com/superagent-ai/superagent-base/backend/domain/workflow/internal/compose"
+	"github.com/superagent-ai/superagent-base/backend/domain/workflow/internal/dagcompose"
 	"github.com/superagent-ai/superagent-base/backend/domain/workflow/internal/execute"
 	"github.com/superagent-ai/superagent-base/backend/domain/workflow/internal/nodes"
+	wfschema "github.com/superagent-ai/superagent-base/backend/domain/workflow/internal/schema"
 	"github.com/superagent-ai/superagent-base/backend/pkg/errorx"
 	"github.com/superagent-ai/superagent-base/backend/pkg/lang/ptr"
 	"github.com/superagent-ai/superagent-base/backend/pkg/lang/slices"
 	"github.com/superagent-ai/superagent-base/backend/pkg/logs"
+	"github.com/superagent-ai/superagent-base/backend/pkg/safego"
 	"github.com/superagent-ai/superagent-base/backend/pkg/sonic"
 	"github.com/superagent-ai/superagent-base/backend/types/errno"
 )
@@ -89,6 +96,10 @@ func (i *impl) SyncExecute(ctx context.Context, config workflowModel.ExecuteConf
 	config.InputFileFields = slices.ToMap(workflowSC.GetAllNodesInputFileFields(ctx), func(e *workflowModel.FileInfo) (string, *workflowModel.FileInfo) {
 		return e.FileURL, e
 	})
+	if useDAGEngine() {
+		return i.syncExecuteDAG(ctx, config, input, wfEntity, workflowSC)
+	}
+
 	var wfOpts []compose.WorkflowOption
 	wfOpts = append(wfOpts, compose.WithIDAsName(wfEntity.ID))
 	if s := execute.GetStaticConfig(); s != nil && s.MaxNodeCountPerWorkflow > 0 {
@@ -199,6 +210,112 @@ func (i *impl) SyncExecute(ctx context.Context, config workflowModel.ExecuteConf
 		UpdatedAt:       ptr.Of(updateTime),
 		RootExecutionID: executeID,
 		InterruptEvents: lastEvent.InterruptEvents,
+	}, wf.TerminatePlan(), nil
+}
+
+// syncExecuteDAG runs the workflow via the self-built DAG engine.
+// This is the parallel path to the compose-based SyncExecute, selected
+// when DAG_ENGINE_ENABLED env var is set.
+func (i *impl) syncExecuteDAG(ctx context.Context, config workflowModel.ExecuteConfig, input map[string]any,
+	wfEntity *entity.Workflow, workflowSC *wfschema.WorkflowSchema) (*entity.WorkflowExecution, vo.TerminatePlan, error) {
+
+	var dagOpts []dagcompose.WorkflowOption
+	dagOpts = append(dagOpts, dagcompose.WithIDAsName(wfEntity.ID))
+	if s := execute.GetStaticConfig(); s != nil && s.MaxNodeCountPerWorkflow > 0 {
+		dagOpts = append(dagOpts, dagcompose.WithMaxNodeCount(s.MaxNodeCountPerWorkflow))
+	}
+
+	wf, err := dagcompose.NewWorkflow(ctx, workflowSC, dagOpts...)
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to create DAG workflow: %w", err)
+	}
+
+	if wfEntity.AppID != nil && config.AppID == nil {
+		config.AppID = wfEntity.AppID
+	}
+
+	var cOpts []nodes.ConvertOption
+	inputFileFields := make(map[string]*workflowModel.FileInfo)
+	cOpts = append(cOpts, nodes.WithCollectFileFields(inputFileFields), nodes.WithNotNeedTrimQueryFileName(true))
+	if config.InputFailFast {
+		cOpts = append(cOpts, nodes.FailFast())
+	}
+
+	convertedInput, ws, err := nodes.ConvertInputs(ctx, input, wf.Inputs(), cOpts...)
+	if err != nil {
+		return nil, "", err
+	} else if ws != nil {
+		logs.CtxWarnf(ctx, "convert inputs warnings: %v", *ws)
+	}
+
+	for k, v := range inputFileFields {
+		config.InputFileFields[k] = v
+	}
+
+	inStr, err := sonic.MarshalString(input)
+	if err != nil {
+		return nil, "", err
+	}
+
+	cancelCtx, executeID, _, _, err := dagcompose.NewWorkflowRunner(wfEntity.GetBasic(), workflowSC, config,
+		dagcompose.WithInput(inStr)).Prepare(ctx)
+	if err != nil {
+		return nil, "", err
+	}
+
+	startTime := time.Now()
+
+	out, runErr := wf.SyncRun(cancelCtx, convertedInput)
+	updateTime := time.Now()
+
+	// Build a synthetic lastEvent for result processing compatibility.
+	var status entity.WorkflowExecuteStatus
+	var failReason *string
+	var eventErr error
+
+	if runErr != nil {
+		if dagcompose.IsInterrupt(runErr) {
+			status = entity.WorkflowInterrupted
+		} else {
+			status = entity.WorkflowFailed
+			failReason = ptr.Of(runErr.Error())
+			eventErr = runErr
+		}
+	} else {
+		status = entity.WorkflowSuccess
+	}
+
+	_ = eventErr
+
+	var outStr string
+	if wf.TerminatePlan() == vo.ReturnVariables {
+		outStr, err = sonic.MarshalString(out)
+		if err != nil {
+			return nil, "", err
+		}
+	} else if out != nil {
+		if s, ok := out["output"].(string); ok {
+			outStr = s
+		}
+	}
+
+	return &entity.WorkflowExecution{
+		ID:              executeID,
+		WorkflowID:      wfEntity.ID,
+		Version:         wfEntity.GetVersion(),
+		SpaceID:         wfEntity.SpaceID,
+		ExecuteConfig:   config,
+		CreatedAt:       startTime,
+		NodeCount:       workflowSC.NodeCount(),
+		Status:          status,
+		Duration:        updateTime.Sub(startTime),
+		Input:           ptr.Of(inStr),
+		Output:          ptr.Of(outStr),
+		ErrorCode:       ptr.Of("-1"),
+		FailReason:      failReason,
+		TokenInfo:       &entity.TokenUsage{},
+		UpdatedAt:       ptr.Of(updateTime),
+		RootExecutionID: executeID,
 	}, wf.TerminatePlan(), nil
 }
 
@@ -501,6 +618,10 @@ func (i *impl) StreamExecute(ctx context.Context, config workflowModel.ExecuteCo
 		return e.FileURL, e
 	})
 
+	if useDAGEngine() {
+		return i.streamExecuteDAG(ctx, config, input, wfEntity, workflowSC)
+	}
+
 	var wfOpts []compose.WorkflowOption
 
 	wfOpts = append(wfOpts, compose.WithIDAsName(wfEntity.ID))
@@ -552,6 +673,62 @@ func (i *impl) StreamExecute(ctx context.Context, config workflowModel.ExecuteCo
 	_ = executeID
 
 	wf.AsyncRun(cancelCtx, input, opts...)
+
+	return sr, nil
+}
+
+// streamExecuteDAG runs the workflow via the self-built DAG engine with
+// streaming output. This is the parallel path to the compose-based
+// StreamExecute, selected when DAG_ENGINE_ENABLED env var is set.
+func (i *impl) streamExecuteDAG(ctx context.Context, config workflowModel.ExecuteConfig, input map[string]any,
+	wfEntity *entity.Workflow, workflowSC *wfschema.WorkflowSchema) (*wfcompose.StreamReader[*entity.Message], error) {
+
+	var dagOpts []dagcompose.WorkflowOption
+	dagOpts = append(dagOpts, dagcompose.WithIDAsName(wfEntity.ID))
+	if s := execute.GetStaticConfig(); s != nil && s.MaxNodeCountPerWorkflow > 0 {
+		dagOpts = append(dagOpts, dagcompose.WithMaxNodeCount(s.MaxNodeCountPerWorkflow))
+	}
+
+	wf, err := dagcompose.NewWorkflow(ctx, workflowSC, dagOpts...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create DAG workflow: %w", err)
+	}
+
+	if wfEntity.AppID != nil && config.AppID == nil {
+		config.AppID = wfEntity.AppID
+	}
+	config.CommitID = wfEntity.CommitID
+
+	var cOpts []nodes.ConvertOption
+	inputFileFields := make(map[string]*workflowModel.FileInfo)
+	cOpts = append(cOpts, nodes.WithCollectFileFields(inputFileFields), nodes.WithNotNeedTrimQueryFileName(true))
+	if config.InputFailFast {
+		cOpts = append(cOpts, nodes.FailFast())
+	}
+
+	input, ws, err := nodes.ConvertInputs(ctx, input, wf.Inputs(), cOpts...)
+	if err != nil {
+		return nil, err
+	} else if ws != nil {
+		logs.CtxWarnf(ctx, "convert inputs warnings: %v", *ws)
+	}
+	for k, v := range inputFileFields {
+		config.InputFileFields[k] = v
+	}
+
+	// Create message pipe.
+	einoSR, einoSW := schema.Pipe[*entity.Message](10)
+	sr := einobridge.WrapStreamReader[*entity.Message](einoSR)
+
+	// Run workflow in background with streaming.
+	safego.Go(ctx, func() {
+		defer einoSW.Close()
+		_, runErr := wf.StreamRun(ctx, input, einoSW)
+		if runErr != nil {
+			logs.CtxErrorf(ctx, "streamExecuteDAG: StreamRun error: %v", runErr)
+			einoSW.Send(nil, runErr)
+		}
+	})
 
 	return sr, nil
 }
@@ -1108,4 +1285,12 @@ func (i *impl) prefetchChatHistory(ctx context.Context, config workflowModel.Exe
 	}
 
 	return response.Messages, response.SchemaMessages, nil
+}
+
+// useDAGEngine checks the DAG_ENGINE_ENABLED env var.
+// When set to "true" (case-insensitive), the workflow service uses the
+// self-built DAG engine (dagcompose) instead of eino/compose.
+func useDAGEngine() bool {
+	v := strings.ToLower(os.Getenv(consts.DAGEngineEnabled))
+	return v == "true" || v == "1" || v == "yes"
 }
