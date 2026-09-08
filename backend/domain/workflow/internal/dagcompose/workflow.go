@@ -63,6 +63,7 @@ type Workflow struct {
 	streamRun     bool
 	terminatePlan vo.TerminatePlan
 	mu            sync.Mutex
+	name          string
 }
 
 // WorkflowOption configures the Workflow.

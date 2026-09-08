@@ -22,6 +22,7 @@ import (
 
 	workflowModel "github.com/superagent-ai/superagent-base/backend/crossdomain/workflow/model"
 	"github.com/superagent-ai/superagent-base/backend/domain/workflow/internal/compose"
+	"github.com/superagent-ai/superagent-base/backend/domain/workflow/internal/dagcompose"
 	"github.com/superagent-ai/superagent-base/backend/domain/workflow"
 	"github.com/superagent-ai/superagent-base/backend/domain/workflow/entity"
 	"github.com/superagent-ai/superagent-base/backend/domain/workflow/entity/vo"
@@ -33,15 +34,24 @@ type asToolImpl struct {
 }
 
 func (a *asToolImpl) WithMessagePipe() (wfcompose.Option, *wfcompose.StreamReader[*entity.Message], func()) {
+	if useDAGEngine() {
+		return dagcompose.WithMessagePipe()
+	}
 	return compose.WithMessagePipe()
 }
 
 func (a *asToolImpl) WithExecuteConfig(cfg workflowModel.ExecuteConfig) wfcompose.Option {
+	if useDAGEngine() {
+		return dagcompose.WithToolExecuteConfig(cfg)
+	}
 	return compose.WithToolExecuteConfig(cfg)
 }
 
 func (a *asToolImpl) WithResumeToolWorkflow(resumingEvent *entity.ToolInterruptEvent, resumeData string,
 	allInterruptEvents map[string]*entity.ToolInterruptEvent) wfcompose.Option {
+	if useDAGEngine() {
+		return dagcompose.WithToolResume(resumingEvent, resumeData, allInterruptEvents)
+	}
 	toolCallID2ExeID := make(map[string]int64, len(allInterruptEvents))
 	for callID, event := range allInterruptEvents {
 		toolCallID2ExeID[callID] = event.ExecuteID
