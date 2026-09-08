@@ -20,6 +20,8 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
+	"os"
+	"strings"
 
 	"github.com/jinzhu/copier"
 
@@ -37,6 +39,8 @@ import (
 	"github.com/superagent-ai/superagent-base/backend/pkg/lang/slices"
 	"github.com/superagent-ai/superagent-base/backend/pkg/logs"
 	"github.com/superagent-ai/superagent-base/backend/types/errno"
+
+	consts "github.com/superagent-ai/superagent-base/backend/types/consts"
 )
 
 type singleAgentImpl struct {
@@ -110,7 +114,13 @@ func (s *singleAgentImpl) StreamExecute(ctx context.Context, req *entity.Execute
 
 		ConversationID: req.ConversationID,
 	}
-	rn, err := agentflow.BuildAgent(ctx, conf)
+	var rn agentflow.Runner
+	if useDAGAgent() {
+		logs.CtxInfof(ctx, "[singleAgent] using DAG-engine agent runner")
+		rn, err = agentflow.BuildDAGAgent(ctx, conf)
+	} else {
+		rn, err = agentflow.BuildAgent(ctx, conf)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -331,4 +341,13 @@ func (s *singleAgentImpl) ListAgentPublishHistory(ctx context.Context, agentID i
 	}
 
 	return allResults[start:end], nil
+}
+
+// useDAGAgent checks the DAG_AGENT_ENABLED env var.
+// When set to "true" (case-insensitive), the single agent service uses
+// the DAG-engine runner (agentflow.BuildDAGAgent) instead of the eino
+// compose runner (agentflow.BuildAgent).
+func useDAGAgent() bool {
+	v := strings.ToLower(os.Getenv(consts.DAGAgentEnabled))
+	return v == "true" || v == "1" || v == "yes"
 }

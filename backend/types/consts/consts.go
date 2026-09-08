@@ -20,7 +20,8 @@ import "time"
 
 const (
 	RunMode            = "RUN_MODE"
-	DAGEngineEnabled    = "DAG_ENGINE_ENABLED" // feature flag: use self-built DAG engine instead of eino/compose
+	DAGEngineEnabled  = "DAG_ENGINE_ENABLED" // feature flag: use self-built DAG engine instead of eino/compose (workflow layer)
+	DAGAgentEnabled  = "DAG_AGENT_ENABLED"   // feature flag: use DAG-engine agent runner instead of eino/compose (agent layer)
 	MySQLDsn           = "MYSQL_DSN"
 	RedisAddr          = "REDIS_ADDR"
 	VeImageXAK         = "VE_IMAGEX_AK"
