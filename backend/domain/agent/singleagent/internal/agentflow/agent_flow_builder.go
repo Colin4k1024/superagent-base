@@ -24,7 +24,6 @@ import (
 
 	"github.com/cloudwego/eino/components/tool"
 	"github.com/cloudwego/eino/compose"
-	"github.com/cloudwego/eino/flow/agent/react"
 	"github.com/cloudwego/eino/schema"
 
 	"github.com/superagent-ai/superagent-base/backend/bizpkg/llm/modelbuilder"
@@ -170,19 +169,13 @@ func BuildAgent(ctx context.Context, conf *Config) (r *AgentRunner, err error) {
 	var agentNodeOpts []compose.GraphAddNodeOpt
 	var agentNodeName string
 	if isReActAgent {
-		agent, err := react.NewAgent(ctx, &react.AgentConfig{
-			ToolCallingModel: chatModel,
-			ToolsConfig: compose.ToolsNodeConfig{
-				Tools: agentTools,
-			},
-			ToolReturnDirectly: returnDirectlyTools,
-			ModelNodeName:      keyOfReActAgentChatModel,
-			ToolsNodeName:      keyOfReActAgentToolsNode,
-		})
+		result, err := buildReActGraph(ctx, chatModel, agentTools, returnDirectlyTools,
+			keyOfReActAgentChatModel, keyOfReActAgentToolsNode)
 		if err != nil {
 			return nil, err
 		}
-		agentGraph, agentNodeOpts = agent.ExportGraph()
+		agentGraph = result.graph
+		agentNodeOpts = result.nodeOpts
 
 		agentNodeName = keyOfReActAgent
 	} else {
