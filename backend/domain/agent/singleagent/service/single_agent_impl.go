@@ -25,7 +25,6 @@ import (
 
 	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose"
 	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
-	"github.com/cloudwego/eino/schema"
 
 	"github.com/superagent-ai/superagent-base/backend/api/model/app/bot_common"
 	crossplugin "github.com/superagent-ai/superagent-base/backend/crossdomain/plugin"
@@ -91,7 +90,7 @@ func (s *singleAgentImpl) MGetSingleAgentDraft(ctx context.Context, agentIDs []i
 	return s.AgentDraftRepo.MGet(ctx, agentIDs)
 }
 
-func (s *singleAgentImpl) StreamExecute(ctx context.Context, req *entity.ExecuteRequest) (events *schema.StreamReader[*entity.AgentEvent], err error) {
+func (s *singleAgentImpl) StreamExecute(ctx context.Context, req *entity.ExecuteRequest) (events *wfcompose.StreamReader[*entity.AgentEvent], err error) {
 	ae, err := s.ObtainAgentByIdentity(ctx, req.Identity)
 	if err != nil {
 		return nil, err
@@ -118,14 +117,18 @@ func (s *singleAgentImpl) StreamExecute(ctx context.Context, req *entity.Execute
 
 	exeReq := &agentflow.AgentRequest{
 		UserID:   req.UserID,
-		Input:    req.Input,
-		History:  req.History,
+		Input:    einobridge.UnwrapMessage(req.Input),
+		History:  einobridge.UnwrapMessageSlice(req.History),
 		Identity: req.Identity,
 
 		ResumeInfo:   req.ResumeInfo,
 		PreCallTools: req.PreCallTools,
 	}
-	return rn.StreamExecute(ctx, rn.PreHandlerReq(ctx, exeReq))
+	einoSR, err := rn.StreamExecute(ctx, rn.PreHandlerReq(ctx, exeReq))
+	if err != nil {
+		return nil, err
+	}
+	return einobridge.WrapStreamReader[*entity.AgentEvent](einoSR), nil
 }
 
 func (s *singleAgentImpl) GetSingleAgent(ctx context.Context, agentID int64, version string) (botInfo *entity.SingleAgent, err error) {

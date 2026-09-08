@@ -104,6 +104,36 @@ func UnwrapStreamReader[T any](sr *wfcompose.StreamReader[T]) *schema.StreamRead
 	return nil
 }
 
+// WrapMessageStreamReader converts an eino *schema.StreamReader[*schema.Message]
+// into a framework-agnostic *wfcompose.StreamReader[*wfcompose.Message] by
+// wrapping each element via WrapMessage. nil in, nil out.
+func WrapMessageStreamReader(sr *schema.StreamReader[*schema.Message]) *wfcompose.StreamReader[*wfcompose.Message] {
+	if sr == nil {
+		return nil
+	}
+	converted := schema.StreamReaderWithConvert(sr, func(m *schema.Message) (*wfcompose.Message, error) {
+		return WrapMessage(m), nil
+	})
+	return WrapStreamReader[*wfcompose.Message](converted)
+}
+
+// UnwrapMessageStreamReader converts a framework-agnostic
+// *wfcompose.StreamReader[*wfcompose.Message] back into an eino
+// *schema.StreamReader[*schema.Message] by unwrapping each element via
+// UnwrapMessage. nil in, nil out.
+func UnwrapMessageStreamReader(sr *wfcompose.StreamReader[*wfcompose.Message]) *schema.StreamReader[*schema.Message] {
+	if sr == nil {
+		return nil
+	}
+	einoSR := UnwrapStreamReader[*wfcompose.Message](sr)
+	if einoSR == nil {
+		return nil
+	}
+	return schema.StreamReaderWithConvert(einoSR, func(m *wfcompose.Message) (*schema.Message, error) {
+		return UnwrapMessage(m), nil
+	})
+}
+
 // WrapStreamWriter wraps an eino *schema.StreamWriter[T] as a framework-agnostic
 // *wfcompose.StreamWriter[T].
 func WrapStreamWriter[T any](sw *schema.StreamWriter[T]) *wfcompose.StreamWriter[T] {
@@ -139,7 +169,7 @@ func AdaptCheckPointStore(store wfcompose.CheckPointStore) compose.CheckPointSto
 }
 
 // EinoCheckPointStore wraps an eino compose.CheckPointStore as a framework-
-//agnostic wfcompose.CheckPointStore.
+// agnostic wfcompose.CheckPointStore.
 type EinoCheckPointStore struct {
 	Store compose.CheckPointStore
 }

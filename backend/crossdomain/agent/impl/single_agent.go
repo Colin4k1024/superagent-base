@@ -19,8 +19,6 @@ package impl
 import (
 	"context"
 
-	"github.com/cloudwego/eino/schema"
-
 	crossagent "github.com/superagent-ai/superagent-base/backend/crossdomain/agent"
 	model "github.com/superagent-ai/superagent-base/backend/crossdomain/agent/model"
 	agentrun "github.com/superagent-ai/superagent-base/backend/crossdomain/agentrun/model"
@@ -28,6 +26,7 @@ import (
 	"github.com/superagent-ai/superagent-base/backend/pkg/lang/conv"
 	"github.com/superagent-ai/superagent-base/backend/pkg/lang/slices"
 	"github.com/superagent-ai/superagent-base/backend/pkg/logs"
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose"
 )
 
 var defaultSVC crossagent.SingleAgent
@@ -45,7 +44,7 @@ func InitDomainService(c singleagent.SingleAgent) crossagent.SingleAgent {
 }
 
 func (c *impl) StreamExecute(ctx context.Context, agentRuntime *crossagent.AgentRuntime,
-) (*schema.StreamReader[*model.AgentEvent], error) {
+) (*wfcompose.StreamReader[*model.AgentEvent], error) {
 
 	singleAgentStreamExecReq := c.buildSingleAgentStreamExecuteReq(ctx, agentRuntime)
 

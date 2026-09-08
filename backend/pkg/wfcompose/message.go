@@ -53,12 +53,12 @@ const (
 type ChatMessagePartType string
 
 const (
-	ChatMessagePartTypeText       ChatMessagePartType = "text"
-	ChatMessagePartTypeImageURL   ChatMessagePartType = "image_url"
-	ChatMessagePartTypeAudioURL   ChatMessagePartType = "audio_url"
-	ChatMessagePartTypeVideoURL   ChatMessagePartType = "video_url"
-	ChatMessagePartTypeFileURL    ChatMessagePartType = "file_url"
-	ChatMessagePartTypeReasoning  ChatMessagePartType = "reasoning"
+	ChatMessagePartTypeText      ChatMessagePartType = "text"
+	ChatMessagePartTypeImageURL  ChatMessagePartType = "image_url"
+	ChatMessagePartTypeAudioURL  ChatMessagePartType = "audio_url"
+	ChatMessagePartTypeVideoURL  ChatMessagePartType = "video_url"
+	ChatMessagePartTypeFileURL   ChatMessagePartType = "file_url"
+	ChatMessagePartTypeReasoning ChatMessagePartType = "reasoning"
 )
 
 // ImageURLDetail is the fidelity hint for an image part.
@@ -72,11 +72,11 @@ const (
 
 // ChatMessageImageURL is the image payload of an image_url part.
 type ChatMessageImageURL struct {
-	URL      string              `json:"url,omitempty"`
-	URI      string              `json:"uri,omitempty"`
-	Detail   ImageURLDetail      `json:"detail,omitempty"`
-	MIMEType string              `json:"mime_type,omitempty"`
-	Extra    map[string]any      `json:"extra,omitempty"`
+	URL      string         `json:"url,omitempty"`
+	URI      string         `json:"uri,omitempty"`
+	Detail   ImageURLDetail `json:"detail,omitempty"`
+	MIMEType string         `json:"mime_type,omitempty"`
+	Extra    map[string]any `json:"extra,omitempty"`
 }
 
 // ChatMessageAudioURL is the audio payload of an audio_url part.
@@ -106,12 +106,12 @@ type ChatMessageFileURL struct {
 
 // ChatMessagePart is one part of a multimodal message (Message.MultiContent).
 type ChatMessagePart struct {
-	Type     ChatMessagePartType      `json:"type,omitempty"`
-	Text     string                   `json:"text,omitempty"`
-	ImageURL *ChatMessageImageURL     `json:"image_url,omitempty"`
-	AudioURL *ChatMessageAudioURL     `json:"audio_url,omitempty"`
-	VideoURL *ChatMessageVideoURL     `json:"video_url,omitempty"`
-	FileURL  *ChatMessageFileURL      `json:"file_url,omitempty"`
+	Type     ChatMessagePartType  `json:"type,omitempty"`
+	Text     string               `json:"text,omitempty"`
+	ImageURL *ChatMessageImageURL `json:"image_url,omitempty"`
+	AudioURL *ChatMessageAudioURL `json:"audio_url,omitempty"`
+	VideoURL *ChatMessageVideoURL `json:"video_url,omitempty"`
+	FileURL  *ChatMessageFileURL  `json:"file_url,omitempty"`
 }
 
 // FunctionCall is the function invocation requested by the assistant.
@@ -122,28 +122,46 @@ type FunctionCall struct {
 
 // ToolCall is a single tool/function call requested by the assistant.
 type ToolCall struct {
-	Index    *int          `json:"index,omitempty"`
-	ID       string        `json:"id"`
-	Type     string        `json:"type"`
-	Function FunctionCall  `json:"function"`
+	Index    *int           `json:"index,omitempty"`
+	ID       string         `json:"id"`
+	Type     string         `json:"type"`
+	Function FunctionCall   `json:"function"`
 	Extra    map[string]any `json:"extra,omitempty"`
+}
+
+// TokenUsage represents the token usage of a chat model request.
+type TokenUsage struct {
+	PromptTokens     int `json:"prompt_tokens"`
+	CompletionTokens int `json:"completion_tokens"`
+	TotalTokens      int `json:"total_tokens"`
+}
+
+// ResponseMeta collects meta information about a chat response.
+type ResponseMeta struct {
+	FinishReason string      `json:"finish_reason,omitempty"`
+	Usage        *TokenUsage `json:"usage,omitempty"`
 }
 
 // Message is the framework-agnostic chat message. It mirrors eino's
 // schema.Message public field surface so engine adapters can convert
 // losslessly and migration is a mechanical type swap.
 type Message struct {
-	Role         RoleType          `json:"role"`
-	Content      string            `json:"content"`
-	MultiContent []ChatMessagePart `json:"multi_content,omitempty"`
-	Name         string            `json:"name,omitempty"`
-	ToolCalls    []ToolCall        `json:"tool_calls,omitempty"`
-	ToolCallID   string            `json:"tool_call_id,omitempty"`
-	ToolName     string            `json:"tool_name,omitempty"`
-	Extra        map[string]any    `json:"extra,omitempty"`
+	Role             RoleType          `json:"role"`
+	Content          string            `json:"content"`
+	MultiContent     []ChatMessagePart `json:"multi_content,omitempty"`
+	Name             string            `json:"name,omitempty"`
+	ToolCalls        []ToolCall        `json:"tool_calls,omitempty"`
+	ToolCallID       string            `json:"tool_call_id,omitempty"`
+	ToolName         string            `json:"tool_name,omitempty"`
+	Extra            map[string]any    `json:"extra,omitempty"`
+	ResponseMeta     *ResponseMeta     `json:"response_meta,omitempty"`
+	ReasoningContent string            `json:"reasoning_content,omitempty"`
 }
 
+const docMetaDataKeyScore = "_score"
+
 // Document is a framework-agnostic retrieved document.
+
 type Document struct {
 	ID       string         `json:"id"`
 	Content  string         `json:"content"`
@@ -156,4 +174,28 @@ func (d *Document) String() string {
 		return ""
 	}
 	return d.Content
+}
+
+// Score returns the relevance score stored in MetaData, or 0 if absent.
+func (d *Document) Score() float64 {
+	if d == nil || d.MetaData == nil {
+		return 0
+	}
+	score, ok := d.MetaData[docMetaDataKeyScore].(float64)
+	if !ok {
+		return 0
+	}
+	return score
+}
+
+// WithScore sets the relevance score in MetaData and returns d.
+func (d *Document) WithScore(score float64) *Document {
+	if d == nil {
+		return nil
+	}
+	if d.MetaData == nil {
+		d.MetaData = make(map[string]any)
+	}
+	d.MetaData[docMetaDataKeyScore] = score
+	return d
 }

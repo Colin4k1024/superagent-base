@@ -38,6 +38,42 @@ import (
 	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose"
 )
 
+// wrapResponseMeta converts eino *schema.ResponseMeta to *wfcompose.ResponseMeta.
+func wrapResponseMeta(rm *schema.ResponseMeta) *wfcompose.ResponseMeta {
+	if rm == nil {
+		return nil
+	}
+	out := &wfcompose.ResponseMeta{
+		FinishReason: rm.FinishReason,
+	}
+	if rm.Usage != nil {
+		out.Usage = &wfcompose.TokenUsage{
+			PromptTokens:     rm.Usage.PromptTokens,
+			CompletionTokens: rm.Usage.CompletionTokens,
+			TotalTokens:      rm.Usage.TotalTokens,
+		}
+	}
+	return out
+}
+
+// unwrapResponseMeta converts *wfcompose.ResponseMeta to eino *schema.ResponseMeta.
+func unwrapResponseMeta(rm *wfcompose.ResponseMeta) *schema.ResponseMeta {
+	if rm == nil {
+		return nil
+	}
+	out := &schema.ResponseMeta{
+		FinishReason: rm.FinishReason,
+	}
+	if rm.Usage != nil {
+		out.Usage = &schema.TokenUsage{
+			PromptTokens:     rm.Usage.PromptTokens,
+			CompletionTokens: rm.Usage.CompletionTokens,
+			TotalTokens:      rm.Usage.TotalTokens,
+		}
+	}
+	return out
+}
+
 // WrapMessage converts an eino *schema.Message into a framework-agnostic
 // *wfcompose.Message by copying the public field surface. nil in, nil out.
 func WrapMessage(m *schema.Message) *wfcompose.Message {
@@ -45,12 +81,14 @@ func WrapMessage(m *schema.Message) *wfcompose.Message {
 		return nil
 	}
 	out := &wfcompose.Message{
-		Role:       wfcompose.RoleType(m.Role),
-		Content:    m.Content,
-		Name:       m.Name,
-		ToolCallID: m.ToolCallID,
-		ToolName:   m.ToolName,
-		Extra:      m.Extra,
+		Role:             wfcompose.RoleType(m.Role),
+		Content:          m.Content,
+		Name:             m.Name,
+		ToolCallID:       m.ToolCallID,
+		ToolName:         m.ToolName,
+		Extra:            m.Extra,
+		ResponseMeta:     wrapResponseMeta(m.ResponseMeta),
+		ReasoningContent: m.ReasoningContent,
 	}
 	if len(m.MultiContent) > 0 {
 		out.MultiContent = make([]wfcompose.ChatMessagePart, len(m.MultiContent))
@@ -83,12 +121,14 @@ func UnwrapMessage(m *wfcompose.Message) *schema.Message {
 		return nil
 	}
 	out := &schema.Message{
-		Role:       schema.RoleType(m.Role),
-		Content:    m.Content,
-		Name:       m.Name,
-		ToolCallID: m.ToolCallID,
-		ToolName:   m.ToolName,
-		Extra:      m.Extra,
+		Role:             schema.RoleType(m.Role),
+		Content:          m.Content,
+		Name:             m.Name,
+		ToolCallID:       m.ToolCallID,
+		ToolName:         m.ToolName,
+		Extra:            m.Extra,
+		ResponseMeta:     unwrapResponseMeta(m.ResponseMeta),
+		ReasoningContent: m.ReasoningContent,
 	}
 	if len(m.MultiContent) > 0 {
 		out.MultiContent = make([]schema.ChatMessagePart, len(m.MultiContent))
@@ -149,6 +189,15 @@ func WrapDocumentSlice(in []*schema.Document) []*wfcompose.Document {
 	out := make([]*wfcompose.Document, len(in))
 	for i, d := range in {
 		out[i] = WrapDocument(d)
+	}
+	return out
+}
+
+// UnwrapDocumentSlice converts a slice of framework-agnostic documents to eino ones.
+func UnwrapDocumentSlice(in []*wfcompose.Document) []*schema.Document {
+	out := make([]*schema.Document, len(in))
+	for i, d := range in {
+		out[i] = UnwrapDocument(d)
 	}
 	return out
 }

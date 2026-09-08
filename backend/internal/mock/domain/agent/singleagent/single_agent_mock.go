@@ -29,9 +29,9 @@ import (
 	context "context"
 	reflect "reflect"
 
-	schema "github.com/cloudwego/eino/schema"
 	playground "github.com/superagent-ai/superagent-base/backend/api/model/playground"
 	entity "github.com/superagent-ai/superagent-base/backend/domain/agent/singleagent/entity"
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose"
 	gomock "go.uber.org/mock/gomock"
 )
 
@@ -312,10 +312,10 @@ func (mr *MockSingleAgentMockRecorder) SavePublishRecord(ctx, p, e any) *gomock.
 }
 
 // StreamExecute mocks base method.
-func (m *MockSingleAgent) StreamExecute(ctx context.Context, req *entity.ExecuteRequest) (*schema.StreamReader[*entity.AgentEvent], error) {
+func (m *MockSingleAgent) StreamExecute(ctx context.Context, req *entity.ExecuteRequest) (*wfcompose.StreamReader[*entity.AgentEvent], error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "StreamExecute", ctx, req)
-	ret0, _ := ret[0].(*schema.StreamReader[*entity.AgentEvent])
+	ret0, _ := ret[0].(*wfcompose.StreamReader[*entity.AgentEvent])
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }

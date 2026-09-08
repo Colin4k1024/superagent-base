@@ -19,19 +19,18 @@ package agent
 import (
 	"context"
 
-	"github.com/cloudwego/eino/schema"
-
 	model "github.com/superagent-ai/superagent-base/backend/crossdomain/agent/model"
 
 	agentrun "github.com/superagent-ai/superagent-base/backend/crossdomain/agentrun/model"
 
 	"github.com/superagent-ai/superagent-base/backend/api/model/playground"
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose"
 )
 
 // Requests and responses must not reference domain entities and can only use models under api/model/crossdomain.
 type SingleAgent interface {
 	StreamExecute(ctx context.Context,
-		agentRuntime *AgentRuntime) (*schema.StreamReader[*model.AgentEvent], error)
+		agentRuntime *AgentRuntime) (*wfcompose.StreamReader[*model.AgentEvent], error)
 	ObtainAgentByIdentity(ctx context.Context, identity *model.AgentIdentity) (*model.SingleAgent, error)
 	GetSingleAgentDraft(ctx context.Context, agentID int64) (agentInfo *model.SingleAgent, err error)
 }
@@ -47,8 +46,8 @@ type AgentRuntime struct {
 	PreRetrieveTools []*agentrun.Tool
 	CustomVariables  map[string]string
 
-	HistoryMsg []*schema.Message
-	Input      *schema.Message
+	HistoryMsg []*wfcompose.Message
+	Input      *wfcompose.Message
 	ResumeInfo *ResumeInfo
 }
 

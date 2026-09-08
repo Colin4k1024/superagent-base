@@ -174,7 +174,7 @@ func (r *AgentRunner) processWfMidAnswerStream(_ context.Context, sw *schema.Str
 			srT, swT = schema.Pipe[*schema.Message](5)
 			sw.Send(&entity.AgentEvent{
 				EventType:     singleagent.EventTypeOfToolMidAnswer,
-				ToolMidAnswer: srT,
+				ToolMidAnswer: einobridge.WrapMessageStreamReader(srT),
 			}, nil)
 		}
 		swT.Send(&schema.Message{
