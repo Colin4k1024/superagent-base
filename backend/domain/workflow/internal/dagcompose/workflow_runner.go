@@ -36,19 +36,24 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/cloudwego/eino/schema"
+
 	workflowmodel "github.com/superagent-ai/superagent-base/backend/crossdomain/workflow/model"
 	"github.com/superagent-ai/superagent-base/backend/domain/workflow/entity"
 	wfschema "github.com/superagent-ai/superagent-base/backend/domain/workflow/internal/schema"
 	"github.com/superagent-ai/superagent-base/backend/pkg/dag"
+	"github.com/superagent-ai/superagent-base/backend/pkg/logs"
 )
 
 // WorkflowRunner mirrors compose.WorkflowRunner but uses the DAG engine.
 // It handles execution context, event channels, and interrupt detection.
 type WorkflowRunner struct {
-	basic  *entity.WorkflowBasic
-	input  string
-	schema *wfschema.WorkflowSchema
-	config workflowmodel.ExecuteConfig
+	basic     *entity.WorkflowBasic
+	input     string
+	resumeReq *entity.ResumeRequest
+	sw        *schema.StreamWriter[*entity.Message]
+	schema    *wfschema.WorkflowSchema
+	config    workflowmodel.ExecuteConfig
 
 	executeID int64
 	cpStore   dag.CheckpointStore
@@ -58,13 +63,26 @@ type WorkflowRunner struct {
 type WorkflowRunnerOption func(*workflowRunnerOptions)
 
 type workflowRunnerOptions struct {
-	input   string
-	cpStore dag.CheckpointStore
+	input     string
+	cpStore   dag.CheckpointStore
+	resumeReq *entity.ResumeRequest
+	sw        *schema.StreamWriter[*entity.Message]
 }
 
 // WithInput sets the serialized input string.
 func WithInput(input string) WorkflowRunnerOption {
 	return func(o *workflowRunnerOptions) { o.input = input }
+}
+
+// WithResumeReq sets the resume request for interrupt/resume flows.
+func WithResumeReq(req *entity.ResumeRequest) WorkflowRunnerOption {
+	return func(o *workflowRunnerOptions) { o.resumeReq = req }
+}
+
+// WithStreamWriter sets the eino schema StreamWriter for streaming output.
+// This is used by NewMessagePipe to feed streaming results to the caller.
+func WithStreamWriter(sw *schema.StreamWriter[*entity.Message]) WorkflowRunnerOption {
+	return func(o *workflowRunnerOptions) { o.sw = sw }
 }
 
 // WithCheckpointStore sets the checkpoint store for interrupt/resume.
@@ -81,6 +99,8 @@ func NewWorkflowRunner(b *entity.WorkflowBasic, sc *wfschema.WorkflowSchema, con
 	return &WorkflowRunner{
 		basic:     b,
 		input:     options.input,
+		resumeReq: options.resumeReq,
+		sw:        options.sw,
 		schema:    sc,
 		config:    config,
 		executeID: 0,
@@ -104,6 +124,9 @@ func (r *WorkflowRunner) Prepare(ctx context.Context) (context.Context, int64, [
 	// with workflow execution records, node status tracking, etc.
 
 	executeID := r.executeID
+	if r.resumeReq != nil {
+		executeID = r.resumeReq.ExecuteID
+	}
 	var dagOpts []dag.ExecutorOption
 
 	if r.config.InputFailFast {
@@ -113,7 +136,17 @@ func (r *WorkflowRunner) Prepare(ctx context.Context) (context.Context, int64, [
 	// Create event channel (currently unused — events are handled inline).
 	eventChan := make(chan *Event, 10)
 
+	if r.resumeReq != nil {
+		logs.CtxInfof(ctx, "dagcompose: resuming execution %d with event %d",
+			r.resumeReq.ExecuteID, r.resumeReq.EventID)
+	}
+
 	return ctx, executeID, dagOpts, eventChan, nil
+}
+
+// StreamWriter returns the stream writer, if set.
+func (r *WorkflowRunner) StreamWriter() *schema.StreamWriter[*entity.Message] {
+	return r.sw
 }
 
 // Event is a simplified workflow execution event.

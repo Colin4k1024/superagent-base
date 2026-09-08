@@ -363,6 +363,10 @@ func (i *impl) AsyncExecute(ctx context.Context, config workflowModel.ExecuteCon
 		return e.FileURL, e
 	})
 
+	if useDAGEngine() {
+		return i.asyncExecuteDAG(ctx, config, input, wfEntity, workflowSC)
+	}
+
 	var wfOpts []compose.WorkflowOption
 	wfOpts = append(wfOpts, compose.WithIDAsName(wfEntity.ID))
 	if s := execute.GetStaticConfig(); s != nil && s.MaxNodeCountPerWorkflow > 0 {
@@ -512,6 +516,10 @@ func (i *impl) AsyncExecuteNode(ctx context.Context, nodeID string, config workf
 	config.InputFileFields = slices.ToMap(workflowSC.GetAllNodesInputFileFields(ctx), func(e *workflowModel.FileInfo) (string, *workflowModel.FileInfo) {
 		return e.FileURL, e
 	})
+
+	if useDAGEngine() {
+		return i.asyncExecuteNodeDAG(ctx, nodeID, config, input, wfEntity, workflowSC)
+	}
 
 	wf, err := compose.NewWorkflowFromNodeNamed(ctx, workflowSC, vo.NodeKey(nodeID), fmt.Sprintf("%d", wfEntity.ID))
 	if err != nil {
@@ -729,6 +737,242 @@ func (i *impl) streamExecuteDAG(ctx context.Context, config workflowModel.Execut
 			einoSW.Send(nil, runErr)
 		}
 	})
+
+	return sr, nil
+}
+
+// asyncExecuteDAG runs the workflow asynchronously via the self-built DAG
+// engine. This is the parallel path to the compose-based AsyncExecute,
+// selected when DAG_ENGINE_ENABLED env var is set.
+func (i *impl) asyncExecuteDAG(ctx context.Context, config workflowModel.ExecuteConfig, input map[string]any,
+	wfEntity *entity.Workflow, workflowSC *wfschema.WorkflowSchema) (int64, error) {
+
+	var dagOpts []dagcompose.WorkflowOption
+	dagOpts = append(dagOpts, dagcompose.WithIDAsName(wfEntity.ID))
+	if s := execute.GetStaticConfig(); s != nil && s.MaxNodeCountPerWorkflow > 0 {
+		dagOpts = append(dagOpts, dagcompose.WithMaxNodeCount(s.MaxNodeCountPerWorkflow))
+	}
+
+	wf, err := dagcompose.NewWorkflow(ctx, workflowSC, dagOpts...)
+	if err != nil {
+		return 0, fmt.Errorf("failed to create DAG workflow: %w", err)
+	}
+
+	if wfEntity.AppID != nil && config.AppID == nil {
+		config.AppID = wfEntity.AppID
+	}
+	config.CommitID = wfEntity.CommitID
+
+	var cOpts []nodes.ConvertOption
+	inputFileFields := make(map[string]*workflowModel.FileInfo)
+	cOpts = append(cOpts, nodes.WithCollectFileFields(inputFileFields), nodes.WithNotNeedTrimQueryFileName(true))
+	if config.InputFailFast {
+		cOpts = append(cOpts, nodes.FailFast())
+	}
+
+	convertedInput, ws, err := nodes.ConvertInputs(ctx, input, wf.Inputs(), cOpts...)
+	if err != nil {
+		return 0, err
+	} else if ws != nil {
+		logs.CtxWarnf(ctx, "convert inputs warnings: %v", *ws)
+	}
+	for k, v := range inputFileFields {
+		config.InputFileFields[k] = v
+	}
+
+	inStr, err := sonic.MarshalString(input)
+	if err != nil {
+		return 0, err
+	}
+
+	cancelCtx, executeID, _, _, err := dagcompose.NewWorkflowRunner(wfEntity.GetBasic(), workflowSC, config,
+		dagcompose.WithInput(inStr)).Prepare(ctx)
+	if err != nil {
+		return 0, err
+	}
+
+	if config.Mode == workflowModel.ExecuteModeDebug {
+		if err = i.repo.SetTestRunLatestExeID(ctx, wfEntity.ID, config.Operator, executeID); err != nil {
+			logs.CtxErrorf(ctx, "failed to set test run latest exe id: %v", err)
+		}
+	}
+
+	wf.AsyncRun(cancelCtx, convertedInput)
+
+	return executeID, nil
+}
+
+// asyncExecuteNodeDAG runs a single node asynchronously via the DAG engine.
+// This is the parallel path to the compose-based AsyncExecuteNode, selected
+// when DAG_ENGINE_ENABLED env var is set.
+func (i *impl) asyncExecuteNodeDAG(ctx context.Context, nodeID string, config workflowModel.ExecuteConfig, input map[string]any,
+	wfEntity *entity.Workflow, workflowSC *wfschema.WorkflowSchema) (int64, error) {
+
+	wf, err := dagcompose.NewWorkflowFromNodeNamed(ctx, workflowSC, vo.NodeKey(nodeID), fmt.Sprintf("%d", wfEntity.ID))
+	if err != nil {
+		return 0, fmt.Errorf("failed to create DAG workflow: %w", err)
+	}
+
+	var cOpts []nodes.ConvertOption
+	inputFileFields := make(map[string]*workflowModel.FileInfo)
+	cOpts = append(cOpts, nodes.WithCollectFileFields(inputFileFields), nodes.WithNotNeedTrimQueryFileName(true))
+	if config.InputFailFast {
+		cOpts = append(cOpts, nodes.FailFast())
+	}
+
+	convertedInput, ws, err := nodes.ConvertInputs(ctx, input, wf.Inputs(), cOpts...)
+	if err != nil {
+		return 0, err
+	} else if ws != nil {
+		logs.CtxWarnf(ctx, "convert inputs warnings: %v", *ws)
+	}
+	for k, v := range inputFileFields {
+		config.InputFileFields[k] = v
+	}
+
+	if wfEntity.AppID != nil && config.AppID == nil {
+		config.AppID = wfEntity.AppID
+	}
+	config.CommitID = wfEntity.CommitID
+
+	inStr, err := sonic.MarshalString(input)
+	if err != nil {
+		return 0, err
+	}
+
+	cancelCtx, executeID, _, _, err := dagcompose.NewWorkflowRunner(wfEntity.GetBasic(), workflowSC, config,
+		dagcompose.WithInput(inStr)).Prepare(ctx)
+	if err != nil {
+		return 0, err
+	}
+
+	if config.Mode == workflowModel.ExecuteModeNodeDebug {
+		if err = i.repo.SetNodeDebugLatestExeID(ctx, wfEntity.ID, nodeID, config.Operator, executeID); err != nil {
+			logs.CtxErrorf(ctx, "failed to set node debug latest exe id: %v", err)
+		}
+	}
+
+	wf.AsyncRun(cancelCtx, convertedInput)
+
+	return executeID, nil
+}
+
+// asyncResumeDAG resumes an interrupted workflow execution via the DAG engine.
+// This is the parallel path to the compose-based AsyncResume, selected when
+// DAG_ENGINE_ENABLED env var is set.
+func (i *impl) asyncResumeDAG(ctx context.Context, req *entity.ResumeRequest, config workflowModel.ExecuteConfig,
+	wfEntity *entity.Workflow, wfExe *entity.WorkflowExecution, canvas vo.Canvas) error {
+
+	if wfExe.Mode == workflowModel.ExecuteModeNodeDebug {
+		nodeExes, err := i.repo.GetNodeExecutionsByWfExeID(ctx, wfExe.ID)
+		if err != nil {
+			return err
+		}
+
+		if len(nodeExes) == 0 {
+			return fmt.Errorf("during node debug resume, no node execution found for workflow execution %d", wfExe.ID)
+		}
+
+		var nodeID string
+		for _, ne := range nodeExes {
+			if ne.ParentNodeID == nil {
+				nodeID = ne.NodeID
+				break
+			}
+		}
+
+		workflowSC, err := adaptor.WorkflowSchemaFromNode(ctx, &canvas, nodeID)
+		if err != nil {
+			return fmt.Errorf("failed to convert canvas to workflow schema: %w", err)
+		}
+
+		wf, err := dagcompose.NewWorkflowFromNodeNamed(ctx, workflowSC, vo.NodeKey(nodeID),
+			fmt.Sprintf("%d", wfExe.WorkflowID))
+		if err != nil {
+			return fmt.Errorf("failed to create DAG workflow: %w", err)
+		}
+
+		config.Mode = workflowModel.ExecuteModeNodeDebug
+
+		cancelCtx, _, _, _, err := dagcompose.NewWorkflowRunner(
+			wfEntity.GetBasic(), workflowSC, config, dagcompose.WithResumeReq(req)).Prepare(ctx)
+		if err != nil {
+			return err
+		}
+
+		wf.AsyncRun(cancelCtx, nil)
+		return nil
+	}
+
+	workflowSC, err := adaptor.CanvasToWorkflowSchema(ctx, &canvas)
+	if err != nil {
+		return fmt.Errorf("failed to convert canvas to workflow schema: %w", err)
+	}
+
+	var dagOpts []dagcompose.WorkflowOption
+	dagOpts = append(dagOpts, dagcompose.WithIDAsName(wfExe.WorkflowID))
+	if s := execute.GetStaticConfig(); s != nil && s.MaxNodeCountPerWorkflow > 0 {
+		dagOpts = append(dagOpts, dagcompose.WithMaxNodeCount(s.MaxNodeCountPerWorkflow))
+	}
+
+	wf, err := dagcompose.NewWorkflow(ctx, workflowSC, dagOpts...)
+	if err != nil {
+		return fmt.Errorf("failed to create DAG workflow: %w", err)
+	}
+
+	cancelCtx, _, _, _, err := dagcompose.NewWorkflowRunner(
+		wfEntity.GetBasic(), workflowSC, config, dagcompose.WithResumeReq(req)).Prepare(ctx)
+	if err != nil {
+		return err
+	}
+
+	wf.AsyncRun(cancelCtx, nil)
+	return nil
+}
+
+// streamResumeDAG resumes an interrupted workflow execution with streaming
+// output via the DAG engine. This is the parallel path to the compose-based
+// StreamResume, selected when DAG_ENGINE_ENABLED env var is set.
+func (i *impl) streamResumeDAG(ctx context.Context, req *entity.ResumeRequest, config workflowModel.ExecuteConfig,
+	wfEntity *entity.Workflow, wfExe *entity.WorkflowExecution, workflowSC *wfschema.WorkflowSchema) (
+	*wfcompose.StreamReader[*entity.Message], error) {
+
+	config.From = func() workflowModel.Locator {
+		if wfExe.Version == "" {
+			return workflowModel.FromDraft
+		}
+		return workflowModel.FromSpecificVersion
+	}()
+	config.Version = wfExe.Version
+	config.AppID = wfExe.AppID
+	config.AgentID = wfExe.AgentID
+	config.CommitID = wfExe.CommitID
+	config.WorkflowMode = wfEntity.Mode
+
+	if config.ConnectorID == 0 {
+		config.ConnectorID = wfExe.ConnectorID
+	}
+
+	var dagOpts []dagcompose.WorkflowOption
+	dagOpts = append(dagOpts, dagcompose.WithIDAsName(wfExe.WorkflowID))
+	if s := execute.GetStaticConfig(); s != nil && s.MaxNodeCountPerWorkflow > 0 {
+		dagOpts = append(dagOpts, dagcompose.WithMaxNodeCount(s.MaxNodeCountPerWorkflow))
+	}
+
+	wf, err := dagcompose.NewWorkflow(ctx, workflowSC, dagOpts...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create DAG workflow: %w", err)
+	}
+
+	sr, swOpt := dagcompose.NewMessagePipe()
+
+	cancelCtx, _, _, _, err := dagcompose.NewWorkflowRunner(wfEntity.GetBasic(), workflowSC, config,
+		dagcompose.WithResumeReq(req), swOpt).Prepare(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	wf.AsyncRun(cancelCtx, nil)
 
 	return sr, nil
 }
@@ -1015,6 +1259,10 @@ func (i *impl) AsyncResume(ctx context.Context, req *entity.ResumeRequest, confi
 		config.ConnectorID = wfExe.ConnectorID
 	}
 
+	if useDAGEngine() {
+		return i.asyncResumeDAG(ctx, req, config, wfEntity, wfExe, canvas)
+	}
+
 	if wfExe.Mode == workflowModel.ExecuteModeNodeDebug {
 		nodeExes, err := i.repo.GetNodeExecutionsByWfExeID(ctx, wfExe.ID)
 		if err != nil {
@@ -1133,6 +1381,10 @@ func (i *impl) StreamResume(ctx context.Context, req *entity.ResumeRequest, conf
 	workflowSC, err := adaptor.CanvasToWorkflowSchema(ctx, &canvas)
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert canvas to workflow schema: %w", err)
+	}
+
+	if useDAGEngine() {
+		return i.streamResumeDAG(ctx, req, config, wfEntity, wfExe, workflowSC)
 	}
 
 	var wfOpts []compose.WorkflowOption
