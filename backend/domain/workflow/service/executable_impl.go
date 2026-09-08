@@ -24,10 +24,8 @@ import (
 
 	"github.com/superagent-ai/superagent-base/backend/types/consts"
 
-	einoCompose "github.com/cloudwego/eino/compose"
 	"github.com/cloudwego/eino/schema"
 	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose"
-	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 
 	workflowapimodel "github.com/superagent-ai/superagent-base/backend/api/model/workflow"
 	crossmessage "github.com/superagent-ai/superagent-base/backend/crossdomain/message"
@@ -139,7 +137,7 @@ func (i *impl) SyncExecute(ctx context.Context, config workflowModel.ExecuteConf
 
 	out, err := wf.SyncRun(cancelCtx, convertedInput, opts...)
 	if err != nil {
-		if _, ok := einoCompose.ExtractInterruptInfo(err); !ok {
+		if !compose.IsInterrupt(err) {
 			var wfe vo.WorkflowError
 			if errors.As(err, &wfe) {
 				return nil, "", wfe.AppendDebug(executeID, wfEntity.SpaceID, wfEntity.ID)
@@ -398,7 +396,7 @@ func (i *impl) AsyncExecuteNode(ctx context.Context, nodeID string, config workf
 		return e.FileURL, e
 	})
 
-	wf, err := compose.NewWorkflowFromNode(ctx, workflowSC, vo.NodeKey(nodeID), einoCompose.WithGraphName(fmt.Sprintf("%d", wfEntity.ID)))
+	wf, err := compose.NewWorkflowFromNodeNamed(ctx, workflowSC, vo.NodeKey(nodeID), fmt.Sprintf("%d", wfEntity.ID))
 	if err != nil {
 		return 0, fmt.Errorf("failed to create workflow: %w", err)
 	}
@@ -543,10 +541,10 @@ func (i *impl) StreamExecute(ctx context.Context, config workflowModel.ExecuteCo
 		return nil, err
 	}
 
-	sr, sw := schema.Pipe[*entity.Message](10)
+	sr, swOpt := compose.NewMessagePipe()
 
 	cancelCtx, executeID, opts, _, err := compose.NewWorkflowRunner(wfEntity.GetBasic(), workflowSC, config,
-		compose.WithInput(inStr), compose.WithStreamWriter(sw)).Prepare(ctx)
+		compose.WithInput(inStr), swOpt).Prepare(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -555,7 +553,7 @@ func (i *impl) StreamExecute(ctx context.Context, config workflowModel.ExecuteCo
 
 	wf.AsyncRun(cancelCtx, input, opts...)
 
-	return einobridge.WrapStreamReader[*entity.Message](sr), nil
+	return sr, nil
 }
 
 func (i *impl) GetExecution(ctx context.Context, wfExe *entity.WorkflowExecution, includeNodes bool) (*entity.WorkflowExecution, error) {
@@ -863,8 +861,8 @@ func (i *impl) AsyncResume(ctx context.Context, req *entity.ResumeRequest, confi
 			return fmt.Errorf("failed to convert canvas to workflow schema: %w", err)
 		}
 
-		wf, err := compose.NewWorkflowFromNode(ctx, workflowSC, vo.NodeKey(nodeID),
-			einoCompose.WithGraphName(fmt.Sprintf("%d", wfExe.WorkflowID)))
+		wf, err := compose.NewWorkflowFromNodeNamed(ctx, workflowSC, vo.NodeKey(nodeID),
+			fmt.Sprintf("%d", wfExe.WorkflowID))
 		if err != nil {
 			return fmt.Errorf("failed to create workflow: %w", err)
 		}
@@ -982,17 +980,17 @@ func (i *impl) StreamResume(ctx context.Context, req *entity.ResumeRequest, conf
 		config.ConnectorID = wfExe.ConnectorID
 	}
 
-	sr, sw := schema.Pipe[*entity.Message](10)
+	sr, swOpt := compose.NewMessagePipe()
 
 	cancelCtx, _, opts, _, err := compose.NewWorkflowRunner(wfEntity.GetBasic(), workflowSC, config,
-		compose.WithResumeReq(req), compose.WithStreamWriter(sw)).Prepare(ctx)
+		compose.WithResumeReq(req), swOpt).Prepare(ctx)
 	if err != nil {
 		return nil, err
 	}
 
 	wf.AsyncRun(cancelCtx, nil, opts...)
 
-	return einobridge.WrapStreamReader[*entity.Message](sr), nil
+	return sr, nil
 }
 
 func (i *impl) Cancel(ctx context.Context, wfExeID int64, wfID, spaceID int64) error {

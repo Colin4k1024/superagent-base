@@ -19,15 +19,13 @@ package service
 import (
 	"context"
 
-	einoCompose "github.com/cloudwego/eino/compose"
 
 	workflowModel "github.com/superagent-ai/superagent-base/backend/crossdomain/workflow/model"
+	"github.com/superagent-ai/superagent-base/backend/domain/workflow/internal/compose"
 	"github.com/superagent-ai/superagent-base/backend/domain/workflow"
 	"github.com/superagent-ai/superagent-base/backend/domain/workflow/entity"
 	"github.com/superagent-ai/superagent-base/backend/domain/workflow/entity/vo"
-	"github.com/superagent-ai/superagent-base/backend/domain/workflow/internal/execute"
 	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose"
-	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 )
 
 type asToolImpl struct {
@@ -35,12 +33,11 @@ type asToolImpl struct {
 }
 
 func (a *asToolImpl) WithMessagePipe() (wfcompose.Option, *wfcompose.StreamReader[*entity.Message], func()) {
-	opt, sr, closer := execute.WithMessagePipe()
-	return einobridge.WrapOption(opt), einobridge.WrapStreamReader[*entity.Message](sr), closer
+	return compose.WithMessagePipe()
 }
 
 func (a *asToolImpl) WithExecuteConfig(cfg workflowModel.ExecuteConfig) wfcompose.Option {
-	return einobridge.WrapOption(einoCompose.WithToolsNodeOption(einoCompose.WithToolOption(execute.WithExecuteConfig(cfg))))
+	return compose.WithToolExecuteConfig(cfg)
 }
 
 func (a *asToolImpl) WithResumeToolWorkflow(resumingEvent *entity.ToolInterruptEvent, resumeData string,
@@ -49,13 +46,7 @@ func (a *asToolImpl) WithResumeToolWorkflow(resumingEvent *entity.ToolInterruptE
 	for callID, event := range allInterruptEvents {
 		toolCallID2ExeID[callID] = event.ExecuteID
 	}
-	return einobridge.WrapOption(einoCompose.WithToolsNodeOption(
-		einoCompose.WithToolOption(
-			execute.WithResume(&entity.ResumeRequest{
-				ExecuteID:  resumingEvent.ExecuteID,
-				EventID:    resumingEvent.ID,
-				ResumeData: resumeData,
-			}, toolCallID2ExeID))))
+	return compose.WithToolResume(resumingEvent, resumeData, allInterruptEvents)
 }
 
 func (a *asToolImpl) WorkflowAsModelTool(ctx context.Context, policies []*vo.GetPolicy) (tools []workflow.ToolFromWorkflow, err error) {
