@@ -128,8 +128,9 @@ func (ex *Executor) Execute(ctx context.Context, input map[string]any) (*Executi
 			continue
 		}
 
-		// Execute the node.
-		output, err := node.Executor.Execute(ctx, nodeInput)
+		// Execute the node. If the node supports streaming and a stream
+		// handler is configured, prefer the streaming path.
+		output, err := ex.executeNode(ctx, node.Executor, nodeInput, key)
 		if err != nil {
 			if ex.cfg.failFast {
 				return nil, fmt.Errorf("dag: node %q failed: %w", key, err)
@@ -175,6 +176,32 @@ func (ex *Executor) Execute(ctx context.Context, input map[string]any) (*Executi
 // StreamHandler. It blocks until the graph completes or errors.
 func (ex *Executor) ExecuteAsync(ctx context.Context, input map[string]any) (*ExecutionResult, error) {
 	return ex.Execute(ctx, input)
+}
+
+// executeNode dispatches to Execute or Stream based on the node's
+// capabilities and whether a stream handler is configured.
+func (ex *Executor) executeNode(ctx context.Context, exec NodeExecutor, input map[string]any, key NodeKey) (map[string]any, error) {
+	if sn, ok := exec.(StreamingNodeExecutor); ok && ex.cfg.streamHandler != nil {
+		ch, err := sn.Stream(ctx, input)
+		if err != nil {
+			return nil, err
+		}
+		return drainStream(ctx, ch, ex.cfg.streamHandler, key)
+	}
+	return exec.Execute(ctx, input)
+}
+
+// executeNode dispatches to Execute or Stream based on the node's
+// capabilities and whether a stream handler is configured.
+func (px *ParallelExecutor) executeNode(ctx context.Context, exec NodeExecutor, input map[string]any, key NodeKey) (map[string]any, error) {
+	if sn, ok := exec.(StreamingNodeExecutor); ok && px.cfg.streamHandler != nil {
+		ch, err := sn.Stream(ctx, input)
+		if err != nil {
+			return nil, err
+		}
+		return drainStream(ctx, ch, px.cfg.streamHandler, key)
+	}
+	return exec.Execute(ctx, input)
 }
 
 // getSelectedPort checks if the node output contains a port selection
@@ -279,7 +306,7 @@ func (px *ParallelExecutor) Execute(ctx context.Context, input map[string]any) (
 				} else {
 					nodeInput = ec.resolveInput(k, px.graph.InEdges(k))
 				}
-				output, err := node.Executor.Execute(ctx, nodeInput)
+				output, err := px.executeNode(ctx, node.Executor, nodeInput, k)
 				if err != nil {
 					mu.Lock()
 					if px.cfg.failFast && execErr == nil {
