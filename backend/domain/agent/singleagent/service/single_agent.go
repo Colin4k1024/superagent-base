@@ -19,10 +19,9 @@ package singleagent
 import (
 	"context"
 
-	"github.com/cloudwego/eino/schema"
-
 	"github.com/superagent-ai/superagent-base/backend/api/model/playground"
 	"github.com/superagent-ai/superagent-base/backend/domain/agent/singleagent/entity"
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose"
 )
 
 //go:generate mockgen -destination ../../../../internal/mock/domain/agent/singleagent/single_agent_mock.go --package singleagent -source single_agent.go
@@ -40,7 +39,7 @@ type SingleAgent interface {
 	// online agent
 	CreateSingleAgent(ctx context.Context, connectorID int64, version string, e *entity.SingleAgent) (int64, error)
 	DuplicateInMemory(ctx context.Context, req *entity.DuplicateInfo) (newAgent *entity.SingleAgent, err error)
-	StreamExecute(ctx context.Context, req *entity.ExecuteRequest) (events *schema.StreamReader[*entity.AgentEvent], err error)
+	StreamExecute(ctx context.Context, req *entity.ExecuteRequest) (events *wfcompose.StreamReader[*entity.AgentEvent], err error)
 	GetSingleAgent(ctx context.Context, agentID int64, version string) (botInfo *entity.SingleAgent, err error)
 	ListAgentPublishHistory(ctx context.Context, agentID int64, pageIndex, pageSize int32, connectorID *int64) ([]*entity.SingleAgentPublish, error)
 	// ObtainAgentByIdentity support obtain agent by connectorID and agentID

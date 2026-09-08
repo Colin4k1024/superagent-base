@@ -36,6 +36,8 @@ import (
 	"github.com/superagent-ai/superagent-base/backend/domain/agent/singleagent/entity"
 	"github.com/superagent-ai/superagent-base/backend/pkg/lang/conv"
 	"github.com/superagent-ai/superagent-base/backend/pkg/logs"
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose"
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 )
 
 func newReplyCallback(_ context.Context, executeID string, returnDirectlyTools map[string]struct{}) (clb callbacks.Handler,
@@ -79,12 +81,12 @@ func (r *replyChunkCallback) OnError(ctx context.Context, info *callbacks.RunInf
 
 			toolMessageEvent := &entity.AgentEvent{
 				EventType: singleagent.EventTypeOfToolsMessage,
-				ToolsMessage: []*schema.Message{
-					{
+				ToolsMessage: []*wfcompose.Message{
+					einobridge.WrapMessage(&schema.Message{
 						Role:       schema.Tool,
 						Content:    "directly streaming reply",
 						ToolCallID: interruptData.ToolCallID,
-					},
+					}),
 				},
 			}
 			r.sw.Send(toolMessageEvent, nil)
@@ -116,7 +118,7 @@ func (r *replyChunkCallback) OnStart(ctx context.Context, info *callbacks.RunInf
 		}
 		ae := &entity.AgentEvent{
 			EventType: singleagent.EventTypeOfFuncCall,
-			FuncCall:  convToolsNodeCallbackInput(input),
+			FuncCall:  einobridge.WrapMessage(convToolsNodeCallbackInput(input)),
 		}
 		r.sw.Send(ae, nil)
 	}
@@ -130,7 +132,7 @@ func (r *replyChunkCallback) OnEnd(ctx context.Context, info *callbacks.RunInfo,
 	case keyOfKnowledgeRetriever:
 		knowledgeEvent := &entity.AgentEvent{
 			EventType: singleagent.EventTypeOfKnowledge,
-			Knowledge: retriever.ConvCallbackOutput(output).Docs,
+			Knowledge: einobridge.WrapDocumentSlice(retriever.ConvCallbackOutput(output).Docs),
 		}
 
 		if knowledgeEvent.Knowledge != nil {
@@ -145,12 +147,12 @@ func (r *replyChunkCallback) OnEnd(ctx context.Context, info *callbacks.RunInfo,
 				if item.Role == schema.Tool {
 					event = &entity.AgentEvent{
 						EventType:    singleagent.EventTypeOfToolsMessage,
-						ToolsMessage: []*schema.Message{item},
+						ToolsMessage: []*wfcompose.Message{einobridge.WrapMessage(item)},
 					}
 				} else {
 					event = &entity.AgentEvent{
 						EventType: singleagent.EventTypeOfFuncCall,
-						FuncCall:  item,
+						FuncCall:  einobridge.WrapMessage(item),
 					}
 				}
 				r.sw.Send(event, nil)
@@ -164,7 +166,7 @@ func (r *replyChunkCallback) OnEnd(ctx context.Context, info *callbacks.RunInfo,
 			for _, item := range sg {
 				suggestionEvent := &entity.AgentEvent{
 					EventType: singleagent.EventTypeOfSuggest,
-					Suggest:   item,
+					Suggest:   einobridge.WrapMessage(item),
 				}
 				r.sw.Send(suggestionEvent, nil)
 			}
@@ -194,7 +196,7 @@ func (r *replyChunkCallback) OnEndWithStreamOutput(ctx context.Context, info *ca
 
 		r.sw.Send(&entity.AgentEvent{
 			EventType:       singleagent.EventTypeOfChatModelAnswer,
-			ChatModelAnswer: sr,
+			ChatModelAnswer: einobridge.WrapMessageStreamReader(sr),
 		}, nil)
 		return ctx
 	case compose.ComponentOfToolsNode:
@@ -206,7 +208,7 @@ func (r *replyChunkCallback) OnEndWithStreamOutput(ctx context.Context, info *ca
 
 		r.sw.Send(&entity.AgentEvent{
 			EventType:    singleagent.EventTypeOfToolsMessage,
-			ToolsMessage: toolsMessage,
+			ToolsMessage: einobridge.WrapMessageSlice(toolsMessage),
 		}, nil)
 		return ctx
 	default:
@@ -318,7 +320,7 @@ func (r *replyChunkCallback) concatToolsNodeOutput(ctx context.Context, output *
 						sr, sw = schema.Pipe[*schema.Message](5)
 						r.sw.Send(&entity.AgentEvent{
 							EventType:             singleagent.EventTypeOfToolsAsChatModelStream,
-							ToolAsChatModelAnswer: sr,
+							ToolAsChatModelAnswer: einobridge.WrapMessageStreamReader(sr),
 						}, nil)
 						streamInitialized = true
 					}

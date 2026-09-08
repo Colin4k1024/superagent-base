@@ -17,8 +17,9 @@
 package model
 
 import (
-	"github.com/cloudwego/eino/schema"
 	"gorm.io/gorm"
+
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose"
 
 	"github.com/superagent-ai/superagent-base/backend/api/model/app/bot_common"
 	agentrun "github.com/superagent-ai/superagent-base/backend/crossdomain/agentrun/model"
@@ -42,14 +43,14 @@ const (
 type AgentEvent struct {
 	EventType EventType
 
-	ToolMidAnswer         *schema.StreamReader[*schema.Message]
-	ToolAsChatModelAnswer *schema.StreamReader[*schema.Message]
+	ToolMidAnswer         *wfcompose.StreamReader[*wfcompose.Message]
+	ToolAsChatModelAnswer *wfcompose.StreamReader[*wfcompose.Message]
 
-	ChatModelAnswer *schema.StreamReader[*schema.Message]
-	ToolsMessage    []*schema.Message
-	FuncCall        *schema.Message
-	Suggest         *schema.Message
-	Knowledge       []*schema.Document
+	ChatModelAnswer *wfcompose.StreamReader[*wfcompose.Message]
+	ToolsMessage    []*wfcompose.Message
+	FuncCall        *wfcompose.Message
+	Suggest         *wfcompose.Message
+	Knowledge       []*wfcompose.Document
 	Interrupt       *InterruptInfo
 }
 
@@ -108,8 +109,8 @@ type ExecuteRequest struct {
 	Identity *AgentIdentity
 	UserID   string
 
-	Input        *schema.Message
-	History      []*schema.Message
+	Input        *wfcompose.Message
+	History      []*wfcompose.Message
 	ResumeInfo   *InterruptInfo
 	PreCallTools []*agentrun.ToolsRetriever
 

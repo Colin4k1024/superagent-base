@@ -22,7 +22,6 @@ import (
 	"io"
 	"sync"
 
-	"github.com/cloudwego/eino/schema"
 	"github.com/mohae/deepcopy"
 
 	crossagent "github.com/superagent-ai/superagent-base/backend/crossdomain/agent"
@@ -37,6 +36,8 @@ import (
 	"github.com/superagent-ai/superagent-base/backend/pkg/lang/ptr"
 	"github.com/superagent-ai/superagent-base/backend/pkg/logs"
 	"github.com/superagent-ai/superagent-base/backend/pkg/safego"
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose"
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	"github.com/superagent-ai/superagent-base/backend/types/errno"
 )
 
@@ -53,8 +54,8 @@ func (art *AgentRuntime) AgentStreamExecute(ctx context.Context, imagex imagex.I
 		ConnectorID:      art.GetRunMeta().ConnectorID,
 		PreRetrieveTools: art.GetRunMeta().PreRetrieveTools,
 		CustomVariables:  art.GetRunMeta().CustomVariables,
-		Input:            transMessageToSchemaMessage(ctx, []*msgEntity.Message{art.GetInput()}, imagex)[0],
-		HistoryMsg:       transMessageToSchemaMessage(ctx, historyPairs(art.GetHistory()), imagex),
+		Input:            einobridge.WrapMessage(transMessageToSchemaMessage(ctx, []*msgEntity.Message{art.GetInput()}, imagex)[0]),
+		HistoryMsg:       einobridge.WrapMessageSlice(transMessageToSchemaMessage(ctx, historyPairs(art.GetHistory()), imagex)),
 		ResumeInfo:       parseResumeInfo(ctx, art.GetHistory()),
 	}
 
@@ -376,7 +377,7 @@ func (art *AgentRuntime) push(ctx context.Context, mainChan chan *entity.AgentRe
 	}
 }
 
-func (art *AgentRuntime) pull(_ context.Context, mainChan chan *entity.AgentRespEvent, events *schema.StreamReader[*crossagent.AgentEvent]) {
+func (art *AgentRuntime) pull(_ context.Context, mainChan chan *entity.AgentRespEvent, events *wfcompose.StreamReader[*crossagent.AgentEvent]) {
 	defer func() {
 		close(mainChan)
 	}()
@@ -403,15 +404,15 @@ func (art *AgentRuntime) pull(_ context.Context, mainChan chan *entity.AgentResp
 
 		respChunk := &entity.AgentRespEvent{
 			EventType:    eventType,
-			ModelAnswer:  rm.ChatModelAnswer,
-			ToolsMessage: rm.ToolsMessage,
-			FuncCall:     rm.FuncCall,
-			Knowledge:    rm.Knowledge,
-			Suggest:      rm.Suggest,
+			ModelAnswer:  einobridge.UnwrapMessageStreamReader(rm.ChatModelAnswer),
+			ToolsMessage: einobridge.UnwrapMessageSlice(rm.ToolsMessage),
+			FuncCall:     einobridge.UnwrapMessage(rm.FuncCall),
+			Knowledge:    einobridge.UnwrapDocumentSlice(rm.Knowledge),
+			Suggest:      einobridge.UnwrapMessage(rm.Suggest),
 			Interrupt:    rm.Interrupt,
 
-			ToolMidAnswer: rm.ToolMidAnswer,
-			ToolAsAnswer:  rm.ToolAsChatModelAnswer,
+			ToolMidAnswer: einobridge.UnwrapMessageStreamReader(rm.ToolMidAnswer),
+			ToolAsAnswer:  einobridge.UnwrapMessageStreamReader(rm.ToolAsChatModelAnswer),
 		}
 
 		mainChan <- respChunk
