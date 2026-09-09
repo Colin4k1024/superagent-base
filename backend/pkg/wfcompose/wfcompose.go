@@ -199,3 +199,12 @@ type CheckPointDeleter interface {
 // compose.FieldPath from eino. It is a simple []string that
 // names successive map keys.
 type FieldPath []string
+
+// Runnable is the framework-agnostic runner interface, mirroring
+// compose.Runnable from eino. It is the contract returned by graph
+// compilation and consumed by the agent/service layer. Only the Stream
+// method is required for the current agentflow usage; additional methods
+// (Invoke, Collect, Transform) can be added when needed.
+type Runnable[I, O any] interface {
+	Stream(ctx context.Context, input I, opts ...Option) (*StreamReader[O], error)
+}

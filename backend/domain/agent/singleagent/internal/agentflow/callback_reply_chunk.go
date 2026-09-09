@@ -26,7 +26,6 @@ import (
 	"github.com/cloudwego/eino/components"
 	"github.com/cloudwego/eino/components/model"
 	"github.com/cloudwego/eino/components/retriever"
-	"github.com/cloudwego/eino/compose"
 	"github.com/cloudwego/eino/schema"
 
 	singleagent "github.com/superagent-ai/superagent-base/backend/crossdomain/agent/model"
@@ -71,8 +70,8 @@ func (r *replyChunkCallback) OnError(ctx context.Context, info *callbacks.RunInf
 	logs.CtxInfof(ctx, "info-OnError, info=%v, err=%v", conv.DebugJsonToStr(info), err)
 
 	switch info.Component {
-	case compose.ComponentOfGraph:
-		if interruptInfo, ok := compose.ExtractInterruptInfo(err); ok {
+	case einobridge.ComponentOfGraph:
+		if interruptInfo, ok := einobridge.ExtractInterruptInfo(err); ok {
 			if info.Name != "" {
 				return ctx
 			}
@@ -112,7 +111,7 @@ func (r *replyChunkCallback) OnStart(ctx context.Context, info *callbacks.RunInf
 	logs.CtxInfof(ctx, "info-OnStart, info=%v, input=%v", conv.DebugJsonToStr(info), conv.DebugJsonToStr(input))
 
 	switch info.Component {
-	case compose.ComponentOfToolsNode:
+	case einobridge.ComponentOfToolsNode:
 		if info.Name != keyOfReActAgentToolsNode {
 			return ctx
 		}
@@ -184,7 +183,7 @@ func (r *replyChunkCallback) OnEndWithStreamOutput(ctx context.Context, info *ca
 ) context.Context {
 	logs.CtxInfof(ctx, "info-OnEndWithStreamOutput, info=%v, output=%v", conv.DebugJsonToStr(info), conv.DebugJsonToStr(output))
 	switch info.Component {
-	case compose.ComponentOfGraph, components.ComponentOfChatModel:
+	case einobridge.ComponentOfGraph, components.ComponentOfChatModel:
 		if info.Name != keyOfReActAgentChatModel && info.Name != keyOfLLM {
 			output.Close()
 			return ctx
@@ -199,7 +198,7 @@ func (r *replyChunkCallback) OnEndWithStreamOutput(ctx context.Context, info *ca
 			ChatModelAnswer: einobridge.WrapMessageStreamReader(sr),
 		}, nil)
 		return ctx
-	case compose.ComponentOfToolsNode:
+	case einobridge.ComponentOfToolsNode:
 		toolsMessage, err := r.concatToolsNodeOutput(ctx, output)
 		if err != nil {
 			r.sw.Send(nil, err)
@@ -216,8 +215,8 @@ func (r *replyChunkCallback) OnEndWithStreamOutput(ctx context.Context, info *ca
 	}
 }
 
-func convInterruptInfo(ctx context.Context, interruptInfo *compose.InterruptInfo) *singleagent.InterruptInfo {
-	var output *compose.InterruptInfo
+func convInterruptInfo(ctx context.Context, interruptInfo *einobridge.InterruptInfo) *singleagent.InterruptInfo {
+	var output *einobridge.InterruptInfo
 	output = interruptInfo.SubGraphs[keyOfReActAgent]
 	var extra any
 
@@ -225,7 +224,7 @@ func convInterruptInfo(ctx context.Context, interruptInfo *compose.InterruptInfo
 		extra = output.RerunNodesExtra[i]
 		break
 	}
-	toolsNodeExtra, ok := extra.(*compose.ToolsInterruptAndRerunExtra)
+	toolsNodeExtra, ok := extra.(*einobridge.ToolsInterruptAndRerunExtra)
 	logs.CtxInfof(ctx, "toolsNodeExtra=%v, err=%v", toolsNodeExtra, ok)
 
 	var toolCallID string
