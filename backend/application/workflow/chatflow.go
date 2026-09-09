@@ -27,7 +27,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/cloudwego/eino/schema"
 	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 
 	"github.com/superagent-ai/superagent-base/backend/api/model/workflow"
@@ -509,7 +508,7 @@ func checkPermission(ctx context.Context, userID int64, workflowID int64, appID 
 }
 
 func (w *ApplicationService) OpenAPIChatFlowRun(ctx context.Context, req *workflow.ChatFlowRunRequest) (
-	_ *schema.StreamReader[[]*workflow.ChatFlowRunResponse], err error) {
+	_ *einobridge.StreamReader[[]*workflow.ChatFlowRunResponse], err error) {
 	defer func() {
 		if panicErr := recover(); panicErr != nil {
 			err = safego.NewPanicErr(panicErr, debug.Stack())
@@ -702,7 +701,7 @@ func (w *ApplicationService) OpenAPIChatFlowRun(ctx context.Context, req *workfl
 			}
 			return nil, err
 		}
-		return schema.StreamReaderWithConvert(einobridge.UnwrapStreamReader(sr), w.convertToChatFlowRunResponseList(ctx, convertToChatFlowInfo{
+		return einobridge.StreamReaderWithConvert(einobridge.UnwrapStreamReader(sr), w.convertToChatFlowRunResponseList(ctx, convertToChatFlowInfo{
 			bizID:            bizID,
 			conversationID:   conversationID,
 			roundID:          roundID,
@@ -776,7 +775,7 @@ func (w *ApplicationService) OpenAPIChatFlowRun(ctx context.Context, req *workfl
 		return nil, err
 	}
 
-	return schema.StreamReaderWithConvert(einobridge.UnwrapStreamReader(sr), w.convertToChatFlowRunResponseList(ctx, convertToChatFlowInfo{
+	return einobridge.StreamReaderWithConvert(einobridge.UnwrapStreamReader(sr), w.convertToChatFlowRunResponseList(ctx, convertToChatFlowInfo{
 		bizID:            bizID,
 		conversationID:   conversationID,
 		roundID:          roundID,
@@ -829,7 +828,7 @@ func (w *ApplicationService) convertToChatFlowRunResponseList(ctx context.Contex
 
 		if msg.StateMessage != nil {
 			if executeID > 0 && executeID != msg.StateMessage.ExecuteID {
-				return nil, schema.ErrNoValue
+				return nil, einobridge.ErrNoValue
 			}
 			switch msg.StateMessage.Status {
 			case entity.WorkflowSuccess:
@@ -837,7 +836,7 @@ func (w *ApplicationService) convertToChatFlowRunResponseList(ctx context.Contex
 				if info.suggestReplyInfo != nil && info.suggestReplyInfo.IsSetSuggestReplyMode() && info.suggestReplyInfo.GetSuggestReplyMode() != workflow.SuggestReplyInfoMode_Disable {
 					sInfo := &vo.SuggestInfo{
 						UserInput:    userMessage,
-						AnswerInput:  schema.AssistantMessage(intermediateMessage.Content, nil),
+						AnswerInput:  einobridge.AssistantMessage(intermediateMessage.Content, nil),
 						PersonaInput: info.suggestReplyInfo.CustomizedSuggestPrompt,
 					}
 
@@ -856,7 +855,7 @@ func (w *ApplicationService) convertToChatFlowRunResponseList(ctx context.Contex
 									ConversationID: strconv.FormatInt(conversationID, 10),
 									SectionID:      strconv.FormatInt(sectionID, 10),
 									BotID:          strconv.FormatInt(bizID, 10),
-									Role:           string(schema.Assistant),
+									Role:           string(einobridge.Assistant),
 									Type:           "follow_up",
 									ContentType:    "text",
 									Content:        s,
@@ -995,7 +994,7 @@ func (w *ApplicationService) convertToChatFlowRunResponseList(ctx context.Contex
 					SectionID:      sectionID,
 					Content:        msgContent,
 					ConversationID: conversationID,
-					Role:           schema.Assistant,
+					Role:           einobridge.Assistant,
 					MessageType:    message.MessageTypeAnswer,
 					ContentType:    contentType,
 				})
@@ -1009,7 +1008,7 @@ func (w *ApplicationService) convertToChatFlowRunResponseList(ctx context.Contex
 					ConversationID: strconv.FormatInt(conversationID, 10),
 					SectionID:      strconv.FormatInt(sectionID, 10),
 					BotID:          strconv.FormatInt(bizID, 10),
-					Role:           string(schema.Assistant),
+					Role:           string(einobridge.Assistant),
 					Type:           string(entity.Answer),
 					ContentType:    string(contentType),
 					Content:        msgContent,
@@ -1085,18 +1084,18 @@ func (w *ApplicationService) convertToChatFlowRunResponseList(ctx context.Contex
 				return responses, nil
 
 			default:
-				return nil, schema.ErrNoValue
+				return nil, einobridge.ErrNoValue
 			}
 		}
 		if msg.DataMessage != nil {
 			if msg.Type != entity.Answer {
-				return nil, schema.ErrNoValue
+				return nil, einobridge.ErrNoValue
 			}
 			if executeID > 0 && executeID != msg.DataMessage.ExecuteID {
-				return nil, schema.ErrNoValue
+				return nil, einobridge.ErrNoValue
 			}
 			if msg.DataMessage.NodeType == entity.NodeTypeQuestionAnswer || msg.DataMessage.NodeType == entity.NodeTypeInputReceiver {
-				return nil, schema.ErrNoValue
+				return nil, einobridge.ErrNoValue
 			}
 			dataMessage := msg.DataMessage
 
@@ -1111,7 +1110,7 @@ func (w *ApplicationService) convertToChatFlowRunResponseList(ctx context.Contex
 					RunID:          roundID,
 					SectionID:      sectionID,
 					ConversationID: conversationID,
-					Role:           schema.Assistant,
+					Role:           einobridge.Assistant,
 					MessageType:    message.MessageTypeAnswer,
 					ContentType:    message.ContentTypeText,
 				}
@@ -1360,7 +1359,7 @@ func toConversationMessage(ctx context.Context, bizID, cid, userID, roundID, sec
 	}
 	if msg.ContentType == "text" {
 		return &message.Message{
-			Role:           schema.User,
+			Role:           einobridge.User,
 			ConversationID: cid,
 			AgentID:        bizID,
 			RunID:          roundID,
@@ -1379,7 +1378,7 @@ func toConversationMessage(ctx context.Context, bizID, cid, userID, roundID, sec
 		}
 
 		m := &message.Message{
-			Role:           schema.User,
+			Role:           einobridge.User,
 			MessageType:    messageType,
 			ConversationID: cid,
 			AgentID:        bizID,
@@ -1427,15 +1426,15 @@ func toConversationMessage(ctx context.Context, bizID, cid, userID, roundID, sec
 	}
 }
 
-func toSchemaMessage(ctx context.Context, msg *workflow.EnterMessage) (*schema.Message, error) {
+func toSchemaMessage(ctx context.Context, msg *workflow.EnterMessage) (*einobridge.Message, error) {
 	type content struct {
 		Type   string  `json:"type"`
 		FileID *string `json:"file_id"`
 		Text   *string `json:"text"`
 	}
 	if msg.ContentType == "text" {
-		return &schema.Message{
-			Role:    schema.User,
+		return &einobridge.Message{
+			Role:    einobridge.User,
 			Content: msg.Content,
 		}, nil
 
@@ -1445,9 +1444,9 @@ func toSchemaMessage(ctx context.Context, msg *workflow.EnterMessage) (*schema.M
 		if err != nil {
 			return nil, err
 		}
-		m := &schema.Message{
-			Role:         schema.User,
-			MultiContent: make([]schema.ChatMessagePart, 0, len(contents)),
+		m := &einobridge.Message{
+			Role:         einobridge.User,
+			MultiContent: make([]einobridge.ChatMessagePart, 0, len(contents)),
 		}
 
 		for _, ct := range contents {
@@ -1455,8 +1454,8 @@ func toSchemaMessage(ctx context.Context, msg *workflow.EnterMessage) (*schema.M
 				if len(*ct.Text) == 0 {
 					continue
 				}
-				m.MultiContent = append(m.MultiContent, schema.ChatMessagePart{
-					Type: schema.ChatMessagePartTypeText,
+				m.MultiContent = append(m.MultiContent, einobridge.ChatMessagePart{
+					Type: einobridge.ChatMessagePartTypeText,
 					Text: *ct.Text,
 				})
 			} else if ct.FileID != nil {
@@ -1470,30 +1469,30 @@ func toSchemaMessage(ctx context.Context, msg *workflow.EnterMessage) (*schema.M
 				}
 				switch ct.Type {
 				case "file":
-					m.MultiContent = append(m.MultiContent, schema.ChatMessagePart{
-						Type: schema.ChatMessagePartTypeFileURL,
-						FileURL: &schema.ChatMessageFileURL{
+					m.MultiContent = append(m.MultiContent, einobridge.ChatMessagePart{
+						Type: einobridge.ChatMessagePartTypeFileURL,
+						FileURL: &einobridge.ChatMessageFileURL{
 							URL: file.File.Url,
 						},
 					})
 				case "image":
-					m.MultiContent = append(m.MultiContent, schema.ChatMessagePart{
-						Type: schema.ChatMessagePartTypeImageURL,
-						ImageURL: &schema.ChatMessageImageURL{
+					m.MultiContent = append(m.MultiContent, einobridge.ChatMessagePart{
+						Type: einobridge.ChatMessagePartTypeImageURL,
+						ImageURL: &einobridge.ChatMessageImageURL{
 							URL: file.File.Url,
 						},
 					})
 				case "audio":
-					m.MultiContent = append(m.MultiContent, schema.ChatMessagePart{
-						Type: schema.ChatMessagePartTypeAudioURL,
-						AudioURL: &schema.ChatMessageAudioURL{
+					m.MultiContent = append(m.MultiContent, einobridge.ChatMessagePart{
+						Type: einobridge.ChatMessagePartTypeAudioURL,
+						AudioURL: &einobridge.ChatMessageAudioURL{
 							URL: file.File.Url,
 						},
 					})
 				case "video":
-					m.MultiContent = append(m.MultiContent, schema.ChatMessagePart{
-						Type: schema.ChatMessagePartTypeVideoURL,
-						VideoURL: &schema.ChatMessageVideoURL{
+					m.MultiContent = append(m.MultiContent, einobridge.ChatMessagePart{
+						Type: einobridge.ChatMessagePartTypeVideoURL,
+						VideoURL: &einobridge.ChatMessageVideoURL{
 							URL: file.File.Url,
 						},
 					})
@@ -1510,7 +1509,7 @@ func toSchemaMessage(ctx context.Context, msg *workflow.EnterMessage) (*schema.M
 }
 
 type convertToChatFlowInfo struct {
-	userMessage      *schema.Message
+	userMessage      *einobridge.Message
 	bizID            int64
 	conversationID   int64
 	roundID          int64

@@ -22,7 +22,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cloudwego/eino/schema"
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 
@@ -130,7 +130,7 @@ func TestCreateMessage(t *testing.T) {
 		RunID:          7498710102375923712,
 		Content:        "你是谁？",
 		MultiContent:   content,
-		Role:           schema.Assistant,
+		Role:           einobridge.Assistant,
 		MessageType:    message.MessageTypeFunctionCall,
 		SectionID:      7496795464897921024,
 		ModelContent:   "{\"role\":\"tool\",\"content\":\"tool call\"}",
@@ -156,14 +156,14 @@ func TestEditMessage(t *testing.T) {
 				ID:             1,
 				ConversationID: 1,
 				UserID:         "1",
-				Role:           string(schema.User),
+				Role:           string(einobridge.User),
 				RunID:          123,
 			},
 			&model.Message{
 				ID:             2,
 				ConversationID: 1,
 				UserID:         "1",
-				Role:           string(schema.User),
+				Role:           string(einobridge.User),
 				RunID:          124,
 				Ext:            string(ext),
 			},
@@ -217,7 +217,7 @@ func TestEditMessage(t *testing.T) {
 
 	assert.Equal(t, int64(2), msg.ID)
 	assert.Equal(t, "test edit message", msg.Content)
-	var modelContent *schema.Message
+	var modelContent *einobridge.Message
 	err = json.Unmarshal([]byte(msg.ModelContent), &modelContent)
 	assert.NoError(t, err)
 
@@ -519,7 +519,7 @@ func TestBatchCreate(t *testing.T) {
 				AgentID:        300,
 				UserID:         "user123",
 				Content:        "Hello World",
-				Role:           schema.User,
+				Role:           einobridge.User,
 				ContentType:    message.ContentTypeText,
 				MessageType:    message.MessageTypeQuestion,
 				Status:         message.MessageStatusAvailable,
@@ -531,7 +531,7 @@ func TestBatchCreate(t *testing.T) {
 				AgentID:        300,
 				UserID:         "user123",
 				Content:        "Hello World",
-				Role:           schema.Assistant,
+				Role:           einobridge.Assistant,
 				ContentType:    message.ContentTypeText,
 				MessageType:    message.MessageTypeQuestion,
 				Status:         message.MessageStatusAvailable,

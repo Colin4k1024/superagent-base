@@ -29,7 +29,7 @@ import (
 	context "context"
 	reflect "reflect"
 
-	schema "github.com/cloudwego/eino/schema"
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	workflow "github.com/superagent-ai/superagent-base/backend/crossdomain/workflow/model"
 	model "github.com/superagent-ai/superagent-base/backend/crossdomain/plugin/model"
 	entity "github.com/superagent-ai/superagent-base/backend/domain/plugin/entity"
@@ -270,10 +270,10 @@ func (m *MockInvokableTool) EXPECT() *MockInvokableToolMockRecorder {
 }
 
 // Info mocks base method.
-func (m *MockInvokableTool) Info(ctx context.Context) (*schema.ToolInfo, error) {
+func (m *MockInvokableTool) Info(ctx context.Context) (*einobridge.ToolInfo, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Info", ctx)
-	ret0, _ := ret[0].(*schema.ToolInfo)
+	ret0, _ := ret[0].(*einobridge.ToolInfo)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }

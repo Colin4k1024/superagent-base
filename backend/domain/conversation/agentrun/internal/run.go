@@ -20,7 +20,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/cloudwego/eino/schema"
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 
 	"github.com/superagent-ai/superagent-base/backend/api/model/app/bot_common"
 	singleagent "github.com/superagent-ai/superagent-base/backend/crossdomain/agent/model"
@@ -43,7 +43,7 @@ type AgentRuntime struct {
 	Input         *msgEntity.Message
 	HistoryMsg    []*msgEntity.Message
 	Usage         *agentrun.Usage
-	SW            *schema.StreamWriter[*entity.AgentRunResponse]
+	SW            *einobridge.StreamWriter[*entity.AgentRunResponse]
 
 	RunProcess    *RunProcess
 	RunRecordRepo repository.RunRecordRepo

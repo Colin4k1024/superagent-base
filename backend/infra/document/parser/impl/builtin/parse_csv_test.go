@@ -25,7 +25,7 @@ import (
 	"testing"
 
 	"github.com/cloudwego/eino/components/document/parser"
-	"github.com/cloudwego/eino/schema"
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/superagent-ai/superagent-base/backend/infra/document"
@@ -181,7 +181,7 @@ func TestParseCSVBadCases(t *testing.T) {
 	})
 }
 
-func assertSheet(t *testing.T, i int, doc *schema.Document) {
+func assertSheet(t *testing.T, i int, doc *einobridge.Document) {
 	fmt.Printf("sheet[%d]:\n", i)
 	assert.NotNil(t, doc.MetaData)
 	assert.NotNil(t, doc.MetaData[document.MetaDataKeyColumns])

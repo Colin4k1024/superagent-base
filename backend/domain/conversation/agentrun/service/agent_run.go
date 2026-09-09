@@ -19,14 +19,14 @@ package agentrun
 import (
 	"context"
 
-	"github.com/cloudwego/eino/schema"
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 
 	"github.com/superagent-ai/superagent-base/backend/domain/conversation/agentrun/entity"
 )
 
 //go:generate mockgen -destination ../../../../internal/mock/domain/conversation/agentrun/agent_run_mock.go --package agentrun -source agent_run.go
 type Run interface {
-	AgentRun(ctx context.Context, req *entity.AgentRunMeta) (*schema.StreamReader[*entity.AgentRunResponse], error)
+	AgentRun(ctx context.Context, req *entity.AgentRunMeta) (*einobridge.StreamReader[*entity.AgentRunResponse], error)
 	Delete(ctx context.Context, runID []int64) error
 	Create(ctx context.Context, runRecord *entity.AgentRunMeta) (*entity.RunRecordMeta, error)
 	List(ctx context.Context, ListMeta *entity.ListRunRecordMeta) ([]*entity.RunRecordMeta, error)

@@ -22,7 +22,7 @@ import (
 
 	"github.com/cloudwego/eino/components/model"
 	"github.com/cloudwego/eino/components/prompt"
-	"github.com/cloudwego/eino/schema"
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/superagent-ai/superagent-base/backend/infra/document"
@@ -32,25 +32,25 @@ func TestNL2SQL(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("test table meta not provided", func(t *testing.T) {
-		impl, err := NewNL2SQL(ctx, &mockChatModel{"mock resp"}, prompt.FromMessages(schema.Jinja2,
-			schema.SystemMessage("system message 123"),
-			schema.UserMessage("{{messages}}, {{table_meta}}"),
+		impl, err := NewNL2SQL(ctx, &mockChatModel{"mock resp"}, prompt.FromMessages(einobridge.Jinja2,
+			einobridge.SystemMessage("system message 123"),
+			einobridge.UserMessage("{{messages}}, {{table_meta}}"),
 		))
 		assert.NoError(t, err)
 
-		sql, err := impl.NL2SQL(ctx, []*schema.Message{schema.UserMessage("hello")}, nil)
+		sql, err := impl.NL2SQL(ctx, []*einobridge.Message{einobridge.UserMessage("hello")}, nil)
 		assert.Error(t, err)
 		assert.Equal(t, "", sql)
 	})
 
 	t.Run("test parse failed", func(t *testing.T) {
-		impl, err := NewNL2SQL(ctx, &mockChatModel{"mock resp"}, prompt.FromMessages(schema.Jinja2,
-			schema.SystemMessage("system message 123"),
-			schema.UserMessage("{{messages}}, {{table_meta}}"),
+		impl, err := NewNL2SQL(ctx, &mockChatModel{"mock resp"}, prompt.FromMessages(einobridge.Jinja2,
+			einobridge.SystemMessage("system message 123"),
+			einobridge.UserMessage("{{messages}}, {{table_meta}}"),
 		))
 		assert.NoError(t, err)
 
-		sql, err := impl.NL2SQL(ctx, []*schema.Message{schema.UserMessage("hello")}, []*document.TableSchema{
+		sql, err := impl.NL2SQL(ctx, []*einobridge.Message{einobridge.UserMessage("hello")}, []*document.TableSchema{
 			{
 				Name:    "mock_table_1",
 				Comment: "hello",
@@ -81,13 +81,13 @@ func TestNL2SQL(t *testing.T) {
 	})
 
 	t.Run("test success", func(t *testing.T) {
-		impl, err := NewNL2SQL(ctx, &mockChatModel{`{"sql":"mock sql","err_code":0,"err_msg":""}`}, prompt.FromMessages(schema.Jinja2,
-			schema.SystemMessage("system message 123"),
-			schema.UserMessage("{{messages}}, {{table_meta}}"),
+		impl, err := NewNL2SQL(ctx, &mockChatModel{`{"sql":"mock sql","err_code":0,"err_msg":""}`}, prompt.FromMessages(einobridge.Jinja2,
+			einobridge.SystemMessage("system message 123"),
+			einobridge.UserMessage("{{messages}}, {{table_meta}}"),
 		))
 		assert.NoError(t, err)
 
-		sql, err := impl.NL2SQL(ctx, []*schema.Message{schema.UserMessage("hello")}, []*document.TableSchema{
+		sql, err := impl.NL2SQL(ctx, []*einobridge.Message{einobridge.UserMessage("hello")}, []*document.TableSchema{
 			{
 				Name:    "mock_table_1",
 				Comment: "hello",
@@ -123,15 +123,15 @@ type mockChatModel struct {
 	content string
 }
 
-func (m mockChatModel) Generate(ctx context.Context, input []*schema.Message, opts ...model.Option) (*schema.Message, error) {
-	return schema.AssistantMessage(m.content, nil), nil
+func (m mockChatModel) Generate(ctx context.Context, input []*einobridge.Message, opts ...model.Option) (*einobridge.Message, error) {
+	return einobridge.AssistantMessage(m.content, nil), nil
 }
 
-func (m mockChatModel) Stream(ctx context.Context, input []*schema.Message, opts ...model.Option) (*schema.StreamReader[*schema.Message], error) {
+func (m mockChatModel) Stream(ctx context.Context, input []*einobridge.Message, opts ...model.Option) (*einobridge.StreamReader[*einobridge.Message], error) {
 	return nil, nil
 }
 
-func (m mockChatModel) BindTools(tools []*schema.ToolInfo) error {
+func (m mockChatModel) BindTools(tools []*einobridge.ToolInfo) error {
 	return nil
 }
 

@@ -23,7 +23,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/cloudwego/eino/schema"
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 	"gorm.io/driver/mysql"
@@ -78,7 +78,7 @@ func TestNL2sqlExec(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	db := mock_db.NewMockRDB(ctrl)
 	nl2SQL := mock.NewMockNL2SQL(ctrl)
-	nl2SQL.EXPECT().NL2SQL(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, messages []*schema.Message, tables []*document.TableSchema, opts ...nl2sql.Option) (sql string, err error) {
+	nl2SQL.EXPECT().NL2SQL(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, messages []*einobridge.Message, tables []*document.TableSchema, opts ...nl2sql.Option) (sql string, err error) {
 		return "select count(*) from users", nil
 	})
 	db.EXPECT().ExecuteSQL(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req *rdb.ExecuteSQLRequest) (*rdb.ExecuteSQLResponse, error) {
@@ -161,7 +161,7 @@ func TestNL2sqlExec(t *testing.T) {
 	assert.Equal(t, nil, err)
 	assert.Equal(t, 1, len(docs))
 	assert.Equal(t, "sql:select count(*) from users;result:[{\"count(*)\":100}]", docs[0].Content)
-	nl2SQL.EXPECT().NL2SQL(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, messages []*schema.Message, tables []*document.TableSchema, opts ...nl2sql.Option) (sql string, err error) {
+	nl2SQL.EXPECT().NL2SQL(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, messages []*einobridge.Message, tables []*document.TableSchema, opts ...nl2sql.Option) (sql string, err error) {
 		return "", errors.New("nl2sql error")
 	})
 	_, err = svc.nl2SqlExec(ctx, &docu, retrieveCtx, nil)
@@ -169,7 +169,7 @@ func TestNL2sqlExec(t *testing.T) {
 	db.EXPECT().ExecuteSQL(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req *rdb.ExecuteSQLRequest) (*rdb.ExecuteSQLResponse, error) {
 		return nil, errors.New("rdb error")
 	})
-	nl2SQL.EXPECT().NL2SQL(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, messages []*schema.Message, tables []*document.TableSchema, opts ...nl2sql.Option) (sql string, err error) {
+	nl2SQL.EXPECT().NL2SQL(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, messages []*einobridge.Message, tables []*document.TableSchema, opts ...nl2sql.Option) (sql string, err error) {
 		return "select count(*) from users", nil
 	})
 	_, err = svc.nl2SqlExec(ctx, &docu, retrieveCtx, nil)
@@ -184,7 +184,7 @@ func TestNL2sqlExec(t *testing.T) {
 			}},
 		}, nil
 	})
-	nl2SQL.EXPECT().NL2SQL(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, messages []*schema.Message, tables []*document.TableSchema, opts ...nl2sql.Option) (sql string, err error) {
+	nl2SQL.EXPECT().NL2SQL(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, messages []*einobridge.Message, tables []*document.TableSchema, opts ...nl2sql.Option) (sql string, err error) {
 		return "select name from users", nil
 	})
 	docs, err = svc.nl2SqlExec(ctx, &docu, retrieveCtx, nil)
@@ -197,7 +197,7 @@ func TestNL2sqlExec(t *testing.T) {
 func TestPackResults(t *testing.T) {
 	svc := knowledgeSVC{}
 	ctx := context.Background()
-	svc.packResults(ctx, []*schema.Document{})
+	svc.packResults(ctx, []*einobridge.Document{})
 	dsn := "root:root@tcp(127.0.0.1:3306)/opencoze?charset=utf8mb4&parseTime=True&loc=Local"
 	if os.Getenv("CI_JOB_NAME") != "" {
 		dsn = strings.ReplaceAll(dsn, "127.0.0.1", "mysql")
@@ -207,7 +207,7 @@ func TestPackResults(t *testing.T) {
 	svc.knowledgeRepo = repository.NewKnowledgeDAO(gormDB)
 	svc.documentRepo = repository.NewKnowledgeDocumentDAO(gormDB)
 	svc.sliceRepo = repository.NewKnowledgeDocumentSliceDAO(gormDB)
-	docs := []*schema.Document{
+	docs := []*einobridge.Document{
 		{
 			ID:      "",
 			Content: "sql:select count(*) from users;result:[{\"count(*)\":100}]",
@@ -223,7 +223,7 @@ func TestPackResults(t *testing.T) {
 	assert.Equal(t, nil, err)
 	assert.Equal(t, 1, len(res))
 	assert.Equal(t, "sql:select count(*) from users;result:[{\"count(*)\":100}]", ptr.From(res[0].Slice.RawContent[0].Text))
-	docs = []*schema.Document{
+	docs = []*einobridge.Document{
 		{
 			ID:      "10000",
 			Content: "",

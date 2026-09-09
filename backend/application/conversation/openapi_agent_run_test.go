@@ -22,7 +22,7 @@ import (
 	"io"
 	"testing"
 
-	"github.com/cloudwego/eino/schema"
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 
@@ -936,9 +936,9 @@ func (m *MockStreamReader) Recv() (*entity.AgentRunResponse, error) {
 	return response, nil
 }
 
-func newMockStreamReader(chunks []*entity.AgentRunResponse) *schema.StreamReader[*entity.AgentRunResponse] {
+func newMockStreamReader(chunks []*entity.AgentRunResponse) *einobridge.StreamReader[*entity.AgentRunResponse] {
 
-	sr, sw := schema.Pipe[*entity.AgentRunResponse](10)
+	sr, sw := einobridge.Pipe[*entity.AgentRunResponse](10)
 
 	go func() {
 		defer sw.Close()

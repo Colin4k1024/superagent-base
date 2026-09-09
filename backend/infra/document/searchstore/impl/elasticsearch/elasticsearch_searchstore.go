@@ -26,7 +26,7 @@ import (
 
 	"github.com/cloudwego/eino/components/indexer"
 	"github.com/cloudwego/eino/components/retriever"
-	"github.com/cloudwego/eino/schema"
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 
 	"github.com/superagent-ai/superagent-base/backend/infra/document"
 	"github.com/superagent-ai/superagent-base/backend/infra/document/searchstore"
@@ -39,7 +39,7 @@ type esSearchStore struct {
 	indexName string
 }
 
-func (e *esSearchStore) Store(ctx context.Context, docs []*schema.Document, opts ...indexer.Option) (ids []string, err error) {
+func (e *esSearchStore) Store(ctx context.Context, docs []*einobridge.Document, opts ...indexer.Option) (ids []string, err error) {
 	implSpecOptions := indexer.GetImplSpecificOptions(&searchstore.IndexerOptions{}, opts...)
 	defer func() {
 		if err != nil {
@@ -88,7 +88,7 @@ func (e *esSearchStore) Store(ctx context.Context, docs []*schema.Document, opts
 	return ids, nil
 }
 
-func (e *esSearchStore) Retrieve(ctx context.Context, query string, opts ...retriever.Option) ([]*schema.Document, error) {
+func (e *esSearchStore) Retrieve(ctx context.Context, query string, opts ...retriever.Option) ([]*einobridge.Document, error) {
 	var (
 		cli   = e.config.Client
 		index = e.indexName
@@ -213,8 +213,8 @@ func (e *esSearchStore) travDSL(query *es.Query, dsl *searchstore.DSL) error {
 	return nil
 }
 
-func (e *esSearchStore) parseSearchResult(resp *es.Response) (docs []*schema.Document, err error) {
-	docs = make([]*schema.Document, 0, len(resp.Hits.Hits))
+func (e *esSearchStore) parseSearchResult(resp *es.Response) (docs []*einobridge.Document, err error) {
+	docs = make([]*einobridge.Document, 0, len(resp.Hits.Hits))
 	firstScore := 0.0
 	for i, hit := range resp.Hits.Hits {
 		var src map[string]any
@@ -225,7 +225,7 @@ func (e *esSearchStore) parseSearchResult(resp *es.Response) (docs []*schema.Doc
 		}
 
 		ext := make(map[string]any)
-		doc := &schema.Document{MetaData: map[string]any{document.MetaDataKeyExternalStorage: ext}}
+		doc := &einobridge.Document{MetaData: map[string]any{document.MetaDataKeyExternalStorage: ext}}
 
 		for field, val := range src {
 			ok := true
@@ -267,7 +267,7 @@ func (e *esSearchStore) parseSearchResult(resp *es.Response) (docs []*schema.Doc
 	return docs, nil
 }
 
-func (e *esSearchStore) fromDocument(doc *schema.Document) (map[string]any, error) {
+func (e *esSearchStore) fromDocument(doc *einobridge.Document) (map[string]any, error) {
 	if doc.MetaData == nil {
 		return nil, fmt.Errorf("[fromDocument] es document meta data is nil")
 	}

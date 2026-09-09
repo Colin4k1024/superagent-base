@@ -26,7 +26,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/cloudwego/eino/schema"
 	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	xmaps "golang.org/x/exp/maps"
 	"golang.org/x/sync/errgroup"
@@ -1405,7 +1404,7 @@ func convertStreamRunEvent(workflowID int64) func(msg *entity.Message) (res *wor
 		if msg.StateMessage != nil {
 			// stream run will skip all messages from workflow tools
 			if executeID > 0 && executeID != msg.StateMessage.ExecuteID {
-				return nil, schema.ErrNoValue
+				return nil, einobridge.ErrNoValue
 			}
 
 			switch msg.StateMessage.Status {
@@ -1454,21 +1453,21 @@ func convertStreamRunEvent(workflowID int64) func(msg *entity.Message) (res *wor
 			case entity.WorkflowRunning:
 				executeID = msg.StateMessage.ExecuteID
 				spaceID = msg.SpaceID
-				return nil, schema.ErrNoValue
+				return nil, einobridge.ErrNoValue
 			default:
-				return nil, schema.ErrNoValue
+				return nil, einobridge.ErrNoValue
 			}
 		}
 
 		if msg.DataMessage != nil {
 			if msg.Type != entity.Answer {
 				// stream run api do not emit FunctionCall or ToolResponse
-				return nil, schema.ErrNoValue
+				return nil, einobridge.ErrNoValue
 			}
 
 			// stream run will skip all messages from workflow tools
 			if executeID > 0 && executeID != msg.DataMessage.ExecuteID {
-				return nil, schema.ErrNoValue
+				return nil, einobridge.ErrNoValue
 			}
 
 			res = &workflow.OpenAPIStreamRunFlowResponse{
@@ -1502,7 +1501,7 @@ func convertStreamRunEvent(workflowID int64) func(msg *entity.Message) (res *wor
 }
 
 func (w *ApplicationService) OpenAPIStreamRun(ctx context.Context, req *workflow.OpenAPIRunFlowRequest) (
-	_ *schema.StreamReader[*workflow.OpenAPIStreamRunFlowResponse], err error,
+	_ *einobridge.StreamReader[*workflow.OpenAPIStreamRunFlowResponse], err error,
 ) {
 	defer func() {
 		if panicErr := recover(); panicErr != nil {
@@ -1598,11 +1597,11 @@ func (w *ApplicationService) OpenAPIStreamRun(ctx context.Context, req *workflow
 
 	convert := convertStreamRunEvent(meta.ID)
 
-	return schema.StreamReaderWithConvert(einobridge.UnwrapStreamReader(sr), convert), nil
+	return einobridge.StreamReaderWithConvert(einobridge.UnwrapStreamReader(sr), convert), nil
 }
 
 func (w *ApplicationService) OpenAPIStreamResume(ctx context.Context, req *workflow.OpenAPIStreamResumeFlowRequest) (
-	_ *schema.StreamReader[*workflow.OpenAPIStreamRunFlowResponse], err error,
+	_ *einobridge.StreamReader[*workflow.OpenAPIStreamRunFlowResponse], err error,
 ) {
 	defer func() {
 		if panicErr := recover(); panicErr != nil {
@@ -1688,7 +1687,7 @@ func (w *ApplicationService) OpenAPIStreamResume(ctx context.Context, req *workf
 
 	convert := convertStreamRunEvent(workflowID)
 
-	return schema.StreamReaderWithConvert(einobridge.UnwrapStreamReader(sr), convert), nil
+	return einobridge.StreamReaderWithConvert(einobridge.UnwrapStreamReader(sr), convert), nil
 }
 
 func (w *ApplicationService) OpenAPIRun(ctx context.Context, req *workflow.OpenAPIRunFlowRequest) (

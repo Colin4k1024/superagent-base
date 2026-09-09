@@ -23,7 +23,7 @@ import (
 	"io"
 
 	"github.com/cloudwego/eino/components/document/parser"
-	"github.com/cloudwego/eino/schema"
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 
 	"github.com/superagent-ai/superagent-base/backend/bizpkg/llm/modelbuilder"
 	contract "github.com/superagent-ai/superagent-base/backend/infra/document/parser"
@@ -32,9 +32,9 @@ import (
 )
 
 func ParseImage(config *contract.Config, model modelbuilder.BaseChatModel) ParseFn {
-	return func(ctx context.Context, reader io.Reader, opts ...parser.Option) (docs []*schema.Document, err error) {
+	return func(ctx context.Context, reader io.Reader, opts ...parser.Option) (docs []*einobridge.Document, err error) {
 		options := parser.GetCommonOptions(&parser.Options{}, opts...)
-		doc := &schema.Document{
+		doc := &einobridge.Document{
 			MetaData: map[string]any{},
 		}
 		for k, v := range options.ExtraMeta {
@@ -56,17 +56,17 @@ func ParseImage(config *contract.Config, model modelbuilder.BaseChatModel) Parse
 			mime := fmt.Sprintf("image/%s", config.FileExtension)
 			url := fmt.Sprintf("data:%s;base64,%s", mime, b64)
 
-			input := &schema.Message{
-				Role: schema.User,
-				MultiContent: []schema.ChatMessagePart{
+			input := &einobridge.Message{
+				Role: einobridge.User,
+				MultiContent: []einobridge.ChatMessagePart{
 					{
-						Type: schema.ChatMessagePartTypeText,
+						Type: einobridge.ChatMessagePartTypeText,
 						//Text: "Give a short description of the image.", // TODO: prompt in current language
 						Text: "简短描述下这张图片",
 					},
 					{
-						Type: schema.ChatMessagePartTypeImageURL,
-						ImageURL: &schema.ChatMessageImageURL{
+						Type: einobridge.ChatMessagePartTypeImageURL,
+						ImageURL: &einobridge.ChatMessageImageURL{
 							URL:      url,
 							MIMEType: mime,
 						},
@@ -74,7 +74,7 @@ func ParseImage(config *contract.Config, model modelbuilder.BaseChatModel) Parse
 				},
 			}
 
-			output, err := model.Generate(ctx, []*schema.Message{input})
+			output, err := model.Generate(ctx, []*einobridge.Message{input})
 			if err != nil {
 				return nil, fmt.Errorf("[ParseImage] model generate failed: %w", err)
 			}
@@ -86,6 +86,6 @@ func ParseImage(config *contract.Config, model modelbuilder.BaseChatModel) Parse
 			return nil, fmt.Errorf("[ParseImage] unknown image annotation type=%d", config.ParsingStrategy.ImageAnnotationType)
 		}
 
-		return []*schema.Document{doc}, nil
+		return []*einobridge.Document{doc}, nil
 	}
 }

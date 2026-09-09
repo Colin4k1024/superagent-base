@@ -20,7 +20,7 @@ import (
 	"os"
 
 	"github.com/cloudwego/eino/components/prompt"
-	"github.com/cloudwego/eino/schema"
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 
 	"github.com/superagent-ai/superagent-base/backend/pkg/logs"
 )
@@ -39,13 +39,13 @@ func ReadJinja2PromptTemplate(jsonFilePath string) (prompt.ChatTemplate, error) 
 	if err != nil {
 		return nil, err
 	}
-	var m2qMessages []*schema.Message
+	var m2qMessages []*einobridge.Message
 	if err = json.Unmarshal(b, &m2qMessages); err != nil {
 		return nil, err
 	}
-	tpl := make([]schema.MessagesTemplate, len(m2qMessages))
+	tpl := make([]einobridge.MessagesTemplate, len(m2qMessages))
 	for i := range m2qMessages {
 		tpl[i] = m2qMessages[i]
 	}
-	return prompt.FromMessages(schema.Jinja2, tpl...), nil
+	return prompt.FromMessages(einobridge.Jinja2, tpl...), nil
 }

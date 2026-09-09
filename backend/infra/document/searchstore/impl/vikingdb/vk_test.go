@@ -24,7 +24,7 @@ import (
 
 	"github.com/cloudwego/eino-ext/components/embedding/openai"
 	"github.com/cloudwego/eino/components/retriever"
-	"github.com/cloudwego/eino/schema"
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	"github.com/stretchr/testify/assert"
 	"github.com/volcengine/volc-sdk-golang/service/vikingdb"
 
@@ -98,7 +98,7 @@ func TestVikingEmbeddingIntegration(t *testing.T) {
 		ss, err := mgr.GetSearchStore(ctx, collectionName)
 		assert.NoError(t, err)
 
-		ids, err := ss.Store(ctx, []*schema.Document{
+		ids, err := ss.Store(ctx, []*einobridge.Document{
 			{
 				ID:      "101",
 				Content: "埃菲尔铁塔：位于法国巴黎，是世界上最著名的地标之一，由居斯塔夫・埃菲尔设计并建于 1889 年。",
@@ -228,7 +228,7 @@ func TestBuiltinEmbeddingIntegration(t *testing.T) {
 		ss, err := mgr.GetSearchStore(ctx, collectionName)
 		assert.NoError(t, err)
 
-		ids, err := ss.Store(ctx, []*schema.Document{
+		ids, err := ss.Store(ctx, []*einobridge.Document{
 			{
 				ID:      "101",
 				Content: "埃菲尔铁塔：位于法国巴黎，是世界上最著名的地标之一，由居斯塔夫・埃菲尔设计并建于 1889 年。",

@@ -19,7 +19,7 @@ package plugin
 import (
 	"context"
 
-	"github.com/cloudwego/eino/schema"
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 
 	model "github.com/superagent-ai/superagent-base/backend/crossdomain/plugin/model"
 	workflow "github.com/superagent-ai/superagent-base/backend/crossdomain/workflow/model"
@@ -44,7 +44,7 @@ type PluginService interface {
 }
 
 type InvokableTool interface {
-	Info(ctx context.Context) (*schema.ToolInfo, error)
+	Info(ctx context.Context) (*einobridge.ToolInfo, error)
 	PluginInvoke(ctx context.Context, argumentsInJSON string, cfg workflow.ExecuteConfig) (string, error)
 }
 

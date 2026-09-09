@@ -20,7 +20,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/cloudwego/eino/schema"
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 
 	agentrun "github.com/superagent-ai/superagent-base/backend/crossdomain/agentrun/model"
 	"github.com/superagent-ai/superagent-base/backend/domain/conversation/agentrun/entity"
@@ -31,7 +31,7 @@ import (
 
 type RunProcess struct {
 	event         *Event
-	SW            *schema.StreamWriter[*entity.AgentRunResponse]
+	SW            *einobridge.StreamWriter[*entity.AgentRunResponse]
 	RunRecordRepo repository.RunRecordRepo
 }
 
@@ -41,11 +41,11 @@ func NewRunProcess(runRecordRepo repository.RunRecordRepo) *RunProcess {
 	}
 }
 
-func (r *RunProcess) StepToCreate(ctx context.Context, srRecord *entity.ChunkRunItem, sw *schema.StreamWriter[*entity.AgentRunResponse]) {
+func (r *RunProcess) StepToCreate(ctx context.Context, srRecord *entity.ChunkRunItem, sw *einobridge.StreamWriter[*entity.AgentRunResponse]) {
 	srRecord.Status = entity.RunStatusCreated
 	r.event.SendRunEvent(entity.RunEventCreated, srRecord, sw)
 }
-func (r *RunProcess) StepToInProgress(ctx context.Context, srRecord *entity.ChunkRunItem, sw *schema.StreamWriter[*entity.AgentRunResponse]) error {
+func (r *RunProcess) StepToInProgress(ctx context.Context, srRecord *entity.ChunkRunItem, sw *einobridge.StreamWriter[*entity.AgentRunResponse]) error {
 	srRecord.Status = entity.RunStatusInProgress
 
 	updateMeta := &entity.UpdateMeta{
@@ -62,7 +62,7 @@ func (r *RunProcess) StepToInProgress(ctx context.Context, srRecord *entity.Chun
 	return nil
 }
 
-func (r *RunProcess) StepToComplete(ctx context.Context, srRecord *entity.ChunkRunItem, sw *schema.StreamWriter[*entity.AgentRunResponse], usage *agentrun.Usage) {
+func (r *RunProcess) StepToComplete(ctx context.Context, srRecord *entity.ChunkRunItem, sw *einobridge.StreamWriter[*entity.AgentRunResponse], usage *agentrun.Usage) {
 
 	completedAt := time.Now().UnixMilli()
 
@@ -89,7 +89,7 @@ func (r *RunProcess) StepToComplete(ctx context.Context, srRecord *entity.ChunkR
 
 	r.event.SendStreamDoneEvent(sw)
 }
-func (r *RunProcess) StepToFailed(ctx context.Context, srRecord *entity.ChunkRunItem, sw *schema.StreamWriter[*entity.AgentRunResponse]) {
+func (r *RunProcess) StepToFailed(ctx context.Context, srRecord *entity.ChunkRunItem, sw *einobridge.StreamWriter[*entity.AgentRunResponse]) {
 
 	nowTime := time.Now().UnixMilli()
 	updateMeta := &entity.UpdateMeta{
@@ -117,6 +117,6 @@ func (r *RunProcess) StepToFailed(ctx context.Context, srRecord *entity.ChunkRun
 	})
 }
 
-func (r *RunProcess) StepToDone(sw *schema.StreamWriter[*entity.AgentRunResponse]) {
+func (r *RunProcess) StepToDone(sw *einobridge.StreamWriter[*entity.AgentRunResponse]) {
 	r.event.SendStreamDoneEvent(sw)
 }

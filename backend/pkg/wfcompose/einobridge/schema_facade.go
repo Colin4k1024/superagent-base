@@ -167,3 +167,12 @@ const (
 	Null    DataType = schema.Null
 	Boolean DataType = schema.Boolean
 )
+
+// Additional type aliases for S4 migration
+type FunctionCall = schema.FunctionCall
+
+// ToolMessage constructs a tool-result message.
+func ToolMessage(content string, toolCallID string) *Message {
+	return schema.ToolMessage(content, toolCallID)
+}
+

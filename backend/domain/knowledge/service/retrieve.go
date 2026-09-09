@@ -26,7 +26,7 @@ import (
 
 	"github.com/cloudwego/eino/components/retriever"
 	"github.com/cloudwego/eino/compose"
-	"github.com/cloudwego/eino/schema"
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	"golang.org/x/sync/errgroup"
 
 	knowledgeModel "github.com/superagent-ai/superagent-base/backend/crossdomain/knowledge/model"
@@ -142,7 +142,7 @@ func (k *knowledgeSVC) newRetrieveContext(ctx context.Context, req *RetrieveRequ
 	resp := RetrieveContext{
 		Ctx:              ctx,
 		OriginQuery:      req.Query,
-		ChatHistory:      append(req.ChatHistory, schema.UserMessage(req.Query)),
+		ChatHistory:      append(req.ChatHistory, einobridge.UserMessage(req.Query)),
 		KnowledgeIDs:     knowledgeIDSets,
 		KnowledgeInfoMap: knowledgeInfoMap,
 		Strategy:         req.Strategy,
@@ -200,7 +200,7 @@ func (k *knowledgeSVC) queryRewriteNode(ctx context.Context, req *RetrieveContex
 	return req, nil
 }
 
-func (k *knowledgeSVC) vectorRetrieveNode(ctx context.Context, req *RetrieveContext) (retrieveResult []*schema.Document, err error) {
+func (k *knowledgeSVC) vectorRetrieveNode(ctx context.Context, req *RetrieveContext) (retrieveResult []*einobridge.Document, err error) {
 	if req.Strategy.SearchType == knowledgeModel.SearchTypeFullText {
 		return nil, nil
 	}
@@ -224,7 +224,7 @@ func (k *knowledgeSVC) vectorRetrieveNode(ctx context.Context, req *RetrieveCont
 	return retrieveResult, nil
 }
 
-func (k *knowledgeSVC) esRetrieveNode(ctx context.Context, req *RetrieveContext) (retrieveResult []*schema.Document, err error) {
+func (k *knowledgeSVC) esRetrieveNode(ctx context.Context, req *RetrieveContext) (retrieveResult []*einobridge.Document, err error) {
 	if req.Strategy.SearchType == knowledgeModel.SearchTypeSemantic {
 		return nil, nil
 	}
@@ -248,7 +248,7 @@ func (k *knowledgeSVC) esRetrieveNode(ctx context.Context, req *RetrieveContext)
 	return retrieveResult, nil
 }
 
-func (k *knowledgeSVC) retrieveChannels(ctx context.Context, req *RetrieveContext, manager searchstore.Manager) (result []*schema.Document, err error) {
+func (k *knowledgeSVC) retrieveChannels(ctx context.Context, req *RetrieveContext, manager searchstore.Manager) (result []*einobridge.Document, err error) {
 	query := req.OriginQuery
 	if req.Strategy.EnableQueryRewrite && req.RewrittenQuery != nil {
 		query = *req.RewrittenQuery
@@ -310,7 +310,7 @@ func (k *knowledgeSVC) retrieveChannels(ctx context.Context, req *RetrieveContex
 	return
 }
 
-func (k *knowledgeSVC) nl2SqlRetrieveNode(ctx context.Context, req *RetrieveContext) (retrieveResult []*schema.Document, err error) {
+func (k *knowledgeSVC) nl2SqlRetrieveNode(ctx context.Context, req *RetrieveContext) (retrieveResult []*einobridge.Document, err error) {
 	hasTable := false
 	var tableDocs []*model.KnowledgeDocument
 	for _, doc := range req.Documents {
@@ -327,7 +327,7 @@ func (k *knowledgeSVC) nl2SqlRetrieveNode(ctx context.Context, req *RetrieveCont
 		mu := sync.Mutex{}
 		eg, ctx := errgroup.WithContext(ctx)
 		eg.SetLimit(len(tableDocs))
-		res := make([]*schema.Document, 0)
+		res := make([]*einobridge.Document, 0)
 		for i := range tableDocs {
 			t := i
 			eg.Go(func() error {
@@ -355,7 +355,7 @@ func (k *knowledgeSVC) nl2SqlRetrieveNode(ctx context.Context, req *RetrieveCont
 }
 
 func (k *knowledgeSVC) nl2SqlExec(ctx context.Context, doc *model.KnowledgeDocument, retrieveCtx *RetrieveContext, opts []nl2sql.Option) (
-	retrieveResult []*schema.Document, err error) {
+	retrieveResult []*einobridge.Document, err error) {
 	sql, err := k.nl2Sql.NL2SQL(ctx, retrieveCtx.ChatHistory, []*document.TableSchema{packNL2SqlRequest(doc)}, opts...)
 	if err != nil {
 		logs.CtxErrorf(ctx, "nl2sql failed: %v", err)
@@ -398,7 +398,7 @@ func (k *knowledgeSVC) nl2SqlExec(ctx context.Context, doc *model.KnowledgeDocum
 		return nil, err
 	}
 	for i := range resp.ResultSet.Rows {
-		d := &schema.Document{
+		d := &einobridge.Document{
 			Content: "",
 			MetaData: map[string]any{
 				"document_id":    doc.ID,
@@ -488,7 +488,7 @@ func (k *knowledgeSVC) passRequestContext(ctx context.Context, req *RetrieveCont
 	return req, nil
 }
 
-func (k *knowledgeSVC) reRankNode(ctx context.Context, resultMap map[string]any) (retrieveResult []*schema.Document, err error) {
+func (k *knowledgeSVC) reRankNode(ctx context.Context, resultMap map[string]any) (retrieveResult []*einobridge.Document, err error) {
 	// First retrieve the context
 	retrieveCtx, ok := resultMap["passRequestContext"].(*RetrieveContext)
 	if !ok {
@@ -496,25 +496,25 @@ func (k *knowledgeSVC) reRankNode(ctx context.Context, resultMap map[string]any)
 		return nil, errorx.New(errno.ErrKnowledgeSystemCode, errorx.KV("msg", "retrieve context is not found"))
 	}
 	// Get the interface for the downvectorized recall
-	vectorRetrieveResult, ok := resultMap["vectorRetrieveNode"].([]*schema.Document)
+	vectorRetrieveResult, ok := resultMap["vectorRetrieveNode"].([]*einobridge.Document)
 	if !ok {
 		logs.CtxErrorf(ctx, "vector retrieve result is not found")
-		vectorRetrieveResult = []*schema.Document{}
+		vectorRetrieveResult = []*einobridge.Document{}
 	}
 	// Get the interface of the es recall.
-	esRetrieveResult, ok := resultMap["esRetrieveNode"].([]*schema.Document)
+	esRetrieveResult, ok := resultMap["esRetrieveNode"].([]*einobridge.Document)
 	if !ok {
 		logs.CtxErrorf(ctx, "es retrieve result is not found")
-		esRetrieveResult = []*schema.Document{}
+		esRetrieveResult = []*einobridge.Document{}
 	}
 	// Get the interface recalled under nl2sql
-	nl2SqlRetrieveResult, ok := resultMap["nl2SqlRetrieveNode"].([]*schema.Document)
+	nl2SqlRetrieveResult, ok := resultMap["nl2SqlRetrieveNode"].([]*einobridge.Document)
 	if !ok {
 		logs.CtxErrorf(ctx, "nl2sql retrieve result is not found")
-		nl2SqlRetrieveResult = []*schema.Document{}
+		nl2SqlRetrieveResult = []*einobridge.Document{}
 	}
 
-	docs2RerankData := func(docs []*schema.Document) []*rerank.Data {
+	docs2RerankData := func(docs []*einobridge.Document) []*rerank.Data {
 		data := make([]*rerank.Data, 0, len(docs))
 		for i := range docs {
 			doc := docs[i]
@@ -556,7 +556,7 @@ func (k *knowledgeSVC) reRankNode(ctx context.Context, resultMap map[string]any)
 		return nil, err
 	}
 
-	retrieveResult = make([]*schema.Document, 0, len(resp.SortedData))
+	retrieveResult = make([]*einobridge.Document, 0, len(resp.SortedData))
 	for _, item := range resp.SortedData {
 		if item.Score < ptr.From(retrieveCtx.Strategy.MinScore) {
 			continue
@@ -569,7 +569,7 @@ func (k *knowledgeSVC) reRankNode(ctx context.Context, resultMap map[string]any)
 	return retrieveResult, nil
 }
 
-func (k *knowledgeSVC) packResults(ctx context.Context, retrieveResult []*schema.Document) (results []*knowledgeModel.RetrieveSlice, err error) {
+func (k *knowledgeSVC) packResults(ctx context.Context, retrieveResult []*einobridge.Document) (results []*knowledgeModel.RetrieveSlice, err error) {
 	if len(retrieveResult) == 0 {
 		return nil, nil
 	}

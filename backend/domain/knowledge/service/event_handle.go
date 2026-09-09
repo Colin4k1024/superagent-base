@@ -26,7 +26,7 @@ import (
 
 	"github.com/bytedance/sonic"
 	"github.com/cloudwego/eino/components/document/parser"
-	"github.com/cloudwego/eino/schema"
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 
 	knowledge "github.com/superagent-ai/superagent-base/backend/crossdomain/knowledge/model"
 	"github.com/superagent-ai/superagent-base/backend/domain/knowledge/entity"
@@ -174,7 +174,7 @@ func (k *knowledgeSVC) indexDocument(ctx context.Context, event *entity.Event) (
 	}
 
 	// Process document parsing and chunking
-	var parseResult []*schema.Document
+	var parseResult []*einobridge.Document
 	var cacheRecord *indexDocCacheRecord
 	parseResult, cacheRecord, err = k.processDocumentParsing(ctx, doc)
 	if err != nil {
@@ -259,7 +259,7 @@ func (k *knowledgeSVC) beginIndexingProcess(ctx context.Context, doc *entity.Doc
 
 // processDocumentParsing handles document parsing and caching
 func (k *knowledgeSVC) processDocumentParsing(ctx context.Context, doc *entity.Document) (
-	[]*schema.Document, *indexDocCacheRecord, error) {
+	[]*einobridge.Document, *indexDocCacheRecord, error) {
 
 	cacheKey := fmt.Sprintf(indexDocCacheKey, doc.KnowledgeID, doc.ID)
 	cacheRecord := &indexDocCacheRecord{}
@@ -284,7 +284,7 @@ func (k *knowledgeSVC) processDocumentParsing(ctx context.Context, doc *entity.D
 
 // parseAndCacheDocument parses the document and caches the results
 func (k *knowledgeSVC) parseAndCacheDocument(ctx context.Context, doc *entity.Document,
-	cacheRecord *indexDocCacheRecord, cacheKey string) ([]*schema.Document, *indexDocCacheRecord, error) {
+	cacheRecord *indexDocCacheRecord, cacheKey string) ([]*einobridge.Document, *indexDocCacheRecord, error) {
 
 	// Get document content from storage
 	bodyBytes, err := k.storage.GetObject(ctx, doc.URI)
@@ -322,7 +322,7 @@ func (k *knowledgeSVC) parseAndCacheDocument(ctx context.Context, doc *entity.Do
 
 // cacheParseResults stores parse results in persistent storage and cache
 func (k *knowledgeSVC) cacheParseResults(ctx context.Context, doc *entity.Document,
-	parseResult []*schema.Document, cacheRecord *indexDocCacheRecord, cacheKey string) error {
+	parseResult []*einobridge.Document, cacheRecord *indexDocCacheRecord, cacheKey string) error {
 
 	parseResultData, err := sonic.Marshal(parseResult)
 	if err != nil {
@@ -342,7 +342,7 @@ func (k *knowledgeSVC) cacheParseResults(ctx context.Context, doc *entity.Docume
 
 // loadParsedDocument loads previously parsed document from cache
 func (k *knowledgeSVC) loadParsedDocument(ctx context.Context,
-	cacheRecord *indexDocCacheRecord) ([]*schema.Document, *indexDocCacheRecord, error) {
+	cacheRecord *indexDocCacheRecord) ([]*einobridge.Document, *indexDocCacheRecord, error) {
 
 	data, err := k.storage.GetObject(ctx, cacheRecord.ParseUri)
 	if err != nil {
@@ -350,7 +350,7 @@ func (k *knowledgeSVC) loadParsedDocument(ctx context.Context,
 			errorx.KV("msg", fmt.Sprintf("get object failed, err: %v", err)))
 	}
 
-	var parseResult []*schema.Document
+	var parseResult []*einobridge.Document
 	if err = sonic.Unmarshal(data, &parseResult); err != nil {
 		return nil, nil, errorx.New(errno.ErrKnowledgeParseJSONCode,
 			errorx.KV("msg", fmt.Sprintf("marshal parse result failed, err: %v", err)))
@@ -361,7 +361,7 @@ func (k *knowledgeSVC) loadParsedDocument(ctx context.Context,
 
 // handleTableDocument handles special processing for table-type documents
 func (k *knowledgeSVC) handleTableDocument(ctx context.Context,
-	doc *entity.Document, parseResult []*schema.Document) error {
+	doc *entity.Document, parseResult []*einobridge.Document) error {
 
 	noData, err := document.GetDocumentsColumnsOnly(parseResult)
 	if err != nil {
@@ -376,7 +376,7 @@ func (k *knowledgeSVC) handleTableDocument(ctx context.Context,
 
 // processDocumentChunks processes document chunks in batches
 func (k *knowledgeSVC) processDocumentChunks(ctx context.Context,
-	doc *entity.Document, parseResult []*schema.Document, cacheRecord *indexDocCacheRecord) error {
+	doc *entity.Document, parseResult []*einobridge.Document, cacheRecord *indexDocCacheRecord) error {
 
 	batchSize := 100
 	progressbar := progressbar.New(ctx, doc.ID,
@@ -414,7 +414,7 @@ func (k *knowledgeSVC) finalizeDocumentIndexing(ctx context.Context, knowledgeID
 
 // batchProcessSlice processes a batch of document slices
 func (k *knowledgeSVC) batchProcessSlice(ctx context.Context, doc *entity.Document,
-	startIdx int, parseResult []*schema.Document, cacheRecord *indexDocCacheRecord,
+	startIdx int, parseResult []*einobridge.Document, cacheRecord *indexDocCacheRecord,
 	progressBar progressbar.ProgressBar) error {
 
 	collectionName := getCollectionName(doc.KnowledgeID)
@@ -485,7 +485,7 @@ func (k *knowledgeSVC) batchProcessSlice(ctx context.Context, doc *entity.Docume
 }
 
 // convertToSlices converts parsed documents to slice entities
-func (k *knowledgeSVC) convertToSlices(doc *entity.Document, parseResult []*schema.Document) ([]*entity.Slice, error) {
+func (k *knowledgeSVC) convertToSlices(doc *entity.Document, parseResult []*einobridge.Document) ([]*entity.Slice, error) {
 
 	convertFn := d2sMapping[doc.Type]
 	if convertFn == nil {
@@ -493,7 +493,7 @@ func (k *knowledgeSVC) convertToSlices(doc *entity.Document, parseResult []*sche
 			errorx.KV("msg", "convertFn is empty"))
 	}
 
-	return slices.TransformWithErrorCheck(parseResult, func(a *schema.Document) (*entity.Slice, error) {
+	return slices.TransformWithErrorCheck(parseResult, func(a *einobridge.Document) (*entity.Slice, error) {
 		return convertFn(a, doc.KnowledgeID, doc.ID, doc.CreatorID)
 	})
 }
@@ -549,7 +549,7 @@ func (k *knowledgeSVC) cleanupPreviousProcessing(ctx context.Context, doc *entit
 
 // storeSlicesInDB stores slice data in the database
 func (k *knowledgeSVC) storeSlicesInDB(ctx context.Context, doc *entity.Document,
-	parseResult []*schema.Document, startIdx int, ids []int64) error {
+	parseResult []*einobridge.Document, startIdx int, ids []int64) error {
 
 	var seqOffset float64
 	var err error
@@ -647,7 +647,7 @@ func (k *knowledgeSVC) indexSlicesInSearchStores(ctx context.Context, doc *entit
 	indexingFields := getIndexingFields(fields)
 
 	// Convert slices to search documents
-	ssDocs, err := slices.TransformWithErrorCheck(sliceEntities, func(a *entity.Slice) (*schema.Document, error) {
+	ssDocs, err := slices.TransformWithErrorCheck(sliceEntities, func(a *entity.Slice) (*einobridge.Document, error) {
 		return k.slice2Document(ctx, doc, a)
 	})
 	if err != nil {
@@ -819,7 +819,7 @@ func (k *knowledgeSVC) indexSlice(ctx context.Context, event *entity.Event) (err
 			return err
 		}
 
-		if _, err = ss.Store(ctx, []*schema.Document{doc},
+		if _, err = ss.Store(ctx, []*einobridge.Document{doc},
 			searchstore.WithIndexerPartitionKey(fieldNameDocumentID),
 			searchstore.WithPartition(strconv.FormatInt(event.Document.ID, 10)),
 			searchstore.WithIndexingFields(indexingFields),
@@ -920,7 +920,7 @@ func (k *knowledgeSVC) mapSearchFields(doc *entity.Document) ([]*searchstore.Fie
 	return fn(doc, k.enableCompactTable), nil
 }
 
-func (k *knowledgeSVC) slice2Document(ctx context.Context, src *entity.Document, slice *entity.Slice) (*schema.Document, error) {
+func (k *knowledgeSVC) slice2Document(ctx context.Context, src *entity.Document, slice *entity.Slice) (*einobridge.Document, error) {
 	fn, found := s2dMapping[src.Type]
 	if !found {
 		return nil, errorx.New(errno.ErrKnowledgeInvalidParamCode, errorx.KV("msg", fmt.Sprintf("document type invalid, type=%d", src.Type)))

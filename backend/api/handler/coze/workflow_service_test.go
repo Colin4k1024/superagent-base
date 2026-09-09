@@ -34,7 +34,7 @@ import (
 
 	"github.com/bytedance/mockey"
 	"github.com/cloudwego/eino/callbacks"
-	"github.com/cloudwego/eino/schema"
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/app/client"
 	"github.com/cloudwego/hertz/pkg/app/server"
@@ -1386,13 +1386,13 @@ func TestResumeWithQANode(t *testing.T) {
 		defer r.closeFn()
 
 		chatModel := &testutil.UTChatModel{
-			InvokeResultProvider: func(index int, in []*schema.Message) (*schema.Message, error) {
+			InvokeResultProvider: func(index int, in []*einobridge.Message) (*einobridge.Message, error) {
 				if index == 0 {
-					return &schema.Message{
-						Role:    schema.Assistant,
+					return &einobridge.Message{
+						Role:    einobridge.Assistant,
 						Content: `{"question": "what's your age?"}`,
-						ResponseMeta: &schema.ResponseMeta{
-							Usage: &schema.TokenUsage{
+						ResponseMeta: &einobridge.ResponseMeta{
+							Usage: &einobridge.TokenUsage{
 								PromptTokens:     6,
 								CompletionTokens: 7,
 								TotalTokens:      13,
@@ -1400,11 +1400,11 @@ func TestResumeWithQANode(t *testing.T) {
 						},
 					}, nil
 				} else if index == 1 {
-					return &schema.Message{
-						Role:    schema.Assistant,
+					return &einobridge.Message{
+						Role:    einobridge.Assistant,
 						Content: `{"fields": {"name": "eino", "age": 1}}`,
-						ResponseMeta: &schema.ResponseMeta{
-							Usage: &schema.TokenUsage{
+						ResponseMeta: &einobridge.ResponseMeta{
+							Usage: &einobridge.TokenUsage{
 								PromptTokens:     11,
 								CompletionTokens: 19,
 								TotalTokens:      30,
@@ -3162,7 +3162,7 @@ func TestConversationHistoryNodes(t *testing.T) {
 			Messages: []*message0.WfMessage{
 				{
 					ID:   mID,
-					Role: schema.User,
+					Role: einobridge.User,
 					Text: ptr.Of("你好"),
 				},
 			},
@@ -3223,7 +3223,7 @@ func TestConversationHistoryNodes(t *testing.T) {
 			Messages: []*message0.WfMessage{
 				{
 					ID:   mID,
-					Role: schema.Assistant,
+					Role: einobridge.Assistant,
 					Text: ptr.Of("你好, 我是coze"),
 				},
 			},

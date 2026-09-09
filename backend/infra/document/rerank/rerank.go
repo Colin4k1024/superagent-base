@@ -19,7 +19,7 @@ package rerank
 import (
 	"context"
 
-	"github.com/cloudwego/eino/schema"
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 )
 
 type Reranker interface {
@@ -38,6 +38,6 @@ type Response struct {
 }
 
 type Data struct {
-	Document *schema.Document
+	Document *einobridge.Document
 	Score    float64
 }

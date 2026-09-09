@@ -24,7 +24,7 @@ import (
 	"time"
 
 	"github.com/bytedance/sonic"
-	"github.com/cloudwego/eino/schema"
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	"golang.org/x/sync/errgroup"
 
 	crossdatacopy "github.com/superagent-ai/superagent-base/backend/crossdomain/datacopy"
@@ -442,7 +442,7 @@ func (k *knowledgeSVC) copyDocument(ctx context.Context, copyCtx *knowledgeCopyC
 			}
 		}
 
-		ssDocs, err := slices.TransformWithErrorCheck(sliceEntities, func(a *entity.Slice) (*schema.Document, error) {
+		ssDocs, err := slices.TransformWithErrorCheck(sliceEntities, func(a *entity.Slice) (*einobridge.Document, error) {
 			return k.slice2Document(ctx, docEntity, a)
 		})
 		if err != nil {

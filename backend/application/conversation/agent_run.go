@@ -23,7 +23,7 @@ import (
 	"io"
 	"strconv"
 
-	"github.com/cloudwego/eino/schema"
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 
 	"github.com/superagent-ai/superagent-base/backend/api/model/app/bot_common"
 	"github.com/superagent-ai/superagent-base/backend/api/model/conversation/message"
@@ -110,7 +110,7 @@ func (c *ConversationApplicationService) Run(ctx context.Context, sseSender *sse
 	return nil
 }
 
-func (c *ConversationApplicationService) pullStream(ctx context.Context, sseSender *sseImpl.SSenderImpl, arStream *schema.StreamReader[*entity.AgentRunResponse], req *run.AgentRunRequest) {
+func (c *ConversationApplicationService) pullStream(ctx context.Context, sseSender *sseImpl.SSenderImpl, arStream *einobridge.StreamReader[*entity.AgentRunResponse], req *run.AgentRunRequest) {
 	var ackMessageInfo *entity.ChunkMessageItem
 	for {
 		chunk, recvErr := arStream.Recv()
@@ -225,7 +225,7 @@ func buildErrMsg(ackChunk *entity.ChunkMessageItem, err *entity.RunError, id int
 		IsFinish:       ptr.Of(true),
 		ConversationID: strconv.FormatInt(ackChunk.ConversationID, 10),
 		Message: &message.ChatMessage{
-			Role:        string(schema.Assistant),
+			Role:        string(einobridge.Assistant),
 			ContentType: string(crossDomainMessage.ContentTypeText),
 			Type:        string(crossDomainMessage.MessageTypeAnswer),
 			MessageID:   strconv.FormatInt(id, 10),

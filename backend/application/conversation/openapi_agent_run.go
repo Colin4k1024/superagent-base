@@ -24,7 +24,7 @@ import (
 	"slices"
 	"strconv"
 
-	"github.com/cloudwego/eino/schema"
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 
 	"github.com/superagent-ai/superagent-base/backend/api/model/app/bot_common"
 	"github.com/superagent-ai/superagent-base/backend/api/model/conversation/common"
@@ -247,7 +247,7 @@ func (a *OpenapiAgentRunApplication) parseQueryContent(ctx context.Context, mult
 
 	if len(multiAdditionalMessages) > 0 {
 		lastMessage := multiAdditionalMessages[len(multiAdditionalMessages)-1]
-		if lastMessage != nil && lastMessage.Role == schema.User {
+		if lastMessage != nil && lastMessage.Role == einobridge.User {
 			multiContent = lastMessage.Content
 			contentType = lastMessage.ContentType
 			filterMultiAdditionalMessages = multiAdditionalMessages[:len(multiAdditionalMessages)-1]
@@ -265,7 +265,7 @@ func (a *OpenapiAgentRunApplication) parseAdditionalMessages(ctx context.Context
 		if item == nil {
 			continue
 		}
-		if item.Role != string(schema.User) && item.Role != string(schema.Assistant) {
+		if item.Role != string(einobridge.User) && item.Role != string(einobridge.Assistant) {
 			return nil, errors.New("additional message role only support user and assistant")
 		}
 		if item.Type != nil && !slices.Contains([]crossmessage.MessageType{crossmessage.MessageTypeQuestion, crossmessage.MessageTypeAnswer}, crossmessage.MessageType(*item.Type)) {
@@ -273,7 +273,7 @@ func (a *OpenapiAgentRunApplication) parseAdditionalMessages(ctx context.Context
 		}
 
 		addOne := entity.AdditionalMessage{
-			Role: schema.RoleType(item.Role),
+			Role: einobridge.RoleType(item.Role),
 		}
 		if item.Type != nil {
 			addOne.Type = crossmessage.MessageType(*item.Type)
@@ -353,7 +353,7 @@ func (a *OpenapiAgentRunApplication) parseAdditionalMessages(ctx context.Context
 	return additionalMessages, nil
 }
 
-func (a *OpenapiAgentRunApplication) pullStream(ctx context.Context, sseSender *sseImpl.SSenderImpl, streamer *schema.StreamReader[*entity.AgentRunResponse]) {
+func (a *OpenapiAgentRunApplication) pullStream(ctx context.Context, sseSender *sseImpl.SSenderImpl, streamer *einobridge.StreamReader[*entity.AgentRunResponse]) {
 	for {
 		chunk, recvErr := streamer.Recv()
 		logs.CtxInfof(ctx, "chunk :%v, err:%v", conv.DebugJsonToStr(chunk), recvErr)

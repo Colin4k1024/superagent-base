@@ -24,7 +24,7 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/cloudwego/eino/schema"
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 )
 
 func TableName(collectionName string) string {
@@ -37,7 +37,7 @@ func TableName(collectionName string) string {
 	return fmt.Sprintf("vector_%s", strings.ToLower(cleanName))
 }
 
-func ExtractContent(doc *schema.Document) string {
+func ExtractContent(doc *einobridge.Document) string {
 	if doc.Content != "" {
 		return strings.TrimSpace(doc.Content)
 	}
@@ -52,7 +52,7 @@ func ExtractContent(doc *schema.Document) string {
 	return ""
 }
 
-func BuildMetadata(doc *schema.Document) map[string]interface{} {
+func BuildMetadata(doc *einobridge.Document) map[string]interface{} {
 	metadata := make(map[string]interface{})
 	if doc.MetaData != nil {
 		for k, v := range doc.MetaData {

@@ -21,7 +21,7 @@ import (
 	"fmt"
 
 	einotool "github.com/cloudwego/eino/components/tool"
-	"github.com/cloudwego/eino/schema"
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 
 	"github.com/superagent-ai/superagent-base/backend/pkg/llm"
 )
@@ -39,42 +39,42 @@ func NewToolAdapter(t llm.Tool) *ToolAdapter {
 }
 
 // Info returns eino ToolInfo derived from the underlying llm.Tool.
-func (a *ToolAdapter) Info(ctx context.Context) (*schema.ToolInfo, error) {
+func (a *ToolAdapter) Info(ctx context.Context) (*einobridge.ToolInfo, error) {
 	info, err := a.tool.Info(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("eino tool adapter: get info: %w", err)
 	}
-	ei := &schema.ToolInfo{
+	ei := &einobridge.ToolInfo{
 		Name:  info.Name,
 		Desc:  info.Desc,
 		Extra: info.Extra,
 	}
 	if pp, ok := info.ParamsOneOf.(*llm.ParamsOneOfByParams); ok && pp != nil {
-		ei.ParamsOneOf = schema.NewParamsOneOfByParams(aclParamsToEino(pp.Params()))
+		ei.ParamsOneOf = einobridge.NewParamsOneOfByParams(aclParamsToEino(pp.Params()))
 	}
 	return ei, nil
 }
 
 // aclParamsToEino converts ACL ParameterInfo map to eino ParameterInfo map.
-func aclParamsToEino(params map[string]*llm.ParameterInfo) map[string]*schema.ParameterInfo {
+func aclParamsToEino(params map[string]*llm.ParameterInfo) map[string]*einobridge.ParameterInfo {
 	if len(params) == 0 {
 		return nil
 	}
-	out := make(map[string]*schema.ParameterInfo, len(params))
+	out := make(map[string]*einobridge.ParameterInfo, len(params))
 	for name, p := range params {
 		if p == nil {
 			continue
 		}
-		ep := &schema.ParameterInfo{
-			Type:      schema.DataType(p.Type),
+		ep := &einobridge.ParameterInfo{
+			Type:      einobridge.DataType(p.Type),
 			Desc:      p.Desc,
 			Enum:      p.Enum,
 			Required:  p.Required,
 			SubParams: aclParamsToEino(p.SubParams),
 		}
 		if p.ElemInfo != nil {
-			ep.ElemInfo = &schema.ParameterInfo{
-				Type:     schema.DataType(p.ElemInfo.Type),
+			ep.ElemInfo = &einobridge.ParameterInfo{
+				Type:     einobridge.DataType(p.ElemInfo.Type),
 				Desc:     p.ElemInfo.Desc,
 				Enum:     p.ElemInfo.Enum,
 				Required: p.ElemInfo.Required,
@@ -130,7 +130,7 @@ var _ llm.Tool = (*ReverseToolAdapter)(nil)
 
 // einoParamsToACL converts eino ParamsOneOf to ACL ParameterInfo map.
 // Uses the ParamsOneOf.ToJSONSchema method to extract params when available.
-func einoParamsToACL(p *schema.ParamsOneOf) map[string]*llm.ParameterInfo {
+func einoParamsToACL(p *einobridge.ParamsOneOf) map[string]*llm.ParameterInfo {
 	if p == nil {
 		return nil
 	}

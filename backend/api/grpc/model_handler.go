@@ -1,4 +1,20 @@
 /*
+ * Copyright 2025 coze-dev Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+/*
  * Copyright 2025 superagent-ai Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -33,7 +49,7 @@ import (
 	bizmgr "github.com/superagent-ai/superagent-base/backend/bizpkg/config/modelmgr"
 	"github.com/superagent-ai/superagent-base/backend/bizpkg/llm/modelbuilder"
 	"github.com/superagent-ai/superagent-base/backend/pkg/logs"
-	"github.com/cloudwego/eino/schema"
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 )
 
 // ModelHandler implements modelv1.ModelServiceServer by delegating to
@@ -223,8 +239,8 @@ func (h *ModelHandler) CreateModel(ctx context.Context, req *modelv1.CreateModel
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "build model failed: %v", err)
 	}
-	if _, err = chatModel.Generate(ctx, []*schema.Message{
-		schema.SystemMessage("1+1=?,Just answer with a number, no explanation."),
+	if _, err = chatModel.Generate(ctx, []*einobridge.Message{
+		einobridge.SystemMessage("1+1=?,Just answer with a number, no explanation."),
 	}); err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "model connectivity check failed: %v", err)
 	}
@@ -288,7 +304,7 @@ func (h *ModelHandler) TestModel(ctx context.Context, req *modelv1.TestModelRequ
 	}
 
 	start := time.Now()
-	resp, err := chatModel.Generate(ctx, []*schema.Message{schema.SystemMessage(prompt)})
+	resp, err := chatModel.Generate(ctx, []*einobridge.Message{einobridge.SystemMessage(prompt)})
 	latencyMs := time.Since(start).Milliseconds()
 
 	if err != nil {

@@ -25,7 +25,7 @@ import (
 
 	"github.com/cloudwego/eino/components/prompt"
 	"github.com/cloudwego/eino/compose"
-	"github.com/cloudwego/eino/schema"
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 
 	"github.com/superagent-ai/superagent-base/backend/bizpkg/llm/modelbuilder"
 	"github.com/superagent-ai/superagent-base/backend/infra/document"
@@ -50,7 +50,7 @@ type n2s struct {
 	tpl prompt.ChatTemplate
 }
 
-func (n *n2s) NL2SQL(ctx context.Context, messages []*schema.Message, tables []*document.TableSchema, opts ...nl2sql.Option) (sql string, err error) {
+func (n *n2s) NL2SQL(ctx context.Context, messages []*einobridge.Message, tables []*document.TableSchema, opts ...nl2sql.Option) (sql string, err error) {
 	o := &nl2sql.Options{ChatModel: n.cm}
 	for _, opt := range opts {
 		opt(o)
@@ -80,7 +80,7 @@ func (n *n2s) NL2SQL(ctx context.Context, messages []*schema.Message, tables []*
 		})).
 		AppendChatTemplate(n.tpl).
 		AppendChatModel(o.ChatModel).
-		AppendLambda(compose.InvokableLambda(func(ctx context.Context, msg *schema.Message) (sql string, err error) {
+		AppendLambda(compose.InvokableLambda(func(ctx context.Context, msg *einobridge.Message) (sql string, err error) {
 			var promptResp *promptResponse
 			if err := json.Unmarshal([]byte(msg.Content), &promptResp); err != nil {
 				logs.CtxWarnf(ctx, "unmarshal failed: %v", err)
@@ -107,7 +107,7 @@ func (n *n2s) NL2SQL(ctx context.Context, messages []*schema.Message, tables []*
 }
 
 type nl2sqlInput struct {
-	messages []*schema.Message
+	messages []*einobridge.Message
 	tables   []*document.TableSchema
 }
 

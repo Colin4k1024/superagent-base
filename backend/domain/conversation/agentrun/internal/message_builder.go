@@ -22,7 +22,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/cloudwego/eino/schema"
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 
 	messageModel "github.com/superagent-ai/superagent-base/backend/api/model/conversation/message"
 	crossagent "github.com/superagent-ai/superagent-base/backend/crossdomain/agent"
@@ -177,7 +177,7 @@ func processInputNodeInterruptData(data string) (string, message.ContentType, er
 	return data, message.ContentTypeCard, nil
 }
 
-func handlerUsage(meta *schema.ResponseMeta) *msgEntity.UsageExt {
+func handlerUsage(meta *einobridge.ResponseMeta) *msgEntity.UsageExt {
 	if meta == nil || meta.Usage == nil {
 		return nil
 	}
@@ -197,7 +197,7 @@ func preCreateAnswer(ctx context.Context, rtDependence *AgentRuntime) (*msgEntit
 		AgentID:        arm.AgentID,
 		SectionID:      arm.SectionID,
 		UserID:         arm.UserID,
-		Role:           schema.Assistant,
+		Role:           einobridge.Assistant,
 		MessageType:    message.MessageTypeAnswer,
 		ContentType:    message.ContentTypeText,
 		Ext:            arm.Ext,
@@ -234,7 +234,7 @@ func buildAdditionalMessage2Create(ctx context.Context, runRecord *entity.RunRec
 
 	switch additionalMessage.Type {
 	case message.MessageTypeQuestion:
-		msg.Role = schema.User
+		msg.Role = einobridge.User
 		msg.ContentType = additionalMessage.ContentType
 		for _, content := range additionalMessage.Content {
 			if content.Type == message.InputTypeText {
@@ -245,7 +245,7 @@ func buildAdditionalMessage2Create(ctx context.Context, runRecord *entity.RunRec
 		msg.MultiContent = additionalMessage.Content
 
 	case message.MessageTypeAnswer:
-		msg.Role = schema.Assistant
+		msg.Role = einobridge.Assistant
 		msg.ContentType = message.ContentTypeText
 		for _, content := range additionalMessage.Content {
 			if content.Type == message.InputTypeText {
@@ -253,8 +253,8 @@ func buildAdditionalMessage2Create(ctx context.Context, runRecord *entity.RunRec
 				break
 			}
 		}
-		modelContent := &schema.Message{
-			Role:    schema.Assistant,
+		modelContent := &einobridge.Message{
+			Role:    einobridge.Assistant,
 			Content: msg.Content,
 		}
 
@@ -282,7 +282,7 @@ func buildAgentMessage2Create(ctx context.Context, chunk *entity.AgentRespEvent,
 
 	switch messageType {
 	case message.MessageTypeQuestion:
-		msg.Role = schema.User
+		msg.Role = einobridge.User
 		msg.ContentType = arm.ContentType
 		for _, content := range arm.Content {
 			if content.Type == message.InputTypeText {
@@ -295,11 +295,11 @@ func buildAgentMessage2Create(ctx context.Context, chunk *entity.AgentRespEvent,
 
 		msg.DisplayContent = arm.DisplayContent
 	case message.MessageTypeAnswer, message.MessageTypeToolAsAnswer:
-		msg.Role = schema.Assistant
+		msg.Role = einobridge.Assistant
 		msg.ContentType = message.ContentTypeText
 
 	case message.MessageTypeToolResponse:
-		msg.Role = schema.Assistant
+		msg.Role = einobridge.Assistant
 		msg.ContentType = message.ContentTypeText
 		msg.Content = chunk.ToolsMessage[0].Content
 
@@ -311,7 +311,7 @@ func buildAgentMessage2Create(ctx context.Context, chunk *entity.AgentRespEvent,
 		}
 
 	case message.MessageTypeKnowledge:
-		msg.Role = schema.Assistant
+		msg.Role = einobridge.Assistant
 		msg.ContentType = message.ContentTypeText
 
 		knowledgeContent := buildKnowledge(ctx, chunk)
@@ -331,7 +331,7 @@ func buildAgentMessage2Create(ctx context.Context, chunk *entity.AgentRespEvent,
 		}
 
 	case message.MessageTypeFunctionCall:
-		msg.Role = schema.Assistant
+		msg.Role = einobridge.Assistant
 		msg.ContentType = message.ContentTypeText
 
 		if len(chunk.FuncCall.ToolCalls) > 0 {
@@ -351,12 +351,12 @@ func buildAgentMessage2Create(ctx context.Context, chunk *entity.AgentRespEvent,
 			}
 		}
 	case message.MessageTypeFlowUp:
-		msg.Role = schema.Assistant
+		msg.Role = einobridge.Assistant
 		msg.ContentType = message.ContentTypeText
 		msg.Content = chunk.Suggest.Content
 
 	case message.MessageTypeVerbose:
-		msg.Role = schema.Assistant
+		msg.Role = einobridge.Assistant
 		msg.ContentType = message.ContentTypeText
 
 		d := &entity.Data{
@@ -371,7 +371,7 @@ func buildAgentMessage2Create(ctx context.Context, chunk *entity.AgentRespEvent,
 		afcMarshal, _ := json.Marshal(afc)
 		msg.Content = string(afcMarshal)
 	case message.MessageTypeInterrupt:
-		msg.Role = schema.Assistant
+		msg.Role = einobridge.Assistant
 		msg.MessageType = message.MessageTypeVerbose
 		msg.ContentType = message.ContentTypeText
 
@@ -462,8 +462,8 @@ func historyPairs(historyMsg []*message.Message) []*message.Message {
 
 }
 
-func transMessageToSchemaMessage(ctx context.Context, msgs []*message.Message, imagexClient imagex.ImageX) []*schema.Message {
-	schemaMessage := make([]*schema.Message, 0, len(msgs))
+func transMessageToSchemaMessage(ctx context.Context, msgs []*message.Message, imagexClient imagex.ImageX) []*einobridge.Message {
+	schemaMessage := make([]*einobridge.Message, 0, len(msgs))
 
 	for _, msgOne := range msgs {
 		if msgOne.ModelContent == "" {
@@ -472,7 +472,7 @@ func transMessageToSchemaMessage(ctx context.Context, msgs []*message.Message, i
 		if msgOne.MessageType == message.MessageTypeVerbose || msgOne.MessageType == message.MessageTypeFlowUp {
 			continue
 		}
-		var sm *schema.Message
+		var sm *einobridge.Message
 		err := json.Unmarshal([]byte(msgOne.ModelContent), &sm)
 		if err != nil {
 			continue
@@ -486,13 +486,13 @@ func transMessageToSchemaMessage(ctx context.Context, msgs []*message.Message, i
 	return schemaMessage
 }
 
-func parseMessageURI(ctx context.Context, mcMsg *schema.Message, imagexClient imagex.ImageX) *schema.Message {
+func parseMessageURI(ctx context.Context, mcMsg *einobridge.Message, imagexClient imagex.ImageX) *einobridge.Message {
 	if mcMsg.MultiContent == nil {
 		return mcMsg
 	}
 	for k, one := range mcMsg.MultiContent {
 		switch one.Type {
-		case schema.ChatMessagePartTypeImageURL:
+		case einobridge.ChatMessagePartTypeImageURL:
 
 			if one.ImageURL.URI != "" {
 				url, err := imagexClient.GetResourceURL(ctx, one.ImageURL.URI)
@@ -500,21 +500,21 @@ func parseMessageURI(ctx context.Context, mcMsg *schema.Message, imagexClient im
 					mcMsg.MultiContent[k].ImageURL.URL = url.URL
 				}
 			}
-		case schema.ChatMessagePartTypeFileURL:
+		case einobridge.ChatMessagePartTypeFileURL:
 			if one.FileURL.URI != "" {
 				url, err := imagexClient.GetResourceURL(ctx, one.FileURL.URI)
 				if err == nil {
 					mcMsg.MultiContent[k].FileURL.URL = url.URL
 				}
 			}
-		case schema.ChatMessagePartTypeAudioURL:
+		case einobridge.ChatMessagePartTypeAudioURL:
 			if one.AudioURL.URI != "" {
 				url, err := imagexClient.GetResourceURL(ctx, one.AudioURL.URI)
 				if err == nil {
 					mcMsg.MultiContent[k].AudioURL.URL = url.URL
 				}
 			}
-		case schema.ChatMessagePartTypeVideoURL:
+		case einobridge.ChatMessagePartTypeVideoURL:
 			if one.VideoURL.URI != "" {
 				url, err := imagexClient.GetResourceURL(ctx, one.VideoURL.URI)
 				if err == nil {

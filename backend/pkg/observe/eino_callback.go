@@ -43,7 +43,7 @@ import (
 	"github.com/cloudwego/eino/callbacks"
 	"github.com/cloudwego/eino/components"
 	"github.com/cloudwego/eino/components/model"
-	"github.com/cloudwego/eino/schema"
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 )
 
 // EinoObserveCallback adapts the ACL ObserveCallback to eino's callbacks.Handler.
@@ -114,7 +114,7 @@ func (c *EinoObserveCallback) OnEnd(ctx context.Context, info *callbacks.RunInfo
 	return c.acl.OnEnd(ctx, einoToACLRunInfo(info), einoToACLOutput(output))
 }
 
-func (c *EinoObserveCallback) OnEndWithStream(ctx context.Context, info *callbacks.RunInfo, output *schema.StreamReader[callbacks.CallbackOutput]) context.Context {
+func (c *EinoObserveCallback) OnEndWithStream(ctx context.Context, info *callbacks.RunInfo, output *einobridge.StreamReader[callbacks.CallbackOutput]) context.Context {
 	// For streaming, we drain the eino stream reader to collect token counts.
 	// The ACL OnEndWithStream expects an llm.StreamReader, but we can't
 	// directly convert the eino stream reader.  Instead, we drain it here
@@ -148,7 +148,7 @@ func (c *EinoObserveCallback) OnError(ctx context.Context, info *callbacks.RunIn
 	return c.acl.OnError(ctx, einoToACLRunInfo(info), err)
 }
 
-// einoMsg is a type alias for schema.Message to avoid direct schema import
+// einoMsg is a type alias for einobridge.Message to avoid direct schema import
 // in the CallbackInput.Raw field.  Callers that need the actual message
-// should type-assert to *schema.Message.
-type einoMsg = schema.Message
+// should type-assert to *einobridge.Message.
+type einoMsg = einobridge.Message

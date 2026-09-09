@@ -23,7 +23,7 @@ import (
 	"testing"
 
 	"github.com/cloudwego/eino/components/document/parser"
-	"github.com/cloudwego/eino/schema"
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 
@@ -66,7 +66,7 @@ func TestParseMarkdown(t *testing.T) {
 	}
 }
 
-func assertDoc(t *testing.T, doc *schema.Document) {
+func assertDoc(t *testing.T, doc *einobridge.Document) {
 	assert.NotZero(t, doc.Content)
 	fmt.Println(doc.Content)
 	assert.NotNil(t, doc.MetaData)

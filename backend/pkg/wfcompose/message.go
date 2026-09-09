@@ -143,7 +143,7 @@ type ResponseMeta struct {
 }
 
 // Message is the framework-agnostic chat message. It mirrors eino's
-// schema.Message public field surface so engine adapters can convert
+// einobridge.Message public field surface so engine adapters can convert
 // losslessly and migration is a mechanical type swap.
 type Message struct {
 	Role             RoleType          `json:"role"`

@@ -19,7 +19,7 @@ package message
 import (
 	"context"
 
-	"github.com/cloudwego/eino/schema"
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 
 	"github.com/superagent-ai/superagent-base/backend/crossdomain/message/model"
 	"github.com/superagent-ai/superagent-base/backend/domain/conversation/message/entity"
@@ -79,7 +79,7 @@ type Content struct {
 
 type WfMessage struct {
 	ID           int64
-	Role         schema.RoleType `json:"role"` // user or assistant
+	Role         einobridge.RoleType `json:"role"` // user or assistant
 	MultiContent []*Content      `json:"multi_content"`
 	Text         *string         `json:"text,omitempty"`
 	ContentType  string          `json:"content_type"`
@@ -102,5 +102,5 @@ type GetMessagesByRunIDsRequest struct {
 
 type GetMessagesByRunIDsResponse struct {
 	Messages       []*WfMessage
-	SchemaMessages []*schema.Message
+	SchemaMessages []*einobridge.Message
 }

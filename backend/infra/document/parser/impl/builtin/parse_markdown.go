@@ -27,7 +27,7 @@ import (
 	"time"
 
 	"github.com/cloudwego/eino/components/document/parser"
-	"github.com/cloudwego/eino/schema"
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	"github.com/yuin/goldmark"
 	"github.com/yuin/goldmark/ast"
 	"github.com/yuin/goldmark/text"
@@ -39,7 +39,7 @@ import (
 )
 
 func ParseMarkdown(config *contract.Config, storage storage.Storage, ocr ocr.OCR) ParseFn {
-	return func(ctx context.Context, reader io.Reader, opts ...parser.Option) (docs []*schema.Document, err error) {
+	return func(ctx context.Context, reader io.Reader, opts ...parser.Option) (docs []*einobridge.Document, err error) {
 		options := parser.GetCommonOptions(&parser.Options{}, opts...)
 		mdParser := goldmark.DefaultParser()
 		b, err := io.ReadAll(reader)
@@ -56,7 +56,7 @@ func ParseMarkdown(config *contract.Config, storage storage.Storage, ocr ocr.OCR
 		}
 
 		var (
-			last       *schema.Document
+			last       *einobridge.Document
 			emptySlice bool
 		)
 
@@ -66,7 +66,7 @@ func ParseMarkdown(config *contract.Config, storage storage.Storage, ocr ocr.OCR
 		}
 
 		newSlice := func(needOverlap bool) {
-			last = &schema.Document{
+			last = &einobridge.Document{
 				MetaData: map[string]any{},
 			}
 

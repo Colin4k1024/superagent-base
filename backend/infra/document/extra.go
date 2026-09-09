@@ -19,7 +19,7 @@ package document
 import (
 	"fmt"
 
-	"github.com/cloudwego/eino/schema"
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 )
 
 const (
@@ -31,7 +31,7 @@ const (
 	MetaDataKeyExternalStorage = "external_storage" // val: map[string]any
 )
 
-func GetDocumentColumns(doc *schema.Document) ([]*Column, error) {
+func GetDocumentColumns(doc *einobridge.Document) ([]*Column, error) {
 	if doc == nil || doc.MetaData == nil {
 		return nil, fmt.Errorf("invalid document")
 	}
@@ -44,12 +44,12 @@ func GetDocumentColumns(doc *schema.Document) ([]*Column, error) {
 	return columns, nil
 }
 
-func WithDocumentColumns(doc *schema.Document, columns []*Column) *schema.Document {
+func WithDocumentColumns(doc *einobridge.Document, columns []*Column) *einobridge.Document {
 	doc.MetaData[MetaDataKeyColumns] = columns
 	return doc
 }
 
-func GetDocumentColumnData(doc *schema.Document) ([]*ColumnData, error) {
+func GetDocumentColumnData(doc *einobridge.Document) ([]*ColumnData, error) {
 	if doc == nil || doc.MetaData == nil {
 		return nil, fmt.Errorf("invalid document")
 	}
@@ -62,17 +62,17 @@ func GetDocumentColumnData(doc *schema.Document) ([]*ColumnData, error) {
 	return data, nil
 }
 
-func WithDocumentColumnData(doc *schema.Document, data []*ColumnData) *schema.Document {
+func WithDocumentColumnData(doc *einobridge.Document, data []*ColumnData) *einobridge.Document {
 	doc.MetaData[MetaDataKeyColumnData] = data
 	return doc
 }
 
-func WithDocumentColumnsOnly(doc *schema.Document) *schema.Document {
+func WithDocumentColumnsOnly(doc *einobridge.Document) *einobridge.Document {
 	doc.MetaData[MetaDataKeyColumnsOnly] = struct{}{}
 	return doc
 }
 
-func GetDocumentColumnsOnly(doc *schema.Document) (bool, error) {
+func GetDocumentColumnsOnly(doc *einobridge.Document) (bool, error) {
 	if doc == nil || doc.MetaData == nil {
 		return false, fmt.Errorf("invalid document")
 	}
@@ -81,7 +81,7 @@ func GetDocumentColumnsOnly(doc *schema.Document) (bool, error) {
 	return ok, nil
 }
 
-func GetDocumentsColumnsOnly(docs []*schema.Document) (bool, error) {
+func GetDocumentsColumnsOnly(docs []*einobridge.Document) (bool, error) {
 	if len(docs) != 1 {
 		return false, nil
 	}
@@ -89,7 +89,7 @@ func GetDocumentsColumnsOnly(docs []*schema.Document) (bool, error) {
 	return GetDocumentColumnsOnly(docs[0])
 }
 
-func GetDocumentCreatorID(doc *schema.Document) (int64, error) {
+func GetDocumentCreatorID(doc *einobridge.Document) (int64, error) {
 	if doc == nil || doc.MetaData == nil {
 		return 0, fmt.Errorf("invalid document")
 	}
@@ -102,12 +102,12 @@ func GetDocumentCreatorID(doc *schema.Document) (int64, error) {
 	return creatorID, nil
 }
 
-func WithDocumentCreatorID(doc *schema.Document, creatorID int64) *schema.Document {
+func WithDocumentCreatorID(doc *einobridge.Document, creatorID int64) *einobridge.Document {
 	doc.MetaData[MetaDataKeyCreatorID] = creatorID
 	return doc
 }
 
-func GetDocumentExternalStorage(doc *schema.Document) (map[string]any, error) {
+func GetDocumentExternalStorage(doc *einobridge.Document) (map[string]any, error) {
 	if doc == nil || doc.MetaData == nil {
 		return nil, fmt.Errorf("invalid document")
 	}
@@ -120,7 +120,7 @@ func GetDocumentExternalStorage(doc *schema.Document) (map[string]any, error) {
 	return data, nil
 }
 
-func WithDocumentExternalStorage(doc *schema.Document, externalStorage map[string]any) *schema.Document {
+func WithDocumentExternalStorage(doc *einobridge.Document, externalStorage map[string]any) *einobridge.Document {
 	doc.MetaData[MetaDataKeyExternalStorage] = externalStorage
 	return doc
 }

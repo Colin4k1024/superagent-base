@@ -19,9 +19,9 @@ package messages2query
 import (
 	"context"
 
-	"github.com/cloudwego/eino/schema"
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 )
 
 type MessagesToQuery interface {
-	MessagesToQuery(ctx context.Context, messages []*schema.Message, opts ...Option) (newQuery string, err error)
+	MessagesToQuery(ctx context.Context, messages []*einobridge.Message, opts ...Option) (newQuery string, err error)
 }

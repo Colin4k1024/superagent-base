@@ -22,7 +22,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/cloudwego/eino/schema"
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	"gorm.io/gorm"
 
 	message "github.com/superagent-ai/superagent-base/backend/crossdomain/message/model"
@@ -334,7 +334,7 @@ func (dao *MessageDAO) buildModelContent(msgDO *entity.Message) (string, error) 
 		return modelContent, nil
 	}
 
-	modelContentObj := &schema.Message{
+	modelContentObj := &einobridge.Message{
 		Role: msgDO.Role,
 		Name: msgDO.Name,
 	}
@@ -342,7 +342,7 @@ func (dao *MessageDAO) buildModelContent(msgDO *entity.Message) (string, error) 
 		return "", nil
 	}
 
-	var multiContent []schema.ChatMessagePart
+	var multiContent []einobridge.ChatMessagePart
 	for _, contentData := range msgDO.MultiContent {
 		if contentData.Type == message.InputTypeText {
 			if len(msgDO.Content) == 0 && len(contentData.Text) > 0 {
@@ -350,28 +350,28 @@ func (dao *MessageDAO) buildModelContent(msgDO *entity.Message) (string, error) 
 			}
 			continue
 		}
-		one := schema.ChatMessagePart{}
+		one := einobridge.ChatMessagePart{}
 		switch contentData.Type {
 		case message.InputTypeImage:
-			one.Type = schema.ChatMessagePartTypeImageURL
-			one.ImageURL = &schema.ChatMessageImageURL{
+			one.Type = einobridge.ChatMessagePartTypeImageURL
+			one.ImageURL = &einobridge.ChatMessageImageURL{
 				URL: contentData.FileData[0].Url,
 				URI: contentData.FileData[0].URI,
 			}
 		case message.InputTypeFile:
-			one.Type = schema.ChatMessagePartTypeFileURL
-			one.FileURL = &schema.ChatMessageFileURL{
+			one.Type = einobridge.ChatMessagePartTypeFileURL
+			one.FileURL = &einobridge.ChatMessageFileURL{
 				URL: contentData.FileData[0].Url,
 				URI: contentData.FileData[0].URI,
 			}
 		case message.InputTypeVideo:
-			one.Type = schema.ChatMessagePartTypeVideoURL
-			one.VideoURL = &schema.ChatMessageVideoURL{
+			one.Type = einobridge.ChatMessagePartTypeVideoURL
+			one.VideoURL = &einobridge.ChatMessageVideoURL{
 				URL: contentData.FileData[0].Url,
 			}
 		case message.InputTypeAudio:
-			one.Type = schema.ChatMessagePartTypeAudioURL
-			one.AudioURL = &schema.ChatMessageAudioURL{
+			one.Type = einobridge.ChatMessagePartTypeAudioURL
+			one.AudioURL = &einobridge.ChatMessageAudioURL{
 				URL: contentData.FileData[0].Url,
 				URI: contentData.FileData[0].URI,
 			}
@@ -380,8 +380,8 @@ func (dao *MessageDAO) buildModelContent(msgDO *entity.Message) (string, error) 
 	}
 	if len(multiContent) > 0 {
 		if len(msgDO.Content) > 0 {
-			multiContent = append(multiContent, schema.ChatMessagePart{
-				Type: schema.ChatMessagePartTypeText,
+			multiContent = append(multiContent, einobridge.ChatMessagePart{
+				Type: einobridge.ChatMessagePartTypeText,
 				Text: msgDO.Content,
 			})
 		}
@@ -408,7 +408,7 @@ func (dao *MessageDAO) batchMessagePO2DO(msgPOs []*model.Message) []*entity.Mess
 			SectionID:        msgPO.SectionID,
 			UserID:           msgPO.UserID,
 			RunID:            msgPO.RunID,
-			Role:             schema.RoleType(msgPO.Role),
+			Role:             einobridge.RoleType(msgPO.Role),
 			ContentType:      message.ContentType(msgPO.ContentType),
 			MessageType:      message.MessageType(msgPO.MessageType),
 			Position:         msgPO.BrokenPosition,
@@ -439,7 +439,7 @@ func (dao *MessageDAO) messagePO2DO(msgPO *model.Message) *entity.Message {
 		SectionID:      msgPO.SectionID,
 		UserID:         msgPO.UserID,
 		RunID:          msgPO.RunID,
-		Role:           schema.RoleType(msgPO.Role),
+		Role:           einobridge.RoleType(msgPO.Role),
 		ContentType:    message.ContentType(msgPO.ContentType),
 		MessageType:    message.MessageType(msgPO.MessageType),
 		ModelContent:   msgPO.ModelContent,
