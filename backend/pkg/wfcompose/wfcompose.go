@@ -246,3 +246,12 @@ func (sr *StreamReader[T]) Copy(n int) []*StreamReader[T] {
 	}
 	return readers
 }
+
+// Schema is a minimal JSON schema representation for tool parameter
+// customization, replacing eino-contrib/jsonschema.
+type Schema struct {
+	Type        string
+	Items       *Schema
+	Description string
+	Enum        []interface{}
+}
