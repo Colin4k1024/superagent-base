@@ -46,18 +46,17 @@ import (
 
 	"github.com/cloudwego/eino/components/model"
 	"github.com/cloudwego/eino/components/tool"
-	"github.com/cloudwego/eino/schema"
 )
 
 // reactState is the per-execution state for the self-built ReAct graph.
 // It mirrors the internal state struct from the react package.
 type reactState struct {
-	Messages                 []*schema.Message
+	Messages                 []*einobridge.Message
 	ReturnDirectlyToolCallID string
 }
 
 func init() {
-	schema.RegisterName[*reactState]("_self_react_state")
+	einobridge.RegisterName[*reactState]("_self_react_state")
 }
 
 // reactGraphResult holds the compiled graph and node options, matching
@@ -79,7 +78,7 @@ func buildReActGraph(ctx context.Context, chatModel model.ToolCallingChatModel,
 	modelNodeName, toolsNodeName string) (*reactGraphResult, error) {
 
 	// Generate tool infos.
-	toolInfos := make([]*schema.ToolInfo, 0, len(agentTools))
+	toolInfos := make([]*einobridge.ToolInfo, 0, len(agentTools))
 	for _, t := range agentTools {
 		tl, err := t.Info(ctx)
 		if err != nil {
@@ -114,13 +113,13 @@ func buildReActGraph(ctx context.Context, chatModel model.ToolCallingChatModel,
 		nodeKeyDirectReturn = "direct_return"
 	)
 
-	graph := einobridge.NewGraph[[]*schema.Message, *schema.Message](
+	graph := einobridge.NewGraph[[]*einobridge.Message, *einobridge.Message](
 		einobridge.WithGenLocalState(func(ctx context.Context) *reactState {
-			return &reactState{Messages: make([]*schema.Message, 0)}
+			return &reactState{Messages: make([]*einobridge.Message, 0)}
 		}))
 
 	// Model node — accumulates messages in state before calling the LLM.
-	modelPreHandle := func(ctx context.Context, input []*schema.Message, state *reactState) ([]*schema.Message, error) {
+	modelPreHandle := func(ctx context.Context, input []*einobridge.Message, state *reactState) ([]*einobridge.Message, error) {
 		state.Messages = append(state.Messages, input...)
 		return state.Messages, nil
 	}
@@ -136,7 +135,7 @@ func buildReActGraph(ctx context.Context, chatModel model.ToolCallingChatModel,
 	}
 
 	// Tools node — executes tool calls and records return-directly.
-	toolsPreHandle := func(ctx context.Context, input *schema.Message, state *reactState) (*schema.Message, error) {
+	toolsPreHandle := func(ctx context.Context, input *einobridge.Message, state *reactState) (*einobridge.Message, error) {
 		if input == nil {
 			// Used for rerun interrupt resume — use last message.
 			return state.Messages[len(state.Messages)-1], nil
@@ -153,7 +152,7 @@ func buildReActGraph(ctx context.Context, chatModel model.ToolCallingChatModel,
 	}
 
 	// Branch after model: if tool calls → tools node, else → END.
-	modelBranchCondition := func(ctx context.Context, sr *schema.StreamReader[*schema.Message]) (string, error) {
+	modelBranchCondition := func(ctx context.Context, sr *einobridge.StreamReader[*einobridge.Message]) (string, error) {
 		isToolCall, err := firstChunkStreamToolCallChecker(ctx, sr)
 		if err != nil {
 			return "", err
@@ -172,9 +171,9 @@ func buildReActGraph(ctx context.Context, chatModel model.ToolCallingChatModel,
 
 	// Return-directly handling: a lambda node that extracts the directly
 	// returned tool result, plus a branch after the tools node.
-	directReturn := func(ctx context.Context, msgs *schema.StreamReader[[]*schema.Message]) (*schema.StreamReader[*schema.Message], error) {
-		return schema.StreamReaderWithConvert(msgs, func(msgs []*schema.Message) (*schema.Message, error) {
-			var msg *schema.Message
+	directReturn := func(ctx context.Context, msgs *einobridge.StreamReader[[]*einobridge.Message]) (*einobridge.StreamReader[*einobridge.Message], error) {
+		return einobridge.StreamReaderWithConvert(msgs, func(msgs []*einobridge.Message) (*einobridge.Message, error) {
+			var msg *einobridge.Message
 			err = einobridge.ProcessState[*reactState](ctx, func(_ context.Context, state *reactState) error {
 				for i := range msgs {
 					if msgs[i] != nil && msgs[i].ToolCallID == state.ReturnDirectlyToolCallID {
@@ -188,7 +187,7 @@ func buildReActGraph(ctx context.Context, chatModel model.ToolCallingChatModel,
 				return nil, err
 			}
 			if msg == nil {
-				return nil, schema.ErrNoValue
+				return nil, einobridge.ErrNoValue
 			}
 			return msg, nil
 		}), nil
@@ -201,7 +200,7 @@ func buildReActGraph(ctx context.Context, chatModel model.ToolCallingChatModel,
 
 	// Branch after tools: if return-directly → directReturn, else → model (loop).
 	if err = graph.AddBranch(nodeKeyTools,
-		einobridge.NewStreamGraphBranch(func(ctx context.Context, msgsStream *schema.StreamReader[[]*schema.Message]) (string, error) {
+		einobridge.NewStreamGraphBranch(func(ctx context.Context, msgsStream *einobridge.StreamReader[[]*einobridge.Message]) (string, error) {
 			msgsStream.Close()
 			var endNode string
 			err = einobridge.ProcessState[*reactState](ctx, func(_ context.Context, state *reactState) error {
@@ -239,7 +238,7 @@ func buildReActGraph(ctx context.Context, chatModel model.ToolCallingChatModel,
 // firstChunkStreamToolCallChecker checks whether the model's streaming output
 // contains tool calls. It reads chunks until it finds tool calls or non-empty
 // content, then returns the result. This mirrors react.firstChunkStreamToolCallChecker.
-func firstChunkStreamToolCallChecker(_ context.Context, sr *schema.StreamReader[*schema.Message]) (bool, error) {
+func firstChunkStreamToolCallChecker(_ context.Context, sr *einobridge.StreamReader[*einobridge.Message]) (bool, error) {
 	defer sr.Close()
 
 	for {
@@ -265,7 +264,7 @@ func firstChunkStreamToolCallChecker(_ context.Context, sr *schema.StreamReader[
 // getReturnDirectlyToolCallID checks if any tool call in the message
 // matches a tool in the returnDirectlyTools set. Returns the first
 // matching tool call ID, or empty string if none match.
-func getReturnDirectlyToolCallID(msg *schema.Message, returnDirectlyTools map[string]struct{}) string {
+func getReturnDirectlyToolCallID(msg *einobridge.Message, returnDirectlyTools map[string]struct{}) string {
 	if len(returnDirectlyTools) == 0 || msg == nil {
 		return ""
 	}

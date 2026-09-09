@@ -27,7 +27,7 @@ import (
 func TestBuildAgent(t *testing.T) {
 
 	// 	sr, sw := wfcompose.Pipe[*wfcompose.Message](2)
-	// 	sw.Send(schema.AssistantMessage("to be great", nil), nil)
+	// 	sw.Send(einobridge.AssistantMessage("to be great", nil), nil)
 	// 	sw.Close()
 	// 	arkModel := mockChatModel.NewMockToolCallingChatModel(ctrl)
 	// 	arkModel.EXPECT().Stream(gomock.Any(), gomock.Any(), gomock.Any()).Return(sr, nil).AnyTimes()
@@ -185,9 +185,9 @@ func TestBuildAgent(t *testing.T) {
 	// 	assert.NoError(t, err)
 
 	// 	req := &AgentRequest{
-	// 		Input: schema.UserMessage("How should a person grow professionally?"),
+	// 		Input: einobridge.UserMessage("How should a person grow professionally?"),
 	// 		History: []*wfcompose.Message{
-	// 			schema.UserMessage("my name is ZhangSan, 25 years old, the position is artificial intelligence application development"),
+	// 			einobridge.UserMessage("my name is ZhangSan, 25 years old, the position is artificial intelligence application development"),
 	// 		},
 	// 	}
 	// 	events, err := rn.StreamExecute(ctx, req)

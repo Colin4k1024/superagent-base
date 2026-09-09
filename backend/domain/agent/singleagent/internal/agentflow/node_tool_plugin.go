@@ -18,10 +18,10 @@ package agentflow
 
 // TODO(fanlv):  remove pluginEntity
 import (
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	"context"
 
 	"github.com/cloudwego/eino/components/tool"
-	"github.com/cloudwego/eino/schema"
 
 	"github.com/superagent-ai/superagent-base/backend/api/model/app/bot_common"
 	crossplugin "github.com/superagent-ai/superagent-base/backend/crossdomain/plugin"
@@ -95,24 +95,24 @@ type pluginInvokableTool struct {
 	conversationID int64
 }
 
-func (p *pluginInvokableTool) Info(ctx context.Context) (*schema.ToolInfo, error) {
+func (p *pluginInvokableTool) Info(ctx context.Context) (*einobridge.ToolInfo, error) {
 	paramInfos, err := p.toolInfo.Operation.ToEinoSchemaParameterInfo(ctx)
 	if err != nil {
 		return nil, err
 	}
 
 	if len(paramInfos) == 0 {
-		return &schema.ToolInfo{
+		return &einobridge.ToolInfo{
 			Name:        p.toolInfo.GetName(),
 			Desc:        p.toolInfo.GetDesc(),
 			ParamsOneOf: nil,
 		}, nil
 	}
 
-	return &schema.ToolInfo{
+	return &einobridge.ToolInfo{
 		Name:        p.toolInfo.GetName(),
 		Desc:        p.toolInfo.GetDesc(),
-		ParamsOneOf: schema.NewParamsOneOfByParams(paramInfos),
+		ParamsOneOf: einobridge.NewParamsOneOfByParams(paramInfos),
 	}, nil
 }
 
