@@ -24,7 +24,6 @@ import (
 	"math"
 	"net/http"
 
-	"github.com/cloudwego/eino-ext/components/embedding/ark"
 	"github.com/volcengine/volcengine-go-sdk/service/arkruntime/model"
 
 	contract "github.com/superagent-ai/superagent-base/backend/infra/embedding"
@@ -33,17 +32,17 @@ import (
 	"github.com/superagent-ai/superagent-base/backend/types/errno"
 )
 
-type EmbeddingConfig = ark.EmbeddingConfig
+type EmbeddingConfig = einobridge.ArkEmbeddingConfig
 
-type APIType = ark.APIType
+type APIType = einobridge.ArkAPIType
 
 const (
-	APITypeText               = ark.APITypeText
-	APITypeMultiModal APIType = ark.APITypeMultiModal
+	APITypeText               = einobridge.ArkAPITypeText
+	APITypeMultiModal APIType = einobridge.ArkAPITypeMultiModal
 )
 
-func NewArkEmbedder(ctx context.Context, config *ark.EmbeddingConfig, dimensions int64, batchSize int) (contract.Embedder, error) {
-	emb, err := ark.NewEmbedder(ctx, config)
+func NewArkEmbedder(ctx context.Context, config *einobridge.ArkEmbeddingConfig, dimensions int64, batchSize int) (contract.Embedder, error) {
+	emb, err := einobridge.ArkNewEmbedder(ctx, config)
 	if err != nil {
 		return nil, err
 	}

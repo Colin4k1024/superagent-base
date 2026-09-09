@@ -16,9 +16,9 @@
 package modelbuilder
 
 import (
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	"context"
 
-	"github.com/cloudwego/eino-ext/components/model/claude"
 
 	"github.com/superagent-ai/superagent-base/backend/api/model/admin/config"
 	"github.com/superagent-ai/superagent-base/backend/pkg/lang/ptr"
@@ -34,11 +34,11 @@ func newClaudeModelBuilder(cfg *config.Model) Service {
 	}
 }
 
-func (c *claudeModelBuilder) getDefaultClaudeConfig() *claude.Config {
-	return &claude.Config{}
+func (c *claudeModelBuilder) getDefaultClaudeConfig() *einobridge.ClaudeConfig {
+	return &einobridge.ClaudeConfig{}
 }
 
-func (c *claudeModelBuilder) applyParamsToChatModelConfig(conf *claude.Config, params *LLMParams) {
+func (c *claudeModelBuilder) applyParamsToChatModelConfig(conf *einobridge.ClaudeConfig, params *LLMParams) {
 	if params == nil {
 		return
 	}
@@ -55,7 +55,7 @@ func (c *claudeModelBuilder) applyParamsToChatModelConfig(conf *claude.Config, p
 	}
 
 	if params.EnableThinking != nil {
-		conf.Thinking = &claude.Thinking{
+		conf.Thinking = &einobridge.ClaudeThinking{
 			Enable: *params.EnableThinking,
 		}
 	}
@@ -73,16 +73,16 @@ func (c *claudeModelBuilder) Build(ctx context.Context, params *LLMParams) (Tool
 
 	switch base.ThinkingType {
 	case config.ThinkingType_Enable:
-		conf.Thinking = &claude.Thinking{
+		conf.Thinking = &einobridge.ClaudeThinking{
 			Enable: true,
 		}
 	case config.ThinkingType_Disable:
-		conf.Thinking = &claude.Thinking{
+		conf.Thinking = &einobridge.ClaudeThinking{
 			Enable: false,
 		}
 	}
 
 	c.applyParamsToChatModelConfig(conf, params)
 
-	return claude.NewChatModel(ctx, conf)
+	return einobridge.ClaudeNewChatModel(ctx, conf)
 }

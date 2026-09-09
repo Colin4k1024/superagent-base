@@ -17,6 +17,7 @@
 package modelmgr
 
 import (
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	"context"
 	"errors"
 	"fmt"
@@ -25,8 +26,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cloudwego/eino-ext/components/model/deepseek"
-	"github.com/cloudwego/eino-ext/components/model/openai"
 	"gorm.io/gorm"
 
 	config "github.com/superagent-ai/superagent-base/backend/api/model/admin/config"
@@ -385,7 +384,7 @@ type OpenAIConfig struct {
 	ByAzure    bool   `json:"by_azure,omitempty" yaml:"by_azure"`
 	APIVersion string `json:"api_version,omitempty" yaml:"api_version"`
 
-	ResponseFormat *openai.ChatCompletionResponseFormat `json:"response_format,omitempty" yaml:"response_format"`
+	ResponseFormat *einobridge.OpenAIChatCompletionResponseFormat `json:"response_format,omitempty" yaml:"response_format"`
 }
 
 type ClaudeConfig struct {
@@ -407,11 +406,11 @@ type ArkConfig struct {
 }
 
 type DeepseekConfig struct {
-	ResponseFormatType deepseek.ResponseFormatType `json:"response_format_type" yaml:"response_format_type"`
+	ResponseFormatType einobridge.DeepSeekResponseFormatType `json:"response_format_type" yaml:"response_format_type"`
 }
 
 type QwenConfig struct {
-	ResponseFormat *openai.ChatCompletionResponseFormat `json:"response_format,omitempty" yaml:"response_format"`
+	ResponseFormat *einobridge.OpenAIChatCompletionResponseFormat `json:"response_format,omitempty" yaml:"response_format"`
 }
 
 type GeminiConfig struct {

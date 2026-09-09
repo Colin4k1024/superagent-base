@@ -17,9 +17,9 @@
 package modelbuilder
 
 import (
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	"context"
 
-	"github.com/cloudwego/eino-ext/components/model/openai"
 
 	"github.com/superagent-ai/superagent-base/backend/api/model/admin/config"
 	"github.com/superagent-ai/superagent-base/backend/api/model/app/bot_common"
@@ -36,17 +36,17 @@ func newOpenaiModelBuilder(cfg *config.Model) Service {
 	}
 }
 
-func (o *openaiModelBuilder) getDefaultConfig() *openai.ChatModelConfig {
-	return &openai.ChatModelConfig{
+func (o *openaiModelBuilder) getDefaultConfig() *einobridge.OpenAIChatModelConfig {
+	return &einobridge.OpenAIChatModelConfig{
 		MaxCompletionTokens: ptr.Of(4096),
-		ResponseFormat: &openai.ChatCompletionResponseFormat{
+		ResponseFormat: &einobridge.OpenAIChatCompletionResponseFormat{
 			Type:       "text",
 			JSONSchema: nil,
 		},
 	}
 }
 
-func (o *openaiModelBuilder) applyParamsToOpenaiConfig(conf *openai.ChatModelConfig, params *LLMParams) {
+func (o *openaiModelBuilder) applyParamsToOpenaiConfig(conf *einobridge.OpenAIChatModelConfig, params *LLMParams) {
 	if params == nil {
 		return
 	}
@@ -70,12 +70,12 @@ func (o *openaiModelBuilder) applyParamsToOpenaiConfig(conf *openai.ChatModelCon
 	conf.TopP = params.TopP
 
 	if params.ResponseFormat == bot_common.ModelResponseFormat_JSON {
-		conf.ResponseFormat = &openai.ChatCompletionResponseFormat{
-			Type: openai.ChatCompletionResponseFormatTypeJSONObject,
+		conf.ResponseFormat = &einobridge.OpenAIChatCompletionResponseFormat{
+			Type: einobridge.OpenAIChatCompletionResponseFormatTypeJSONObject,
 		}
 	} else {
-		conf.ResponseFormat = &openai.ChatCompletionResponseFormat{
-			Type: openai.ChatCompletionResponseFormatTypeText,
+		conf.ResponseFormat = &einobridge.OpenAIChatCompletionResponseFormat{
+			Type: einobridge.OpenAIChatCompletionResponseFormatTypeText,
 		}
 	}
 }
@@ -98,5 +98,5 @@ func (o *openaiModelBuilder) Build(ctx context.Context, params *LLMParams) (Tool
 
 	o.applyParamsToOpenaiConfig(conf, params)
 
-	return openai.NewChatModel(ctx, conf)
+	return einobridge.OpenAINewChatModel(ctx, conf)
 }

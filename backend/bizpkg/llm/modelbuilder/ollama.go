@@ -17,9 +17,9 @@
 package modelbuilder
 
 import (
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	"context"
 
-	"github.com/cloudwego/eino-ext/components/model/ollama"
 	"github.com/eino-contrib/ollama/api"
 
 	"github.com/superagent-ai/superagent-base/backend/api/model/admin/config"
@@ -36,14 +36,14 @@ func newOllamaModelBuilder(cfg *config.Model) Service {
 	}
 }
 
-func (o *ollamaModelBuilder) getDefaultOllamaConfig() *ollama.ChatModelConfig {
-	return &ollama.ChatModelConfig{
+func (o *ollamaModelBuilder) getDefaultOllamaConfig() *einobridge.OllamaChatModelConfig {
+	return &einobridge.OllamaChatModelConfig{
 		Options: &api.Options{},
 		BaseURL: "http://127.0.0.1:11434",
 	}
 }
 
-func (o *ollamaModelBuilder) applyParamsToOllamaConfig(conf *ollama.ChatModelConfig, params *LLMParams) {
+func (o *ollamaModelBuilder) applyParamsToOllamaConfig(conf *einobridge.OllamaChatModelConfig, params *LLMParams) {
 	if params == nil {
 		return
 	}
@@ -97,5 +97,5 @@ func (o *ollamaModelBuilder) Build(ctx context.Context, params *LLMParams) (Tool
 
 	o.applyParamsToOllamaConfig(conf, params)
 
-	return ollama.NewChatModel(ctx, conf)
+	return einobridge.OllamaNewChatModel(ctx, conf)
 }

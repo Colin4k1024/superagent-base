@@ -22,11 +22,6 @@ import (
 	"fmt"
 	"strings"
 
-	einoark "github.com/cloudwego/eino-ext/components/model/ark"
-	einoclaude "github.com/cloudwego/eino-ext/components/model/claude"
-	einodeepseek "github.com/cloudwego/eino-ext/components/model/deepseek"
-	einoollama "github.com/cloudwego/eino-ext/components/model/ollama"
-	einoopenai "github.com/cloudwego/eino-ext/components/model/openai"
 
 	"github.com/superagent-ai/superagent-base/backend/pkg/llm"
 )
@@ -58,7 +53,7 @@ func NewDefaultRegistry(defaultBaseURL string) *llm.ModelProviderRegistry {
 	reg.Register(&Provider{
 		protocol: "openai",
 		create: func(ctx context.Context, cfg llm.ModelConfig) (einobridge.ToolCallingChatModel, error) {
-			return einoopenai.NewChatModel(ctx, &einoopenai.ChatModelConfig{
+			return einobridge.OpenAINewChatModel(ctx, &einobridge.OpenAIChatModelConfig{
 				BaseURL: cfg.BaseURL,
 				APIKey:  cfg.APIKey,
 				Model:   cfg.ModelID,
@@ -69,7 +64,7 @@ func NewDefaultRegistry(defaultBaseURL string) *llm.ModelProviderRegistry {
 	reg.Register(&Provider{
 		protocol: "qwen",
 		create: func(ctx context.Context, cfg llm.ModelConfig) (einobridge.ToolCallingChatModel, error) {
-			return einoopenai.NewChatModel(ctx, &einoopenai.ChatModelConfig{
+			return einobridge.OpenAINewChatModel(ctx, &einobridge.OpenAIChatModelConfig{
 				BaseURL: cfg.BaseURL,
 				APIKey:  cfg.APIKey,
 				Model:   cfg.ModelID,
@@ -80,7 +75,7 @@ func NewDefaultRegistry(defaultBaseURL string) *llm.ModelProviderRegistry {
 	reg.Register(&Provider{
 		protocol: "claude",
 		create: func(ctx context.Context, cfg llm.ModelConfig) (einobridge.ToolCallingChatModel, error) {
-			return einoclaude.NewChatModel(ctx, &einoclaude.Config{
+			return einobridge.ClaudeNewChatModel(ctx, &einobridge.ClaudeConfig{
 				BaseURL: &cfg.BaseURL,
 				APIKey:  cfg.APIKey,
 				Model:   cfg.ModelID,
@@ -91,7 +86,7 @@ func NewDefaultRegistry(defaultBaseURL string) *llm.ModelProviderRegistry {
 	reg.Register(&Provider{
 		protocol: "ark",
 		create: func(ctx context.Context, cfg llm.ModelConfig) (einobridge.ToolCallingChatModel, error) {
-			return einoark.NewChatModel(ctx, &einoark.ChatModelConfig{
+			return einobridge.ArkNewChatModel(ctx, &einobridge.ArkChatModelConfig{
 				BaseURL: cfg.BaseURL,
 				APIKey:  cfg.APIKey,
 				Model:   cfg.ModelID,
@@ -106,7 +101,7 @@ func NewDefaultRegistry(defaultBaseURL string) *llm.ModelProviderRegistry {
 			if baseURL == "" || baseURL == defaultBaseURL {
 				baseURL = "https://api.deepseek.com/v1"
 			}
-			return einodeepseek.NewChatModel(ctx, &einodeepseek.ChatModelConfig{
+			return einobridge.DeepSeekNewChatModel(ctx, &einobridge.DeepSeekChatModelConfig{
 				BaseURL: baseURL,
 				APIKey:  cfg.APIKey,
 				Model:   cfg.ModelID,
@@ -122,7 +117,7 @@ func NewDefaultRegistry(defaultBaseURL string) *llm.ModelProviderRegistry {
 				ollamaURL = "http://localhost:11434"
 			}
 			ollamaURL = strings.TrimSuffix(ollamaURL, "/v1")
-			return einoollama.NewChatModel(ctx, &einoollama.ChatModelConfig{
+			return einobridge.OllamaNewChatModel(ctx, &einobridge.OllamaChatModelConfig{
 				BaseURL: ollamaURL,
 				Model:   cfg.ModelID,
 			})
@@ -136,7 +131,7 @@ func NewDefaultRegistry(defaultBaseURL string) *llm.ModelProviderRegistry {
 			if cfg.BaseURL == "" {
 				return nil, fmt.Errorf("gemini protocol requires base_url pointing to an OpenAI-compatible proxy")
 			}
-			return einoopenai.NewChatModel(ctx, &einoopenai.ChatModelConfig{
+			return einobridge.OpenAINewChatModel(ctx, &einobridge.OpenAIChatModelConfig{
 				BaseURL: cfg.BaseURL,
 				APIKey:  cfg.APIKey,
 				Model:   cfg.ModelID,

@@ -17,9 +17,9 @@
 package modelbuilder
 
 import (
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	"context"
 
-	"github.com/cloudwego/eino-ext/components/model/gemini"
 	"google.golang.org/genai"
 
 	"github.com/superagent-ai/superagent-base/backend/api/model/admin/config"
@@ -36,8 +36,8 @@ func newGeminiModelBuilder(cfg *config.Model) Service {
 	}
 }
 
-func (g *geminiModelBuilder) getDefaultGeminiConfig() *gemini.Config {
-	return &gemini.Config{}
+func (g *geminiModelBuilder) getDefaultGeminiConfig() *einobridge.GeminiModelConfig {
+	return &einobridge.GeminiModelConfig{}
 }
 
 func (g *geminiModelBuilder) getDefaultGenaiConfig() *genai.ClientConfig {
@@ -48,7 +48,7 @@ func (g *geminiModelBuilder) getDefaultGenaiConfig() *genai.ClientConfig {
 	}
 }
 
-func (g *geminiModelBuilder) applyParamsToGeminiConfig(conf *gemini.Config, params *LLMParams) {
+func (g *geminiModelBuilder) applyParamsToGeminiConfig(conf *einobridge.GeminiModelConfig, params *LLMParams) {
 	if params == nil {
 		return
 	}
@@ -108,5 +108,5 @@ func (g *geminiModelBuilder) Build(ctx context.Context, params *LLMParams) (Tool
 
 	g.applyParamsToGeminiConfig(conf, params)
 
-	return gemini.NewChatModel(ctx, conf)
+	return einobridge.GeminiNewChatModel(ctx, conf)
 }

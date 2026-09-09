@@ -17,15 +17,15 @@
 package wrap
 
 import (
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	"context"
 
-	"github.com/cloudwego/eino-ext/components/embedding/openai"
 
 	contract "github.com/superagent-ai/superagent-base/backend/infra/embedding"
 )
 
-func NewOpenAIEmbedder(ctx context.Context, config *openai.EmbeddingConfig, dimensions int64, batchSize int) (contract.Embedder, error) {
-	emb, err := openai.NewEmbedder(ctx, config)
+func NewOpenAIEmbedder(ctx context.Context, config *einobridge.OpenAIEmbeddingConfig, dimensions int64, batchSize int) (contract.Embedder, error) {
+	emb, err := einobridge.OpenAINewEmbedder(ctx, config)
 	if err != nil {
 		return nil, err
 	}
