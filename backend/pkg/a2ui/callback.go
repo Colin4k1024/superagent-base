@@ -34,10 +34,10 @@ package a2ui
 
 import (
 	"context"
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	"encoding/json"
 	"fmt"
 
-	"github.com/cloudwego/eino/callbacks"
 	"github.com/cloudwego/eino/components"
 	"github.com/cloudwego/eino/components/tool"
 
@@ -62,9 +62,9 @@ func streamFromCtx(ctx context.Context) *EventStream {
 // NewA2UICallback creates an eino callback handler that injects tool_call and
 // tool_result events into the A2UI EventStream stored in context.
 // This enables structured rendering of tool usage on the frontend.
-func NewA2UICallback() callbacks.Handler {
+func NewA2UICallback() einobridge.Handler {
 	cb := &a2uiCallback{}
-	return callbacks.NewHandlerBuilder().
+	return einobridge.NewHandlerBuilder().
 		OnStartFn(cb.OnStart).
 		OnEndFn(cb.OnEnd).
 		OnErrorFn(cb.OnError).
@@ -73,7 +73,7 @@ func NewA2UICallback() callbacks.Handler {
 
 type a2uiCallback struct{}
 
-func (c *a2uiCallback) OnStart(ctx context.Context, info *callbacks.RunInfo, input callbacks.CallbackInput) context.Context {
+func (c *a2uiCallback) OnStart(ctx context.Context, info *einobridge.RunInfo, input einobridge.CallbackInput) context.Context {
 	stream := streamFromCtx(ctx)
 	if stream == nil {
 		return ctx
@@ -86,7 +86,7 @@ func (c *a2uiCallback) OnStart(ctx context.Context, info *callbacks.RunInfo, inp
 	return ctx
 }
 
-func (c *a2uiCallback) OnEnd(ctx context.Context, info *callbacks.RunInfo, output callbacks.CallbackOutput) context.Context {
+func (c *a2uiCallback) OnEnd(ctx context.Context, info *einobridge.RunInfo, output einobridge.CallbackOutput) context.Context {
 	stream := streamFromCtx(ctx)
 	if stream == nil {
 		return ctx
@@ -99,7 +99,7 @@ func (c *a2uiCallback) OnEnd(ctx context.Context, info *callbacks.RunInfo, outpu
 	return ctx
 }
 
-func (c *a2uiCallback) OnError(ctx context.Context, info *callbacks.RunInfo, err error) context.Context {
+func (c *a2uiCallback) OnError(ctx context.Context, info *einobridge.RunInfo, err error) context.Context {
 	stream := streamFromCtx(ctx)
 	if stream == nil {
 		return ctx
@@ -111,8 +111,8 @@ func (c *a2uiCallback) OnError(ctx context.Context, info *callbacks.RunInfo, err
 	return ctx
 }
 
-// einoToA2UIRunInfo converts eino's callbacks.RunInfo to ACL CallbackRunInfo.
-func einoToA2UIRunInfo(info *callbacks.RunInfo) observe.CallbackRunInfo {
+// einoToA2UIRunInfo converts eino's einobridge.RunInfo to ACL CallbackRunInfo.
+func einoToA2UIRunInfo(info *einobridge.RunInfo) observe.CallbackRunInfo {
 	comp := observe.ComponentOther
 	switch info.Component {
 	case components.ComponentOfChatModel:
@@ -124,7 +124,7 @@ func einoToA2UIRunInfo(info *callbacks.RunInfo) observe.CallbackRunInfo {
 }
 
 // extractToolArgs attempts to extract tool arguments from callback input.
-func extractToolArgs(input callbacks.CallbackInput) map[string]any {
+func extractToolArgs(input einobridge.CallbackInput) map[string]any {
 	if input == nil {
 		return nil
 	}
@@ -143,7 +143,7 @@ func extractToolArgs(input callbacks.CallbackInput) map[string]any {
 }
 
 // extractToolResult attempts to extract a string result from callback output.
-func extractToolResult(output callbacks.CallbackOutput) string {
+func extractToolResult(output einobridge.CallbackOutput) string {
 	if output == nil {
 		return ""
 	}

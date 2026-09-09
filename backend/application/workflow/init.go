@@ -24,7 +24,6 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	"github.com/cloudwego/eino/callbacks"
 	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose"
 	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	"gorm.io/gorm"
@@ -99,7 +98,7 @@ func InitService(_ context.Context, components *ServiceComponents) (*Application
 	wrapPlugin.SetOSS(components.Tos)
 
 	coderunner.SetCodeRunner(components.CodeRunner)
-	callbacks.AppendGlobalHandlers(service.GetTokenCallbackHandler())
+	einobridge.AppendGlobalHandlers(service.GetTokenCallbackHandler())
 
 	setEventBus(components.DomainNotifier)
 

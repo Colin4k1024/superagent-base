@@ -49,7 +49,7 @@ const (
 )
 
 // CallbackRunInfo carries framework-agnostic run metadata.
-// It replaces eino's callbacks.RunInfo so business code does not import eino.
+// It replaces eino's einobridge.RunInfo so business code does not import eino.
 type CallbackRunInfo struct {
 	Component CallbackComponent
 	Name      string // model ID, tool name, or agent name
@@ -77,7 +77,7 @@ type CallbackOutput struct {
 
 // ObservabilityCallback is the framework-agnostic callback interface
 // for feeding OpenTelemetry tracing and Prometheus metrics from
-// component lifecycle events.  It abstracts eino's callbacks.Handler
+// component lifecycle events.  It abstracts eino's einobridge.Handler
 // and Google ADK Go's BeforeAgentCallbacks/AfterAgentCallbacks.
 type ObservabilityCallback interface {
 	// OnStart is called when a component starts executing.

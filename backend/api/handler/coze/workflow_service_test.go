@@ -33,7 +33,6 @@ import (
 	"github.com/alicebob/miniredis/v2"
 
 	"github.com/bytedance/mockey"
-	"github.com/cloudwego/eino/callbacks"
 	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/app/client"
@@ -115,7 +114,7 @@ import (
 )
 
 func TestMain(m *testing.M) {
-	callbacks.AppendGlobalHandlers(service.GetTokenCallbackHandler())
+	einobridge.AppendGlobalHandlers(service.GetTokenCallbackHandler())
 	service.RegisterAllNodeAdaptors()
 	os.Exit(m.Run())
 }

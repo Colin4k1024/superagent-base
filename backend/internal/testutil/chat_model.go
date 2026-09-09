@@ -22,7 +22,6 @@ import (
 	"runtime/debug"
 	"sync"
 
-	"github.com/cloudwego/eino/callbacks"
 	"github.com/cloudwego/eino/components"
 	"github.com/cloudwego/eino/components/model"
 	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
@@ -43,8 +42,8 @@ type UTChatModel struct {
 }
 
 func (q *UTChatModel) Generate(ctx context.Context, in []*einobridge.Message, _ ...model.Option) (*einobridge.Message, error) {
-	ctx = callbacks.EnsureRunInfo(ctx, "ut_chat_model", components.ComponentOfChatModel)
-	ctx = callbacks.OnStart(ctx, in)
+	ctx = einobridge.EnsureRunInfo(ctx, "ut_chat_model", components.ComponentOfChatModel)
+	ctx = einobridge.OnStart(ctx, in)
 	defer func() {
 		q.mu.Lock()
 		q.Index++
@@ -53,7 +52,7 @@ func (q *UTChatModel) Generate(ctx context.Context, in []*einobridge.Message, _ 
 	defer func() {
 		if panicErr := recover(); panicErr != nil {
 			logs.CtxErrorf(ctx, "ut Chat Model: %s, panic: %v, stack: %s", q.ModelType, panicErr, string(debug.Stack()))
-			callbacks.OnError(ctx, fmt.Errorf("model: %s, panic: %v, stack: %s", q.ModelType, panicErr, string(debug.Stack())))
+			einobridge.OnError(ctx, fmt.Errorf("model: %s, panic: %v, stack: %s", q.ModelType, panicErr, string(debug.Stack())))
 		}
 	}()
 
@@ -65,7 +64,7 @@ func (q *UTChatModel) Generate(ctx context.Context, in []*einobridge.Message, _ 
 	msg, err := q.InvokeResultProvider(q.Index, in)
 	q.mu.Unlock()
 	if err != nil {
-		callbacks.OnError(ctx, err)
+		einobridge.OnError(ctx, err)
 		return nil, err
 	}
 
@@ -84,13 +83,13 @@ func (q *UTChatModel) Generate(ctx context.Context, in []*einobridge.Message, _ 
 		}
 	}
 
-	_ = callbacks.OnEnd(ctx, callbackOut)
+	_ = einobridge.OnEnd(ctx, callbackOut)
 	return msg, nil
 }
 
 func (q *UTChatModel) Stream(ctx context.Context, in []*einobridge.Message, _ ...model.Option) (*einobridge.StreamReader[*einobridge.Message], error) {
-	ctx = callbacks.EnsureRunInfo(ctx, "ut_chat_model", components.ComponentOfChatModel)
-	ctx = callbacks.OnStart(ctx, in)
+	ctx = einobridge.EnsureRunInfo(ctx, "ut_chat_model", components.ComponentOfChatModel)
+	ctx = einobridge.OnStart(ctx, in)
 	defer func() {
 		q.mu.Lock()
 		q.Index++
@@ -99,7 +98,7 @@ func (q *UTChatModel) Stream(ctx context.Context, in []*einobridge.Message, _ ..
 	defer func() {
 		if panicErr := recover(); panicErr != nil {
 			logs.CtxErrorf(ctx, "ut Chat Model: %s, panic: %v, stack: %s", q.ModelType, panicErr, string(debug.Stack()))
-			callbacks.OnError(ctx, fmt.Errorf("model: %s, panic: %v, stack: %s", q.ModelType, panicErr, string(debug.Stack())))
+			einobridge.OnError(ctx, fmt.Errorf("model: %s, panic: %v, stack: %s", q.ModelType, panicErr, string(debug.Stack())))
 		}
 	}()
 
@@ -111,7 +110,7 @@ func (q *UTChatModel) Stream(ctx context.Context, in []*einobridge.Message, _ ..
 	outS, err := q.StreamResultProvider(q.Index, in)
 	q.mu.Unlock()
 	if err != nil {
-		callbacks.OnError(ctx, err)
+		einobridge.OnError(ctx, err)
 		return nil, err
 	}
 
@@ -133,7 +132,7 @@ func (q *UTChatModel) Stream(ctx context.Context, in []*einobridge.Message, _ ..
 
 		return callbackOut, nil
 	})
-	_, s := callbacks.OnEndWithStreamOutput(ctx, callbackStream)
+	_, s := einobridge.OnEndWithStreamOutput(ctx, callbackStream)
 	return einobridge.StreamReaderWithConvert(s, func(t *model.CallbackOutput) (*einobridge.Message, error) {
 		return t.Message, nil
 	}), nil

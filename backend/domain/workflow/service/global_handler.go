@@ -17,11 +17,11 @@
 package service
 
 import (
-	"github.com/cloudwego/eino/callbacks"
 
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	"github.com/superagent-ai/superagent-base/backend/domain/workflow/internal/execute"
 )
 
-func GetTokenCallbackHandler() callbacks.Handler {
+func GetTokenCallbackHandler() einobridge.Handler {
 	return execute.GetTokenCallbackHandler()
 }
