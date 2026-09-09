@@ -31,13 +31,13 @@
  */
 
 // Package gemini provides a native embedding provider for Google Gemini,
-// implementing the eino embedding.Embedder interface without any eino-ext imports.
+// implementing the wfcompose.Embedder interface without any eino-ext imports.
 package gemini
 
 import (
 	"context"
 
-	"github.com/cloudwego/eino/components/embedding"
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose"
 	"google.golang.org/genai"
 )
 
@@ -51,7 +51,7 @@ type EmbeddingConfig struct {
 	AutoTruncate         bool   `json:"autoTruncate,omitempty"`
 }
 
-var _ embedding.Embedder = (*Embedder)(nil)
+var _ wfcompose.Embedder = (*Embedder)(nil)
 
 type Embedder struct {
 	cli  *genai.Client
@@ -62,8 +62,8 @@ func NewEmbedder(ctx context.Context, cfg *EmbeddingConfig) (*Embedder, error) {
 	return &Embedder{cli: cfg.Client, conf: cfg}, nil
 }
 
-func (e *Embedder) EmbedStrings(ctx context.Context, texts []string, opts ...embedding.Option) ([][]float64, error) {
-	options := embedding.GetCommonOptions(&embedding.Options{
+func (e *Embedder) EmbedStrings(ctx context.Context, texts []string, opts ...wfcompose.EmbeddingOption) ([][]float64, error) {
+	options := wfcompose.GetEmbeddingOptions(&wfcompose.EmbeddingOptions{
 		Model: &e.conf.Model,
 	}, opts...)
 

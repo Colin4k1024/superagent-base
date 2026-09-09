@@ -36,8 +36,9 @@ package einobridge
 
 import (
 	"github.com/cloudwego/eino/components"
+
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose"
 	"github.com/cloudwego/eino/components/document/parser"
-	"github.com/cloudwego/eino/components/embedding"
 	"github.com/cloudwego/eino/components/indexer"
 	"github.com/cloudwego/eino/components/model"
 	"github.com/cloudwego/eino/components/prompt"
@@ -142,8 +143,8 @@ type IndexerOption = indexer.Option
 // eino/components/embedding
 // ---------------------------------------------------------------------------
 
-type Embedder = embedding.Embedder
-type EmbeddingOption = embedding.Option
+type Embedder = wfcompose.Embedder
+type EmbeddingOption = wfcompose.EmbeddingOption
 
 // ---------------------------------------------------------------------------
 // eino/components/document/parser
@@ -216,10 +217,6 @@ func IndexerWrapImplSpecificOptFn[T any](optFn func(*T)) IndexerOption {
 // Generic function wrappers for embedding package
 // ---------------------------------------------------------------------------
 
-func EmbeddingGetImplSpecificOptions[T any](base *T, opts ...EmbeddingOption) *T {
-	return embedding.GetImplSpecificOptions[T](base, opts...)
-}
-
 // ---------------------------------------------------------------------------
 // Generic function wrappers for parser package
 // ---------------------------------------------------------------------------
@@ -251,11 +248,4 @@ func RetrieverConvCallbackInput(src CallbackInput) *retriever.CallbackInput {
 	return retriever.ConvCallbackInput(src)
 }
 
-// EmbeddingConvCallbackOutput converts a callback output to an embedding callback output.
-func EmbeddingConvCallbackOutput(src CallbackOutput) *embedding.CallbackOutput {
-	return embedding.ConvCallbackOutput(src)
-}
-
-func EmbeddingConvCallbackInput(src CallbackInput) *embedding.CallbackInput {
-	return embedding.ConvCallbackInput(src)
-}
+// EmbeddingConvCallbackOutput and EmbeddingConvCallbackInput removed (unused, eino decoupling).
