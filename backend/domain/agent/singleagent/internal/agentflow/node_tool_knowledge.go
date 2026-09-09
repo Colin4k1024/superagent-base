@@ -24,8 +24,6 @@ import (
 	"reflect"
 	"strconv"
 
-	"github.com/eino-contrib/jsonschema"
-
 	"github.com/superagent-ai/superagent-base/backend/api/model/app/bot_common"
 	crossknowledge "github.com/superagent-ai/superagent-base/backend/crossdomain/knowledge"
 	knowledgeEntity "github.com/superagent-ai/superagent-base/backend/domain/knowledge/entity"
@@ -51,7 +49,7 @@ func newKnowledgeTool(ctx context.Context, conf *knowledgeConfig) (einobridge.In
 	}
 
 	customTagsFn := func(jsonTagName string, t reflect.Type, tag reflect.StructTag,
-		sc *jsonschema.Schema,
+		sc *wfcompose.Schema,
 	) {
 		// Process KnowledgeIDs field only
 		if jsonTagName != "KnowledgeIDs" {
@@ -65,7 +63,7 @@ func newKnowledgeTool(ctx context.Context, conf *knowledgeConfig) (einobridge.In
 		}
 
 		sc.Type = "array"
-		sc.Items = &jsonschema.Schema{
+		sc.Items = &wfcompose.Schema{
 			Type: "integer",
 		}
 		// Set field descriptions and enumeration values

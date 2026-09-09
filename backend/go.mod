@@ -218,7 +218,6 @@ require (
 
 require (
 	github.com/apache/pulsar-client-go v0.16.0
-	github.com/eino-contrib/jsonschema v1.0.3
 	github.com/nats-io/nats.go v1.34.1
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp v1.45.0
 	google.golang.org/adk/v2 v2.3.0
@@ -231,9 +230,7 @@ require (
 	github.com/DataDog/zstd v1.5.0 // indirect
 	github.com/ardielle/ardielle-go v1.5.2 // indirect
 	github.com/aws/aws-sdk-go-v2/service/signin v1.5.4 // indirect
-	github.com/bahlo/generic-list-go v0.2.0 // indirect
 	github.com/bits-and-blooms/bitset v1.4.0 // indirect
-	github.com/buger/jsonparser v1.1.1 // indirect
 	github.com/cenkalti/backoff/v5 v5.0.3 // indirect
 	github.com/danieljoos/wincred v1.1.2 // indirect
 	github.com/dvsekhvalnov/jose2go v1.6.0 // indirect
@@ -255,7 +252,6 @@ require (
 	github.com/nats-io/nkeys v0.4.7 // indirect
 	github.com/nats-io/nuid v1.0.1 // indirect
 	github.com/openai/openai-go/v3 v3.52.0 // indirect
-	github.com/wk8/go-ordered-map/v2 v2.1.8 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.68.0 // indirect
 	go.opentelemetry.io/otel/log v0.21.0 // indirect
 	golang.org/x/term v0.45.0 // indirect
