@@ -1,6 +1,6 @@
 # Superagent Base — AI Agent 开发基座
 
-> 基于 Eino 框架，YAML 声明式构建任意 AI Agent — 5 分钟上手
+> 基于 Google ADK 框架，YAML 声明式构建任意 AI Agent — 5 分钟上手
 
 **[5 分钟快速上手](guide/quickstart)** | **[完整文档](guide/getting-started)** | **[GitHub](https://github.com/Colin4k1024/superagent-base)**
 

@@ -6,7 +6,7 @@
 
 **Architecture:** 共享 MySQL + Redis（Go 用全量 schema，Java/Python 用 Redis 做会话存储），三套后端各自 Docker 化，前端通过 Vite `--mode` 切换后端目标，矩阵测试套件用现有 Python SDK 对三后端各跑一遍。
 
-**Tech Stack:** Docker Compose, Spring Boot 3 + WebFlux, FastAPI + AgentScope 2.0, Hertz + Eino, Vite `--mode`, pytest-asyncio, Python SDK (`sdks/python/`)
+**Tech Stack:** Docker Compose, Spring Boot 3 + WebFlux, FastAPI + AgentScope 2.0, Hertz + Google ADK, Vite `--mode`, pytest-asyncio, Python SDK (`sdks/python/`)
 
 ---
 

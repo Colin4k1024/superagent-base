@@ -122,7 +122,7 @@ func main() {
 		}
 	}
 
-	// DEV-001: In-repo dev surface (#15) replaces Eino DevOps server.
+	// DEV-001: In-repo dev surface (#15) replaces legacy Eino DevOps server.
 	// Dry-run and node inspector endpoints are registered in startHttpServer.
 
 	// Initialize SkillManager with marketplace clients + builtin skills.
@@ -299,7 +299,7 @@ func main() {
 		}
 		builderOpts = append(builderOpts, agentdef.WithProviderEndpoints(providerEPs))
 	}
-	// Create ACL model provider registry with all 7 eino-ext providers.
+	// Create ACL model provider registry with all 7 model providers.
 	modelProviderReg := adkllm.NewDefaultRegistry()
 	builderOpts = append(builderOpts, agentdef.WithModelProviderRegistry(modelProviderReg))
 

@@ -76,7 +76,7 @@ spec:
   # runtime: python  # delegated to internal Python lane
 ```
 
-- `go` (default): the Go backend (ADK Go / eino DAG engine) is the sole
+- `go` (default): the Go backend (Google ADK Go DAG engine) is the sole
   externally exposed entrypoint via `/api/v2`.
 - `python`: the agent is delegated to the internal Python lane (DeerFlow/
   LangGraph), reached via a private Go-side proxy. Python services are never

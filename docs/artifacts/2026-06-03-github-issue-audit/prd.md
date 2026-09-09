@@ -133,7 +133,7 @@ GitHub 仓库 `Colin4k1024/superagent-base` 的 Issue #2《项目审查报告》
 - **Owner**: architect
 - **估时**: 进 ADR 讨论
 
-#### A-4: eino_graph 标注"coming soon"但有代码引用
+#### A-4: adk_graph 标注"coming soon"但有代码引用
 - **方案**: 清理死引用或移除 coming soon 标注
 - **Owner**: backend-engineer
 - **估时**: 0.5d

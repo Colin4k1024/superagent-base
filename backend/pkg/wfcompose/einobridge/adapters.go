@@ -31,7 +31,7 @@
  */
 
 // adapters.go previously contained chatModelAdapter that wrapped
-// wfcompose.ToolCallingChatModel as eino's model.ToolCallingChatModel.
+// wfcompose.ToolCallingChatModel as Google ADK's model.ToolCallingChatModel.
 // Now that all facades use wfcompose types, the adapter is no longer needed.
 // This file is kept as a compatibility shim for NewModelAdapter callers.
 package einobridge

@@ -1,7 +1,7 @@
 version: "3.8"
 
 # Superagent Three-Base Deployment
-# Go (Eino) + Python (AgentScope) + Java (AgentScope Java)
+# Go (Google ADK) + Python (AgentScope) + Java (AgentScope Java)
 #
 # Usage:
 #   docker compose -f shared/docker/docker-compose.yml up -d
@@ -39,7 +39,7 @@ services:
       timeout: 5s
       retries: 5
 
-  # ── Go Base (Eino) ─────────────────────────────────────────────────────────
+  # ── Go Base (Google ADK) ─────────────────────────────────────────────────────────
 
   go-base:
     build:

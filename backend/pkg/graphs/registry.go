@@ -30,14 +30,14 @@
  * limitations under the License.
  */
 
-// Package graphs is the drop zone for Eino Dev–generated graph code.
+// Package graphs is the drop zone for ADK Dev–generated graph code.
 //
 // # Workflow
 //
-//  1. Use the "Eino Dev" VS Code plugin to visually orchestrate your graph.
+//  1. Use the "ADK Dev" VS Code plugin to visually orchestrate your graph.
 //  2. Export the generated Go code into this package (e.g. pkg/graphs/my_flow.go).
 //  3. Add an init() call that registers the compiled graph under a name.
-//  4. Reference the name from any agent YAML with type: eino_graph.
+//  4. Reference the name from any agent YAML with type: adk_graph.
 //
 // # Example registration
 //
@@ -48,7 +48,7 @@
 // # Example YAML
 //
 //	spec:
-//	  type: eino_graph
+//	  type: adk_graph
 //	  graph: my-research-flow
 //	  system_prompt: "You are a research assistant."
 package graphs
@@ -61,14 +61,14 @@ import (
 	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 )
 
-// GraphFactory builds and compiles a single Eino graph runnable.
+// GraphFactory builds and compiles a single Google ADK graph runnable.
 // The context carries request-scoped values; the factory is called once per
 // agent build (at startup or hot-reload) and the result is cached for the
 // lifetime of the agent.
 //
 // The standard graph type is []*einobridge.Message → *einobridge.Message, which maps
 // naturally to the Agent.Chat interface.  Use CompileGraph to wrap the
-// *einobridge.Graph builder function Eino Dev generates.
+// *einobridge.Graph builder function ADK Dev generates.
 type GraphFactory func(ctx context.Context) (einobridge.Runnable[[]*einobridge.Message, *einobridge.Message], error)
 
 var (
@@ -108,7 +108,7 @@ func List() []string {
 }
 
 // CompileGraph is a convenience wrapper: it turns the *einobridge.Graph builder
-// function that Eino Dev generates into a GraphFactory.
+// function that ADK Dev generates into a GraphFactory.
 //
 // Usage:
 //

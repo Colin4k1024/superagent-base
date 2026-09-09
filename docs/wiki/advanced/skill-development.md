@@ -26,7 +26,7 @@ Agent YAML (skill://calculator)
     │  scheme = "skill", target = "calculator"
     │
     ▼ skill.Manager.GetTool("calculator")
-    │  包装为 Eino InvokableTool
+    │  包装为 Google ADK InvokableTool
     │
     ▼ skill.Manager → skill.SkillInvoker
     │
@@ -364,7 +364,7 @@ manager.Install(ctx, "sentiment-analysis", "latest")
 ## 技能调用流程（内部机制）
 
 ```go
-// skill.Manager.GetTool("calculator") 返回包装后的 Eino InvokableTool
+// skill.Manager.GetTool("calculator") 返回包装后的 Google ADK InvokableTool
 func (m *Manager) GetTool(name string) (tool.InvokableTool, bool) {
     inst, ok := m.cache.Get(name)
     if !ok {
@@ -373,7 +373,7 @@ func (m *Manager) GetTool(name string) (tool.InvokableTool, bool) {
     return NewSkillTool(inst.Meta, m.invoker), true
 }
 
-// SkillTool 实现 Eino InvokableTool 接口
+// SkillTool 实现 Google ADK InvokableTool 接口
 // 调用时：m.invoker.Invoke(ctx, name, input)
 // invoker 可以是 LocalInvoker / HTTPInvoker / CompositeInvoker
 ```

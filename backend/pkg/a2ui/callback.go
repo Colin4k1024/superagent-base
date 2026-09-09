@@ -57,7 +57,7 @@ func streamFromCtx(ctx context.Context) *EventStream {
 	return s
 }
 
-// NewA2UICallback creates an eino callback handler that injects tool_call and
+// NewA2UICallback creates an ADK callback handler that injects tool_call and
 // tool_result events into the A2UI EventStream stored in context.
 // This enables structured rendering of tool usage on the frontend.
 func NewA2UICallback() einobridge.Handler {

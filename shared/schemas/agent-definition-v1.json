@@ -64,7 +64,7 @@
             "plan_execute",
             "workflow",
             "agentloop",
-            "eino_graph"
+            "adk_graph"
           ],
           "description": "Agent execution mode."
         },
@@ -95,7 +95,7 @@
         "interrupt": { "$ref": "#/$defs/InterruptConfig" },
         "graph": {
           "type": "string",
-          "description": "Registered Eino graph name for type=eino_graph."
+          "description": "Registered Google ADK graph name for type=adk_graph."
         },
         "max_turns": {
           "type": "integer",
@@ -113,7 +113,15 @@
       "properties": {
         "protocol": {
           "type": "string",
-          "enum": ["openai", "claude", "deepseek", "gemini", "ark", "ollama", "qwen"],
+          "enum": [
+            "openai",
+            "claude",
+            "deepseek",
+            "gemini",
+            "ark",
+            "ollama",
+            "qwen"
+          ],
           "description": "LLM provider protocol. Defaults to openai."
         },
         "router": {

@@ -43,8 +43,8 @@ import (
 
 // Manager keeps a registry of named tools and optionally wraps invocations
 // with a middleware chain. Tools are stored as framework-agnostic llm.Tool
-// instances; eino-native tools are wrapped via ReverseToolAdapter at
-// registration time so business code never imports eino.
+// instances; ADK-native tools are wrapped via ReverseToolAdapter at
+// registration time so business code never imports eino directly.
 type Manager struct {
 	mu         sync.RWMutex
 	tools      map[string]llm.Tool

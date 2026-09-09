@@ -9,7 +9,7 @@
 
 | Track | Status | Evidence |
 |---|---|---|
-| Go backend: eino → Google ADK Go | **Done.** Dual-framework flag in `backend/pkg/agentdef/builder.go` (`"eino"` default / `"adk"` Google ADK Go); ADK runner/stream paths live in `adk_runner.go`, `adk_stream.go`; eino remains only as a fallback path. | In-repo code |
+| Go backend: Google ADK Go migration | **Done.** Google ADK Go is the primary runtime in `backend/pkg/agentdef/builder.go`; ADK runner/stream paths live in `adk_runner.go`, `adk_stream.go`. The legacy eino path has been removed. | In-repo code |
 | Python side: AgentScope → DeerFlow 2.0 | **Planned.** Full migration plan exists at `docs/plans/2026-08-30-python-agentscope-to-deerflow-2-migration.md`: embed DeerFlow Harness behind an anti-corruption layer, preserve `/api/v2` + A2UI SSE contract, Python 3.12 floor, LangGraph for deterministic agents. | Existing plan |
 
 Both tracks independently chose to leave their original framework. The two
