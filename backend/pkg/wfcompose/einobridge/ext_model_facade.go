@@ -42,7 +42,7 @@ package einobridge
 import (
 	"context"
 
-	"github.com/cloudwego/eino/components/model"
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose"
 
 	claudeprovider "github.com/superagent-ai/superagent-base/backend/pkg/llm/providers/claude"
 	geminiprovider "github.com/superagent-ai/superagent-base/backend/pkg/llm/providers/gemini"
@@ -63,12 +63,12 @@ const (
 	OpenAIChatCompletionResponseFormatTypeJSONSchema = openaiprovider.ResponseFormatTypeJSONSchema
 )
 
-func OpenAINewChatModel(ctx context.Context, config *OpenAIChatModelConfig) (model.ToolCallingChatModel, error) {
+func OpenAINewChatModel(ctx context.Context, config *OpenAIChatModelConfig) (wfcompose.ToolCallingChatModel, error) {
 	provider, err := openaiprovider.NewChatModel(ctx, config)
 	if err != nil {
 		return nil, err
 	}
-	return NewModelAdapter(provider), nil
+	return provider, nil
 }
 
 // ---------------------------------------------------------------------------
@@ -96,7 +96,7 @@ type ArkResponseFormat struct {
 	JSONSchema *volcmodel.ResponseFormatJSONSchemaJSONSchemaParam `json:"json_schema,omitempty"`
 }
 
-func ArkNewChatModel(ctx context.Context, config *ArkChatModelConfig) (model.ToolCallingChatModel, error) {
+func ArkNewChatModel(ctx context.Context, config *ArkChatModelConfig) (wfcompose.ToolCallingChatModel, error) {
 	openaiConf := &openaiprovider.ChatModelConfig{
 		APIKey:            config.APIKey,
 		BaseURL:           config.BaseURL,
@@ -123,7 +123,7 @@ func ArkNewChatModel(ctx context.Context, config *ArkChatModelConfig) (model.Too
 	if err != nil {
 		return nil, err
 	}
-	return NewModelAdapter(provider), nil
+	return provider, nil
 }
 
 // ---------------------------------------------------------------------------
@@ -133,12 +133,12 @@ func ArkNewChatModel(ctx context.Context, config *ArkChatModelConfig) (model.Too
 type ClaudeConfig = claudeprovider.Config
 type ClaudeThinking = claudeprovider.ThinkingConfig
 
-func ClaudeNewChatModel(ctx context.Context, config *ClaudeConfig) (model.ToolCallingChatModel, error) {
+func ClaudeNewChatModel(ctx context.Context, config *ClaudeConfig) (wfcompose.ToolCallingChatModel, error) {
 	provider, err := claudeprovider.NewChatModel(ctx, config)
 	if err != nil {
 		return nil, err
 	}
-	return NewModelAdapter(provider), nil
+	return provider, nil
 }
 
 // ---------------------------------------------------------------------------
@@ -165,7 +165,7 @@ const (
 	DeepSeekResponseFormatTypeJSONObject DeepSeekResponseFormatType = "json_object"
 )
 
-func DeepSeekNewChatModel(ctx context.Context, config *DeepSeekChatModelConfig) (model.ToolCallingChatModel, error) {
+func DeepSeekNewChatModel(ctx context.Context, config *DeepSeekChatModelConfig) (wfcompose.ToolCallingChatModel, error) {
 	openaiConf := &openaiprovider.ChatModelConfig{
 		APIKey:           config.APIKey,
 		BaseURL:          config.BaseURL,
@@ -191,7 +191,7 @@ func DeepSeekNewChatModel(ctx context.Context, config *DeepSeekChatModelConfig) 
 	if err != nil {
 		return nil, err
 	}
-	return NewModelAdapter(provider), nil
+	return provider, nil
 }
 
 // ---------------------------------------------------------------------------
@@ -200,12 +200,12 @@ func DeepSeekNewChatModel(ctx context.Context, config *DeepSeekChatModelConfig) 
 
 type GeminiModelConfig = geminiprovider.Config
 
-func GeminiNewChatModel(ctx context.Context, config *GeminiModelConfig) (model.ToolCallingChatModel, error) {
+func GeminiNewChatModel(ctx context.Context, config *GeminiModelConfig) (wfcompose.ToolCallingChatModel, error) {
 	provider, err := geminiprovider.NewChatModel(ctx, config)
 	if err != nil {
 		return nil, err
 	}
-	return NewModelAdapter(provider), nil
+	return provider, nil
 }
 
 // ---------------------------------------------------------------------------
@@ -231,7 +231,7 @@ type OllamaThinkValue struct {
 	Value *bool `json:"value,omitempty"`
 }
 
-func OllamaNewChatModel(ctx context.Context, config *OllamaChatModelConfig) (model.ToolCallingChatModel, error) {
+func OllamaNewChatModel(ctx context.Context, config *OllamaChatModelConfig) (wfcompose.ToolCallingChatModel, error) {
 	openaiConf := &openaiprovider.ChatModelConfig{
 		APIKey:  "ollama",
 		BaseURL: config.BaseURL,
@@ -258,7 +258,7 @@ func OllamaNewChatModel(ctx context.Context, config *OllamaChatModelConfig) (mod
 	if err != nil {
 		return nil, err
 	}
-	return NewModelAdapter(provider), nil
+	return provider, nil
 }
 
 // ---------------------------------------------------------------------------
@@ -279,7 +279,7 @@ type QwenChatModelConfig struct {
 	EnableThinking   *bool                               `json:"enable_thinking,omitempty"`
 }
 
-func QwenNewChatModel(ctx context.Context, config *QwenChatModelConfig) (model.ToolCallingChatModel, error) {
+func QwenNewChatModel(ctx context.Context, config *QwenChatModelConfig) (wfcompose.ToolCallingChatModel, error) {
 	openaiConf := &openaiprovider.ChatModelConfig{
 		APIKey:           config.APIKey,
 		BaseURL:          config.BaseURL,
@@ -298,7 +298,7 @@ func QwenNewChatModel(ctx context.Context, config *QwenChatModelConfig) (model.T
 	if err != nil {
 		return nil, err
 	}
-	return NewModelAdapter(provider), nil
+	return provider, nil
 }
 
 // ---------------------------------------------------------------------------

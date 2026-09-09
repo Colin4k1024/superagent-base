@@ -30,17 +30,15 @@
  * limitations under the License.
  */
 
-// compose_facade re-exports cloudwego/eino/compose types and functions as
-// type aliases and thin wrappers so agentflow can avoid importing
-// cloudwego/eino/compose directly (S2 acceptance criterion).
+// compose_facade re-exports wfcompose/compose types and functions as
+// type aliases and thin wrappers so callers avoid importing eino directly.
+// This file has ZERO cloudwego/eino imports.
 package einobridge
 
 import (
 	"context"
 
-	"github.com/cloudwego/eino/callbacks"
-	"github.com/cloudwego/eino/compose"
-
+	nativecompose "github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/compose"
 	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose"
 )
 
@@ -48,43 +46,41 @@ import (
 // Type aliases
 // ---------------------------------------------------------------------------
 
-type NewGraphOption = compose.NewGraphOption
-type GraphAddNodeOpt = compose.GraphAddNodeOpt
-type GraphCompileOption = compose.GraphCompileOption
-type NodeTriggerMode = compose.NodeTriggerMode
-type AnyGraph = compose.AnyGraph
-type Graph[I, O any] = compose.Graph[I, O]
-type Lambda = compose.Lambda
-type GraphBranch = compose.GraphBranch
-type ToolsNode = compose.ToolsNode
-type ToolsNodeConfig = compose.ToolsNodeConfig
-type CheckPointStore = compose.CheckPointStore
-type InterruptInfo = compose.InterruptInfo
-type ToolsInterruptAndRerunExtra = compose.ToolsInterruptAndRerunExtra
-type Option = compose.Option
-type LambdaOpt = compose.LambdaOpt
+type NewGraphOption = nativecompose.NewGraphOption
+type GraphAddNodeOpt = nativecompose.GraphAddNodeOpt
+type GraphCompileOption = nativecompose.GraphCompileOption
+type NodeTriggerMode = nativecompose.NodeTriggerMode
+type Graph[I, O any] = nativecompose.Graph[I, O]
+type Lambda = nativecompose.Lambda
+type GraphBranch = nativecompose.GraphBranch
+type ToolsNode = nativecompose.ToolsNode
+type ToolsNodeConfig = nativecompose.ToolsNodeConfig
+type CheckPointStore = wfcompose.CheckPointStore
+type InterruptInfo = nativecompose.InterruptInfo
+type Option = wfcompose.Option
+type LambdaOpt = nativecompose.LambdaOpt
 
-type GenLocalState[S any] = compose.GenLocalState[S]
-type StatePreHandler[I, S any] = compose.StatePreHandler[I, S]
-type StatePostHandler[O, S any] = compose.StatePostHandler[O, S]
-type StreamGraphBranchCondition[T any] = compose.StreamGraphBranchCondition[T]
-type InvokeWOOpt[I, O any] = compose.InvokeWOOpt[I, O]
-type TransformWOOpts[I, O any] = compose.TransformWOOpts[I, O]
+type GenLocalState[S any] = func(ctx context.Context) S
+type StatePreHandler[I, S any] = func(ctx context.Context, input I, state S) (I, error)
+type StatePostHandler[O, S any] = func(ctx context.Context, output O, state S) (O, error)
+type StreamGraphBranchCondition[T any] = nativecompose.StreamGraphBranchCondition[T]
+type InvokeWOOpt[I, O any] = nativecompose.InvokeWOOpt[I, O]
+type TransformWOOpts[I, O any] = nativecompose.TransformWOOpts[I, O]
 
 // ---------------------------------------------------------------------------
 // Constants & variables
 // ---------------------------------------------------------------------------
 
 const (
-	START                = compose.START
-	END                  = compose.END
-	ComponentOfGraph     = compose.ComponentOfGraph
-	ComponentOfToolsNode = compose.ComponentOfToolsNode
+	START                = nativecompose.START
+	END                  = nativecompose.END
+	ComponentOfGraph     = nativecompose.ComponentOfGraph
+	ComponentOfToolsNode = nativecompose.ComponentOfToolsNode
 )
 
 var (
-	AllPredecessor NodeTriggerMode = compose.AllPredecessor
-	AnyPredecessor NodeTriggerMode = compose.AnyPredecessor
+	AllPredecessor NodeTriggerMode = nativecompose.AllPredecessor
+	AnyPredecessor NodeTriggerMode = nativecompose.AnyPredecessor
 )
 
 // ---------------------------------------------------------------------------
@@ -92,20 +88,15 @@ var (
 // ---------------------------------------------------------------------------
 
 type RunnableAdapter[I, O any] struct {
-	Inner compose.Runnable[I, O]
+	Inner *nativecompose.Runnable[I, O]
 }
 
-func NewRunnableAdapter[I, O any](r compose.Runnable[I, O]) *RunnableAdapter[I, O] {
+func NewRunnableAdapter[I, O any](r *nativecompose.Runnable[I, O]) *RunnableAdapter[I, O] {
 	return &RunnableAdapter[I, O]{Inner: r}
 }
 
 func (a *RunnableAdapter[I, O]) Stream(ctx context.Context, input I, opts ...wfcompose.Option) (*wfcompose.StreamReader[O], error) {
-	einoOpts := UnwrapOptionSlice(opts...)
-	sr, err := a.Inner.Stream(ctx, input, einoOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return WrapStreamReader[O](sr), nil
+	return a.Inner.Stream(ctx, input, opts...)
 }
 
 // ---------------------------------------------------------------------------
@@ -113,97 +104,96 @@ func (a *RunnableAdapter[I, O]) Stream(ctx context.Context, input I, opts ...wfc
 // ---------------------------------------------------------------------------
 
 func NewGraph[I, O any](opts ...NewGraphOption) *Graph[I, O] {
-	return compose.NewGraph[I, O](opts...)
+	return nativecompose.NewGraph[I, O](opts...)
 }
 
 func InvokableLambda[I, O any](fn InvokeWOOpt[I, O], opts ...LambdaOpt) *Lambda {
-	return compose.InvokableLambda[I, O](fn, opts...)
+	return nativecompose.InvokableLambda[I, O](fn, opts...)
 }
 
 func TransformableLambda[I, O any](fn TransformWOOpts[I, O], opts ...LambdaOpt) *Lambda {
-	return compose.TransformableLambda[I, O](fn, opts...)
+	return nativecompose.TransformableLambda[I, O](fn, opts...)
 }
 
 func ToList[I any](opts ...LambdaOpt) *Lambda {
-	return compose.ToList[I](opts...)
+	return nativecompose.ToList[I](opts...)
 }
 
 func NewToolNode(ctx context.Context, conf *ToolsNodeConfig) (*ToolsNode, error) {
-	return compose.NewToolNode(ctx, conf)
+	return nativecompose.NewToolNode(ctx, conf)
 }
 
 func NewStreamGraphBranch[T any](condition StreamGraphBranchCondition[T], endNodes map[string]bool) *GraphBranch {
-	return compose.NewStreamGraphBranch[T](condition, endNodes)
+	return nativecompose.NewStreamGraphBranch[T](condition, endNodes)
 }
 
 func ProcessState[S any](ctx context.Context, handler func(context.Context, S) error) error {
-	return compose.ProcessState[S](ctx, handler)
+	return nativecompose.ProcessState[S](ctx, handler)
 }
 
 func ExtractInterruptInfo(err error) (*InterruptInfo, bool) {
-	return compose.ExtractInterruptInfo(err)
+	return nativecompose.ExtractInterruptInfo(err)
 }
 
 func RegisterSerializableType[T any](name string) error {
-	return compose.RegisterSerializableType[T](name)
+	return nativecompose.RegisterSerializableType[T](name)
 }
 
 // ---------------------------------------------------------------------------
 // Option wrappers
 // ---------------------------------------------------------------------------
 
-func WithCallbacks(cbs ...callbacks.Handler) Option {
-	return compose.WithCallbacks(cbs...)
-}
-
 func WithCheckPointID(id string) Option {
-	return compose.WithCheckPointID(id)
+	return wfcompose.NewOption(id)
 }
 
 func WithGenLocalState[S any](gls GenLocalState[S]) NewGraphOption {
-	return compose.WithGenLocalState[S](gls)
+	return nativecompose.WithGenLocalState[S](gls)
 }
 
 func WithStatePreHandler[I, S any](pre StatePreHandler[I, S]) GraphAddNodeOpt {
-	return compose.WithStatePreHandler[I, S](pre)
+	return func(nc *nativecompose.NodeConfig) {
+		nc.StatePreHandler = pre
+	}
 }
 
 func WithStatePostHandler[O, S any](post StatePostHandler[O, S]) GraphAddNodeOpt {
-	return compose.WithStatePostHandler[O, S](post)
+	return func(nc *nativecompose.NodeConfig) {
+		nc.StatePostHandler = post
+	}
 }
 
 func WithOutputKey(key string) GraphAddNodeOpt {
-	return compose.WithOutputKey(key)
+	return nativecompose.WithOutputKey(key)
 }
 
 func WithNodeName(name string) GraphAddNodeOpt {
-	return compose.WithNodeName(name)
+	return nativecompose.WithNodeName(name)
 }
 
 func WithNodeTriggerMode(mode NodeTriggerMode) GraphCompileOption {
-	return compose.WithNodeTriggerMode(mode)
+	return nativecompose.WithNodeTriggerMode(mode)
 }
 
 func WithGraphCompileOptions(opts ...GraphCompileOption) GraphAddNodeOpt {
-	return compose.WithGraphCompileOptions(opts...)
+	return nativecompose.WithGraphCompileOptions(opts...)
 }
 
 func WithMaxRunSteps(steps int) GraphCompileOption {
-	return compose.WithMaxRunSteps(steps)
+	return nativecompose.WithMaxRunSteps(steps)
 }
 
 func WithGraphName(name string) GraphCompileOption {
-	return compose.WithGraphName(name)
+	return nativecompose.WithGraphName(name)
 }
 
 func WithCheckPointStore(store CheckPointStore) GraphCompileOption {
-	return compose.WithCheckPointStore(store)
+	return nativecompose.WithCheckPointStore(store)
 }
 
-// Compile wraps compose.Graph.Compile, returning a RunnableAdapter
-// that satisfies wfcompose.Runnable.
+// Compile wraps nativecompose.Graph.Compile, returning a RunnableAdapter.
 func Compile[I, O any](g *Graph[I, O], ctx context.Context, opts ...GraphCompileOption) (*RunnableAdapter[I, O], error) {
-	r, err := g.Compile(ctx, opts...)
+	r, err := nativecompose.Compile[I, O](g, ctx, opts...)
 	if err != nil {
 		return nil, err
 	}

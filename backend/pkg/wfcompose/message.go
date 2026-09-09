@@ -32,6 +32,8 @@
 
 package wfcompose
 
+import "context"
+
 // This file defines framework-agnostic chat message types that mirror the
 // public field surface of cloudwego/eino/schema's Message family. They let
 // business code carry conversation messages without importing eino, and let
@@ -131,6 +133,7 @@ type ToolCall struct {
 
 // TokenUsage represents the token usage of a chat model request.
 type TokenUsage struct {
+	PromptTokenDetails *PromptTokenDetails
 	PromptTokens     int `json:"prompt_tokens"`
 	CompletionTokens int `json:"completion_tokens"`
 	TotalTokens      int `json:"total_tokens"`
@@ -198,4 +201,10 @@ func (d *Document) WithScore(score float64) *Document {
 	}
 	d.MetaData[docMetaDataKeyScore] = score
 	return d
+}
+
+// Format implements MessagesTemplate by returning the message itself.
+// This allows a *Message to be used where a MessagesTemplate is expected.
+func (m *Message) Format(ctx context.Context, vs map[string]any, formatType FormatType) ([]*Message, error) {
+	return []*Message{m}, nil
 }

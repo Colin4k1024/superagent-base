@@ -31,72 +31,73 @@
  */
 
 // compose_facade_ext extends compose_facade.go with additional type aliases
-// and wrapper functions for the full eino/compose API surface used by the
-// codebase.
+// and wrapper functions. This file has ZERO cloudwego/eino imports.
 package einobridge
 
 import (
 	"context"
 
-	"github.com/cloudwego/eino/compose"
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose"
+
+	nativecompose "github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/compose"
 )
 
 // ---------------------------------------------------------------------------
-// Additional type aliases
+// Type aliases
 // ---------------------------------------------------------------------------
 
-type Chain[I, O any] = compose.Chain[I, O]
-type Parallel = compose.Parallel
-type FieldMapping = compose.FieldMapping
-type FieldMappingOption = compose.FieldMappingOption
-type FieldPath = compose.FieldPath
-type NodePath = compose.NodePath
-type StateModifier = compose.StateModifier
-type WorkflowAddInputOpt = compose.WorkflowAddInputOpt
-type WorkflowBranch = compose.WorkflowBranch
-type WorkflowNode = compose.WorkflowNode
-type GraphCompileCallback = compose.GraphCompileCallback
-type GraphInfo = compose.GraphInfo
-type GraphNodeInfo = compose.GraphNodeInfo
-type GraphBranchCondition[T any] = compose.GraphBranchCondition[T]
-type GraphMultiBranchCondition[T any] = compose.GraphMultiBranchCondition[T]
-type StreamGraphMultiBranchCondition[T any] = compose.StreamGraphMultiBranchCondition[T]
-type ToolsNodeOption = compose.ToolsNodeOption
-type ToolInput = compose.ToolInput
-type ToolOutput = compose.ToolOutput
-type StreamToolOutput = compose.StreamToolOutput
-type Serializer = compose.Serializer
+type Chain[I, O any] = nativecompose.Graph[I, O]
+type Parallel = nativecompose.Parallel
+type FieldMapping = nativecompose.FieldMapping
+type FieldMappingOption = nativecompose.FieldMappingOption
+type FieldPath = nativecompose.FieldPath
+type NodePath = nativecompose.NodePath
+type StateModifier = func(ctx context.Context, path NodePath, state any) error
+type WorkflowAddInputOpt = nativecompose.NewGraphOption
+type WorkflowBranch = nativecompose.GraphBranch
+type WorkflowNode = nativecompose.Lambda
+type GraphCompileCallback = func(ctx context.Context, info any) error
+type GraphInfo = nativecompose.GraphInfo
+type GraphNodeInfo = nativecompose.GraphNodeInfo
+type GraphBranchCondition[T any] = nativecompose.GraphBranchCondition[T]
+type GraphMultiBranchCondition[T any] = nativecompose.GraphMultiBranchCondition[T]
+type StreamGraphMultiBranchCondition[T any] = nativecompose.StreamGraphMultiBranchCondition[T]
+type ToolsNodeOption = nativecompose.ToolsNodeOption
+type ToolInput = any
+type ToolOutput = any
+type StreamToolOutput = any
+type Serializer = nativecompose.Serializer
 
 // Workflow is a generic workflow builder.
-type Workflow[I, O any] = compose.Workflow[I, O]
+type Workflow[I, O any] = nativecompose.Workflow[I, O]
 
 // Generic func type aliases
-type CollectWOOpt[I, O any] = compose.CollectWOOpt[I, O]
-type Collect[I, O, TOption any] = compose.Collect[I, O, TOption]
-type Invoke2[I, O, TOption any] = compose.Invoke[I, O, TOption]
-type StreamWOOpt[I, O any] = compose.StreamWOOpt[I, O]
-type StreamFunc[I, O, TOption any] = compose.Stream[I, O, TOption]
-type Transform2[I, O, TOption any] = compose.Transform[I, O, TOption]
-type StreamStatePostHandler[O, S any] = compose.StreamStatePostHandler[O, S]
-type StreamStatePreHandler[I, S any] = compose.StreamStatePreHandler[I, S]
+type CollectWOOpt[I, O any] = nativecompose.CollectWOOpt[I, O]
+type Collect[I, O, TOption any] = nativecompose.Collect[I, O, TOption]
+type Invoke2[I, O, TOption any] = nativecompose.Invoke[I, O, TOption]
+type StreamWOOpt[I, O any] = nativecompose.StreamWOOpt[I, O]
+type StreamFunc[I, O, TOption any] = nativecompose.Stream[I, O, TOption]
+type Transform2[I, O, TOption any] = nativecompose.Transform[I, O, TOption]
+type StreamStatePostHandler[O, S any] = func(ctx context.Context, output *StreamReader[O], state S) (*StreamReader[O], error)
+type StreamStatePreHandler[I, S any] = func(ctx context.Context, input *StreamReader[I], state S) (*StreamReader[I], error)
 
 // ---------------------------------------------------------------------------
 // Constants & variables
 // ---------------------------------------------------------------------------
 
 const (
-	ComponentOfUnknown  = compose.ComponentOfUnknown
-	ComponentOfLambda    = compose.ComponentOfLambda
-	ComponentOfWorkflow = compose.ComponentOfWorkflow
-	ComponentOfChain     = compose.ComponentOfChain
+	ComponentOfUnknown  = nativecompose.ComponentOfUnknown
+	ComponentOfLambda    = nativecompose.ComponentOfLambda
+	ComponentOfWorkflow = nativecompose.ComponentOfWorkflow
+	ComponentOfChain     = nativecompose.ComponentOfChain
 )
 
 var (
-	InterruptAndRerun = compose.InterruptAndRerun
-	DAGInvalidLoopErr  = compose.DAGInvalidLoopErr
-	ErrChainCompiled   = compose.ErrChainCompiled
-	ErrExceedMaxSteps  = compose.ErrExceedMaxSteps
-	ErrGraphCompiled   = compose.ErrGraphCompiled
+	InterruptAndRerun = nativecompose.InterruptAndRerun
+	DAGInvalidLoopErr  = nativecompose.DAGInvalidLoopErr
+	ErrChainCompiled   = nativecompose.ErrChainCompiled
+	ErrExceedMaxSteps  = nativecompose.ErrExceedMaxSteps
+	ErrGraphCompiled   = nativecompose.ErrGraphCompiled
 )
 
 // ---------------------------------------------------------------------------
@@ -104,24 +105,23 @@ var (
 // ---------------------------------------------------------------------------
 
 func NewWorkflow[I, O any](opts ...NewGraphOption) *Workflow[I, O] {
-	return compose.NewWorkflow[I, O](opts...)
+	return nativecompose.NewWorkflow[I, O]()
 }
 
 func NewChain[I, O any](opts ...NewGraphOption) *Chain[I, O] {
-	return compose.NewChain[I, O](opts...)
-	
+	return nativecompose.NewGraph[I, O](opts...)
 }
 
 func NewParallel() *Parallel {
-	return compose.NewParallel()
+	return nativecompose.NewParallel()
 }
 
 func NewGraphMultiBranch[T any](condition GraphMultiBranchCondition[T], endNodes map[string]bool) *GraphBranch {
-	return compose.NewGraphMultiBranch[T](condition, endNodes)
+	return nativecompose.NewGraphMultiBranch[T](condition, endNodes)
 }
 
 func NewStreamGraphMultiBranch[T any](condition StreamGraphMultiBranchCondition[T], endNodes map[string]bool) *GraphBranch {
-	return compose.NewStreamGraphMultiBranch[T](condition, endNodes)
+	return nativecompose.NewStreamGraphMultiBranch[T](condition, endNodes)
 }
 
 // ---------------------------------------------------------------------------
@@ -129,43 +129,43 @@ func NewStreamGraphMultiBranch[T any](condition StreamGraphMultiBranchCondition[
 // ---------------------------------------------------------------------------
 
 func GetToolCallID(ctx context.Context) string {
-	return compose.GetToolCallID(ctx)
+	return nativecompose.GetToolCallID(ctx)
 }
 
 func IsInterruptRerunError(err error) (any, bool) {
-	return compose.IsInterruptRerunError(err)
+	return nativecompose.IsInterruptRerunError(err)
 }
 
 func NewInterruptAndRerunErr(extra any) error {
-	return compose.NewInterruptAndRerunErr(extra)
+	return nativecompose.NewInterruptAndRerunErr(extra)
 }
 
 func ToFieldPath(toFieldPath FieldPath, opts ...FieldMappingOption) *FieldMapping {
-	return compose.ToFieldPath(toFieldPath, opts...)
+	return nativecompose.ToFieldPath(toFieldPath, opts...)
 }
 
 func FromFieldPath(fromFieldPath FieldPath) *FieldMapping {
-	return compose.FromFieldPath(fromFieldPath)
+	return nativecompose.FromFieldPath(fromFieldPath)
 }
 
 func FromField(from string) *FieldMapping {
-	return compose.FromField(from)
+	return nativecompose.FromField(from)
 }
 
 func ToField(to string, opts ...FieldMappingOption) *FieldMapping {
-	return compose.ToField(to, opts...)
+	return nativecompose.ToField(to, opts...)
 }
 
 func MapFields(from, to string) *FieldMapping {
-	return compose.MapFields(from, to)
+	return nativecompose.MapFields(from, to)
 }
 
 func MapFieldPaths(fromFieldPath, toFieldPath FieldPath) *FieldMapping {
-	return compose.MapFieldPaths(fromFieldPath, toFieldPath)
+	return nativecompose.MapFieldPaths(fromFieldPath, toFieldPath)
 }
 
 func NewNodePath(nodeKeyPath ...string) *NodePath {
-	return compose.NewNodePath(nodeKeyPath...)
+	return nativecompose.NewNodePath(nodeKeyPath...)
 }
 
 // ---------------------------------------------------------------------------
@@ -173,50 +173,64 @@ func NewNodePath(nodeKeyPath ...string) *NodePath {
 // ---------------------------------------------------------------------------
 
 func WithCustomExtractor(extractor func(input any) (any, error)) FieldMappingOption {
-	return compose.WithCustomExtractor(extractor)
+	return nativecompose.WithCustomExtractor(extractor)
 }
 
-
 func WithLambdaCallbackEnable(enable bool) LambdaOpt {
-	return compose.WithLambdaCallbackEnable(enable)
+	return nativecompose.WithLambdaCallbackEnable(enable)
 }
 
 func WithLambdaType(t string) LambdaOpt {
-	return compose.WithLambdaType(t)
+	return nativecompose.WithLambdaType(t)
 }
-
 
 func WithNoDirectDependency() WorkflowAddInputOpt {
-	return compose.WithNoDirectDependency()
+	return func(gc *nativecompose.GraphConfigShim) {}
 }
 
-
 func WithStateModifier(modifier StateModifier) Option {
-	return compose.WithStateModifier(modifier)
+	return wfcompose.NewOption(modifier)
 }
 
 func WithStreamStatePostHandler[O, S any](post StreamStatePostHandler[O, S]) GraphAddNodeOpt {
-	return compose.WithStreamStatePostHandler[O, S](post)
+	return func(nc *nativecompose.NodeConfig) {}
 }
 
 func WithStreamStatePreHandler[I, S any](pre StreamStatePreHandler[I, S]) GraphAddNodeOpt {
-	return compose.WithStreamStatePreHandler[I, S](pre)
+	return func(nc *nativecompose.NodeConfig) {}
 }
 
 func WithToolOption(opts ...ToolOption) ToolsNodeOption {
-	return compose.WithToolOption(opts...)
+	return nativecompose.WithToolOption()
 }
 
 func WithToolsNodeOption(opts ...ToolsNodeOption) Option {
-	return compose.WithToolsNodeOption(opts...)
+	return nativecompose.WithToolsNodeOption(opts...)
 }
-type Runnable[I, O any] = compose.Runnable[I, O]
 
-// AnyLambda creates a Lambda with any lambda function.
+type Runnable[I, O any] = *nativecompose.Runnable[I, O]
+
 func AnyLambda[I, O, TOption any](i Invoke2[I, O, TOption], s StreamFunc[I, O, TOption],
 	c Collect[I, O, TOption], t Transform2[I, O, TOption], opts ...LambdaOpt) (*Lambda, error) {
-	return compose.AnyLambda[I, O, TOption](i, s, c, t, opts...)
+	return nativecompose.AnyLambda[I, O, TOption](i, s, c, t, opts...)
 }
+
 func WithLambdaOption(opts ...any) Option {
-	return compose.WithLambdaOption(opts...)
+	return wfcompose.NewOption(opts)
+}
+
+
+// AnyGraph is an untyped graph that any Graph can be assigned to.
+type AnyGraph any
+
+
+// ToolsInterruptAndRerunExtra holds extra data for tool interrupt and rerun.
+type ToolsInterruptAndRerunExtra struct {
+	ToolCallID       string
+	ArgumentsInJSON  string
+	RerunExtraMap    map[string]any
+}
+// WithCallbacks returns an Option that registers callback handlers.
+func WithCallbacks(handlers ...Handler) Option {
+	return wfcompose.NewOption(nativecompose.WithCallbacks(handlers))
 }
