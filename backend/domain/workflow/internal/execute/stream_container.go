@@ -17,29 +17,29 @@
 package execute
 
 import (
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	"errors"
 	"io"
 	"sync"
 
-	"github.com/cloudwego/eino/schema"
 
 	"github.com/superagent-ai/superagent-base/backend/domain/workflow/entity"
 )
 
 type StreamContainer struct {
-	sw         *schema.StreamWriter[*entity.Message]
-	subStreams chan *schema.StreamReader[*entity.Message]
+	sw         *einobridge.StreamWriter[*entity.Message]
+	subStreams chan *einobridge.StreamReader[*entity.Message]
 	wg         sync.WaitGroup
 }
 
-func NewStreamContainer(sw *schema.StreamWriter[*entity.Message]) *StreamContainer {
+func NewStreamContainer(sw *einobridge.StreamWriter[*entity.Message]) *StreamContainer {
 	return &StreamContainer{
 		sw:         sw,
-		subStreams: make(chan *schema.StreamReader[*entity.Message]),
+		subStreams: make(chan *einobridge.StreamReader[*entity.Message]),
 	}
 }
 
-func (sc *StreamContainer) AddChild(sr *schema.StreamReader[*entity.Message]) {
+func (sc *StreamContainer) AddChild(sr *einobridge.StreamReader[*entity.Message]) {
 	sc.wg.Add(1)
 	sc.subStreams <- sr
 }

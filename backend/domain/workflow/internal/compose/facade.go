@@ -43,7 +43,6 @@ import (
 	"context"
 
 	einoCompose "github.com/cloudwego/eino/compose"
-	"github.com/cloudwego/eino/schema"
 
 	workflowModel "github.com/superagent-ai/superagent-base/backend/crossdomain/workflow/model"
 	"github.com/superagent-ai/superagent-base/backend/domain/workflow/entity"
@@ -63,10 +62,10 @@ func IsInterrupt(err error) bool {
 
 // NewMessagePipe creates a streaming pipe for workflow message output and
 // returns a framework-agnostic reader plus the runner option that feeds the
-// write side into the workflow runner. It replaces direct eino schema.Pipe
+// write side into the workflow runner. It replaces direct eino einobridge.Pipe
 // usage in the service layer so callers never import eino/schema for streaming.
 func NewMessagePipe() (*wfcompose.StreamReader[*entity.Message], WorkflowRunnerOption) {
-	sr, sw := schema.Pipe[*entity.Message](10)
+	sr, sw := einobridge.Pipe[*entity.Message](10)
 	return einobridge.WrapStreamReader[*entity.Message](sr), WithStreamWriter(sw)
 }
 

@@ -17,6 +17,7 @@
 package execute
 
 import (
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	"context"
 	"errors"
 	"fmt"
@@ -25,7 +26,6 @@ import (
 	"time"
 
 	"github.com/bytedance/sonic"
-	"github.com/cloudwego/eino/schema"
 
 	workflowModel "github.com/superagent-ai/superagent-base/backend/crossdomain/workflow/model"
 	"github.com/superagent-ai/superagent-base/backend/domain/workflow"
@@ -40,7 +40,7 @@ import (
 )
 
 func setRootWorkflowSuccess(ctx context.Context, event *Event, repo workflow.Repository,
-	sw *schema.StreamWriter[*entity.Message]) (err error) {
+	sw *einobridge.StreamWriter[*entity.Message]) (err error) {
 	exeID := event.RootCtx.RootExecuteID
 	wfExec := &entity.WorkflowExecution{
 		ID:       exeID,
@@ -97,7 +97,7 @@ const (
 )
 
 func handleEvent(ctx context.Context, event *Event, repo workflow.Repository,
-	sw *schema.StreamWriter[*entity.Message], // when this workflow's caller needs to receive intermediate results
+	sw *einobridge.StreamWriter[*entity.Message], // when this workflow's caller needs to receive intermediate results
 ) (signal terminateSignal, err error) {
 	switch event.Type {
 	case WorkflowStart:
@@ -335,7 +335,7 @@ func handleEvent(ctx context.Context, event *Event, repo workflow.Repository,
 			sw.Send(&entity.Message{
 				DataMessage: &entity.DataMessage{
 					ExecuteID: event.RootExecuteID,
-					Role:      schema.Assistant,
+					Role:      einobridge.Assistant,
 					Type:      entity.Answer,
 					Content:   firstIE.InterruptData, // TODO: may need to extract from InterruptData the actual info for user
 					NodeID:    string(nodeKey),
@@ -538,7 +538,7 @@ func handleEvent(ctx context.Context, event *Event, repo workflow.Repository,
 			sw.Send(&entity.Message{
 				DataMessage: &entity.DataMessage{
 					ExecuteID: event.RootExecuteID,
-					Role:      schema.Assistant,
+					Role:      einobridge.Assistant,
 					Type:      entity.Answer,
 					Content:   event.Answer,
 					NodeID:    string(event.NodeKey),
@@ -561,7 +561,7 @@ func handleEvent(ctx context.Context, event *Event, repo workflow.Repository,
 			sw.Send(&entity.Message{
 				DataMessage: &entity.DataMessage{
 					ExecuteID: event.RootExecuteID,
-					Role:      schema.Assistant,
+					Role:      einobridge.Assistant,
 					Type:      entity.Answer,
 					Content:   event.Answer,
 					NodeID:    string(event.NodeKey),
@@ -646,7 +646,7 @@ func handleEvent(ctx context.Context, event *Event, repo workflow.Repository,
 		sw.Send(&entity.Message{
 			DataMessage: &entity.DataMessage{
 				ExecuteID:    event.RootExecuteID,
-				Role:         schema.Assistant,
+				Role:         einobridge.Assistant,
 				Type:         entity.FunctionCall,
 				FunctionCall: event.functionCall.FunctionCallInfo,
 			},
@@ -659,7 +659,7 @@ func handleEvent(ctx context.Context, event *Event, repo workflow.Repository,
 		sw.Send(&entity.Message{
 			DataMessage: &entity.DataMessage{
 				ExecuteID:    event.RootExecuteID,
-				Role:         schema.Tool,
+				Role:         einobridge.Tool,
 				Type:         entity.ToolResponse,
 				Last:         true,
 				ToolResponse: event.toolResponse,
@@ -673,7 +673,7 @@ func handleEvent(ctx context.Context, event *Event, repo workflow.Repository,
 		sw.Send(&entity.Message{
 			DataMessage: &entity.DataMessage{
 				ExecuteID:    event.RootExecuteID,
-				Role:         schema.Tool,
+				Role:         einobridge.Tool,
 				Type:         entity.ToolResponse,
 				Last:         event.StreamEnd,
 				ToolResponse: event.toolResponse,
@@ -700,7 +700,7 @@ func HandleExecuteEvent(ctx context.Context,
 	cancelFn context.CancelFunc,
 	timeoutFn context.CancelFunc,
 	repo workflow.Repository,
-	sw *schema.StreamWriter[*entity.Message],
+	sw *einobridge.StreamWriter[*entity.Message],
 	exeCfg workflowModel.ExecuteConfig,
 ) (event *Event) {
 	var (

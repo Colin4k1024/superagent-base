@@ -30,7 +30,6 @@ import (
 	"strings"
 
 	"github.com/cloudwego/eino/compose"
-	"github.com/cloudwego/eino/schema"
 	"github.com/mohae/deepcopy"
 
 	"github.com/superagent-ai/superagent-base/backend/domain/workflow/entity"
@@ -374,7 +373,7 @@ func (v *VariableAggregator) Transform(ctx context.Context, input *wfcompose.Str
 				state.SetIntermediateResult(v.nodeKey, groupToChoice)
 				return nil
 			})
-			return einobridge.WrapStreamReader[map[string]any](schema.StreamReaderFromArray([]map[string]any{result})), nil
+			return einobridge.WrapStreamReader[map[string]any](einobridge.StreamReaderFromArray([]map[string]any{result})), nil
 		}
 	}
 
@@ -474,7 +473,7 @@ func (v *VariableAggregator) Transform(ctx context.Context, input *wfcompose.Str
 		return nil
 	})
 
-	actualStream := schema.StreamReaderWithConvert(outS, func(in map[string]map[int]any) (map[string]any, error) {
+	actualStream := einobridge.StreamReaderWithConvert(outS, func(in map[string]map[int]any) (map[string]any, error) {
 		out := make(map[string]any)
 		for group, items := range in {
 			choice, ok := groupToChoice[group]
@@ -492,7 +491,7 @@ func (v *VariableAggregator) Transform(ctx context.Context, input *wfcompose.Str
 		}
 
 		if len(out) == 0 {
-			return nil, schema.ErrNoValue
+			return nil, einobridge.ErrNoValue
 		}
 
 		return out, nil
@@ -505,8 +504,8 @@ func (v *VariableAggregator) Transform(ctx context.Context, input *wfcompose.Str
 		}
 	}
 	if len(nullGroups) > 0 {
-		nullStream := schema.StreamReaderFromArray([]map[string]any{nullGroups})
-		merged := schema.MergeStreamReaders([]*schema.StreamReader[map[string]any]{actualStream, nullStream})
+		nullStream := einobridge.StreamReaderFromArray([]map[string]any{nullGroups})
+		merged := einobridge.MergeStreamReaders([]*einobridge.StreamReader[map[string]any]{actualStream, nullStream})
 		return einobridge.WrapStreamReader[map[string]any](merged), nil
 	}
 
@@ -534,7 +533,7 @@ func inputConverter(in map[string]any) (converted map[string]map[int]any, err er
 	return converted, nil
 }
 
-func streamInputConverter(in *schema.StreamReader[map[string]any]) *schema.StreamReader[map[string]map[int]any] {
+func streamInputConverter(in *einobridge.StreamReader[map[string]any]) *einobridge.StreamReader[map[string]map[int]any] {
 	converter := func(input map[string]any) (output map[string]map[int]any, err error) {
 		defer func() {
 			if r := recover(); r != nil {
@@ -543,7 +542,7 @@ func streamInputConverter(in *schema.StreamReader[map[string]any]) *schema.Strea
 		}()
 		return inputConverter(input)
 	}
-	return schema.StreamReaderWithConvert(in, converter)
+	return einobridge.StreamReaderWithConvert(in, converter)
 }
 
 type vaCallbackInput struct {

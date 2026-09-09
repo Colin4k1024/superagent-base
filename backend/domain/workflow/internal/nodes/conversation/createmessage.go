@@ -17,6 +17,7 @@
 package conversation
 
 import (
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	"context"
 	"errors"
 	"fmt"
@@ -27,7 +28,6 @@ import (
 	"strconv"
 	"sync/atomic"
 
-	einoSchema "github.com/cloudwego/eino/schema"
 
 	crossagentrun "github.com/superagent-ai/superagent-base/backend/crossdomain/agentrun"
 	crossconversation "github.com/superagent-ai/superagent-base/backend/crossdomain/conversation"
@@ -269,7 +269,7 @@ func (c *CreateMessage) Invoke(ctx context.Context, input map[string]any) (map[s
 
 	message := &model.Message{
 		ConversationID: conversationID,
-		Role:           einoSchema.RoleType(role),
+		Role:           einobridge.RoleType(role),
 		Content:        content,
 		ContentType:    model.ContentType("text"),
 		UserID:         strconv.FormatInt(userID, 10),
@@ -277,7 +277,7 @@ func (c *CreateMessage) Invoke(ctx context.Context, input map[string]any) (map[s
 		RunID:          runID,
 		SectionID:      sectionID,
 	}
-	if message.Role == einoSchema.User {
+	if message.Role == einobridge.User {
 		message.MessageType = model.MessageTypeQuestion
 	} else {
 		message.MessageType = model.MessageTypeAnswer

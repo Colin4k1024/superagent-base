@@ -17,13 +17,13 @@
 package knowledge
 
 import (
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	"context"
 	"errors"
 	"maps"
 
 	"github.com/spf13/cast"
 
-	einoSchema "github.com/cloudwego/eino/schema"
 
 	"github.com/superagent-ai/superagent-base/backend/api/model/workflow"
 	crossknowledge "github.com/superagent-ai/superagent-base/backend/crossdomain/knowledge"
@@ -222,7 +222,7 @@ func (kr *Retrieve) Invoke(ctx context.Context, input map[string]any) (map[strin
 	return result, nil
 }
 
-func (kr *Retrieve) GetChatHistoryOrNil(ctx context.Context, ChatHistorySetting *vo.ChatHistorySetting) []*einoSchema.Message {
+func (kr *Retrieve) GetChatHistoryOrNil(ctx context.Context, ChatHistorySetting *vo.ChatHistorySetting) []*einobridge.Message {
 	if ChatHistorySetting == nil || !ChatHistorySetting.EnableChatHistory {
 		return nil
 	}
@@ -236,7 +236,7 @@ func (kr *Retrieve) GetChatHistoryOrNil(ctx context.Context, ChatHistorySetting 
 		return nil
 	}
 
-	historyMessages, ok := ctxcache.Get[[]*einoSchema.Message](ctx, chatHistoryKey)
+	historyMessages, ok := ctxcache.Get[[]*einobridge.Message](ctx, chatHistoryKey)
 
 	if !ok || len(historyMessages) == 0 {
 		logs.CtxWarnf(ctx, "conversation history is empty")
@@ -252,7 +252,7 @@ func (kr *Retrieve) ToCallbackInput(ctx context.Context, in map[string]any) (
 	}
 
 	var messages []*crossmessage.WfMessage
-	var scMessages []*einoSchema.Message
+	var scMessages []*einobridge.Message
 	var sectionID *int64
 	execCtx := execute.GetExeCtx(ctx)
 	if execCtx != nil {
@@ -282,7 +282,7 @@ func (kr *Retrieve) ToCallbackInput(ctx context.Context, in map[string]any) (
 	count := 0
 	startIdx := 0
 	for i := len(messages) - 1; i >= 0; i-- {
-		if messages[i].Role == einoSchema.User {
+		if messages[i].Role == einobridge.User {
 			count++
 		}
 		if count >= maxRounds {

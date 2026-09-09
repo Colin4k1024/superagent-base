@@ -17,12 +17,12 @@
 package intentdetector
 
 import (
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	"context"
 	"fmt"
 	"strings"
 
 	"github.com/cloudwego/eino/components/prompt"
-	"github.com/cloudwego/eino/schema"
 
 	"github.com/superagent-ai/superagent-base/backend/api/model/workflow"
 	"github.com/superagent-ai/superagent-base/backend/domain/workflow/entity/vo"
@@ -43,7 +43,7 @@ func newHistoryChatTemplate(basePrompt prompt.ChatTemplate, chatHistorySetting *
 	}
 }
 
-func (t *historyChatTemplate) Format(ctx context.Context, vs map[string]any, opts ...prompt.Option) ([]*schema.Message, error) {
+func (t *historyChatTemplate) Format(ctx context.Context, vs map[string]any, opts ...prompt.Option) ([]*einobridge.Message, error) {
 	baseMessages, err := t.basePrompt.Format(ctx, vs, opts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to format base prompt: %w", err)
@@ -66,7 +66,7 @@ func (t *historyChatTemplate) Format(ctx context.Context, vs map[string]any, opt
 		return baseMessages, nil
 	}
 
-	historyMessages, ok := ctxcache.Get[[]*schema.Message](ctx, chatHistoryKey)
+	historyMessages, ok := ctxcache.Get[[]*einobridge.Message](ctx, chatHistoryKey)
 	if !ok || len(historyMessages) == 0 {
 		logs.CtxWarnf(ctx, "conversation history is empty")
 		return baseMessages, nil
@@ -76,7 +76,7 @@ func (t *historyChatTemplate) Format(ctx context.Context, vs map[string]any, opt
 		return baseMessages, nil
 	}
 
-	finalMessages := make([]*schema.Message, 0, len(baseMessages)+len(historyMessages))
+	finalMessages := make([]*einobridge.Message, 0, len(baseMessages)+len(historyMessages))
 	finalMessages = append(finalMessages, baseMessages[0]) // System prompt
 	finalMessages = append(finalMessages, handleHistoryMessages(historyMessages)...)
 	if len(baseMessages) > 1 {
@@ -86,7 +86,7 @@ func (t *historyChatTemplate) Format(ctx context.Context, vs map[string]any, opt
 	return finalMessages, nil
 }
 
-func handleHistoryMessages(historyMessages []*schema.Message) []*schema.Message {
+func handleHistoryMessages(historyMessages []*einobridge.Message) []*einobridge.Message {
 	for _, msg := range historyMessages {
 		var sb strings.Builder
 		if msg.Content != "" {
@@ -98,15 +98,15 @@ func handleHistoryMessages(historyMessages []*schema.Message) []*schema.Message 
 				sb.WriteString("\n")
 			}
 			switch part.Type {
-			case schema.ChatMessagePartTypeText:
+			case einobridge.ChatMessagePartTypeText:
 				sb.WriteString(part.Text)
-			case schema.ChatMessagePartTypeImageURL:
+			case einobridge.ChatMessagePartTypeImageURL:
 				sb.WriteString(part.ImageURL.URL)
-			case schema.ChatMessagePartTypeAudioURL:
+			case einobridge.ChatMessagePartTypeAudioURL:
 				sb.WriteString(part.AudioURL.URL)
-			case schema.ChatMessagePartTypeVideoURL:
+			case einobridge.ChatMessagePartTypeVideoURL:
 				sb.WriteString(part.VideoURL.URL)
-			case schema.ChatMessagePartTypeFileURL:
+			case einobridge.ChatMessagePartTypeFileURL:
 				sb.WriteString(part.FileURL.URL)
 			}
 		}

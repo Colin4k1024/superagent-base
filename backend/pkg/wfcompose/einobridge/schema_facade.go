@@ -113,3 +113,57 @@ func NewParamsOneOfByParams(params map[string]*ParameterInfo) *ParamsOneOf {
 func AssistantMessage(content string, toolCalls []ToolCall) *Message {
 	return schema.AssistantMessage(content, toolCalls)
 }
+
+// ---------------------------------------------------------------------------
+// Additional type aliases for domain/workflow/ migration
+// ---------------------------------------------------------------------------
+
+type ChatMessagePart = schema.ChatMessagePart
+type ChatMessagePartType = schema.ChatMessagePartType
+type ChatMessageImageURL = schema.ChatMessageImageURL
+type ChatMessageAudioURL = schema.ChatMessageAudioURL
+type ChatMessageVideoURL = schema.ChatMessageVideoURL
+type ChatMessageFileURL = schema.ChatMessageFileURL
+type RoleType = schema.RoleType
+type ResponseMeta = schema.ResponseMeta
+type TokenUsage = schema.TokenUsage
+type Document = schema.Document
+
+// Role constants
+const (
+	Assistant RoleType = schema.Assistant
+	User      RoleType = schema.User
+	System    RoleType = schema.System
+	Tool      RoleType = schema.Tool
+)
+
+// ChatMessagePartType constants
+const (
+	ChatMessagePartTypeText      ChatMessagePartType = schema.ChatMessagePartTypeText
+	ChatMessagePartTypeImageURL  ChatMessagePartType = schema.ChatMessagePartTypeImageURL
+	ChatMessagePartTypeAudioURL  ChatMessagePartType = schema.ChatMessagePartTypeAudioURL
+	ChatMessagePartTypeVideoURL  ChatMessagePartType = schema.ChatMessagePartTypeVideoURL
+	ChatMessagePartTypeFileURL   ChatMessagePartType = schema.ChatMessagePartTypeFileURL
+)
+
+// Additional stream helpers
+func StreamReaderFromArray[T any](arr []T) *StreamReader[T] {
+	return schema.StreamReaderFromArray(arr)
+}
+
+func MergeStreamReaders[T any](readers []*StreamReader[T]) *StreamReader[T] {
+	return schema.MergeStreamReaders(readers)
+}
+
+// DataType and JSON schema constants
+type DataType = schema.DataType
+
+const (
+	Object  DataType = schema.Object
+	Number  DataType = schema.Number
+	Integer DataType = schema.Integer
+	String  DataType = schema.String
+	Array   DataType = schema.Array
+	Null    DataType = schema.Null
+	Boolean DataType = schema.Boolean
+)

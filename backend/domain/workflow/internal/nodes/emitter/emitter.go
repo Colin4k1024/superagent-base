@@ -24,7 +24,6 @@ import (
 
 	"github.com/bytedance/sonic"
 	"github.com/cloudwego/eino/compose"
-	"github.com/cloudwego/eino/schema"
 
 	workflow2 "github.com/superagent-ai/superagent-base/backend/api/model/workflow"
 	"github.com/superagent-ai/superagent-base/backend/domain/workflow/entity"
@@ -282,7 +281,7 @@ func (c *cacheStore) find(part nodes.TemplatePart) (root any, subCache *cachedVa
 	return rootCached.val, currentCache, currentSource, actualPath
 }
 
-func (c *cacheStore) readyForPart(part nodes.TemplatePart, sw *schema.StreamWriter[map[string]any]) (
+func (c *cacheStore) readyForPart(part nodes.TemplatePart, sw *einobridge.StreamWriter[map[string]any]) (
 	hasErr bool, partFinished bool) {
 	cachedRoot, subCache, sourceInfo, _ := c.find(part)
 	if cachedRoot != nil && subCache != nil {
@@ -343,7 +342,7 @@ func (e *OutputEmitter) Transform(ctx context.Context, in *wfcompose.StreamReade
 		return nil, fmt.Errorf("output emitter can't get resolved sources")
 	}
 
-	sr, sw := schema.Pipe[map[string]any](0)
+	sr, sw := einobridge.Pipe[map[string]any](0)
 	parts := nodes.ParseTemplate(e.Template)
 	safego.Go(ctx, func() {
 		hasErr := false
@@ -540,7 +539,7 @@ func (e *OutputEmitter) Invoke(ctx context.Context, in map[string]any) (output m
 	return output, nil
 }
 
-func renderAndSend(tp nodes.TemplatePart, k string, v any, sw *schema.StreamWriter[map[string]any]) bool /*hasError*/ {
+func renderAndSend(tp nodes.TemplatePart, k string, v any, sw *einobridge.StreamWriter[map[string]any]) bool /*hasError*/ {
 	m, err := sonic.Marshal(map[string]any{k: v})
 	if err != nil {
 		sw.Send(nil, err)

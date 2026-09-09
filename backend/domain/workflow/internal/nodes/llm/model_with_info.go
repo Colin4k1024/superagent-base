@@ -17,13 +17,13 @@
 package llm
 
 import (
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	"context"
 	"errors"
 
 	"github.com/cloudwego/eino/callbacks"
 	"github.com/cloudwego/eino/components"
 	"github.com/cloudwego/eino/components/model"
-	"github.com/cloudwego/eino/schema"
 
 	"github.com/superagent-ai/superagent-base/backend/bizpkg/config/modelmgr"
 	"github.com/superagent-ai/superagent-base/backend/bizpkg/llm/modelbuilder"
@@ -78,8 +78,8 @@ func NewModelWithFallback(m, f modelbuilder.BaseChatModel, info, fInfo *modelmgr
 	}
 }
 
-func (m *ModelForLLM) Generate(ctx context.Context, input []*schema.Message, opts ...model.Option) (
-	output *schema.Message, err error,
+func (m *ModelForLLM) Generate(ctx context.Context, input []*einobridge.Message, opts ...model.Option) (
+	output *einobridge.Message, err error,
 ) {
 	if m.UseFallback(ctx) {
 		if !m.fallbackEnableCallback {
@@ -108,8 +108,8 @@ func (m *ModelForLLM) Generate(ctx context.Context, input []*schema.Message, opt
 	return m.Model.Generate(ctx, input, opts...)
 }
 
-func (m *ModelForLLM) Stream(ctx context.Context, input []*schema.Message, opts ...model.Option) (
-	output *schema.StreamReader[*schema.Message], err error,
+func (m *ModelForLLM) Stream(ctx context.Context, input []*einobridge.Message, opts ...model.Option) (
+	output *einobridge.StreamReader[*einobridge.Message], err error,
 ) {
 	if m.UseFallback(ctx) {
 		if !m.fallbackEnableCallback {
@@ -138,7 +138,7 @@ func (m *ModelForLLM) Stream(ctx context.Context, input []*schema.Message, opts 
 	return m.Model.Stream(ctx, input, opts...)
 }
 
-func (m *ModelForLLM) WithTools(tools []*schema.ToolInfo) (model.ToolCallingChatModel, error) {
+func (m *ModelForLLM) WithTools(tools []*einobridge.ToolInfo) (model.ToolCallingChatModel, error) {
 	toolModel, ok := m.Model.(model.ToolCallingChatModel)
 	if !ok {
 		return nil, errors.New("requires a ToolCallingChatModel to use with tools")

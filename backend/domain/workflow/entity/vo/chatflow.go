@@ -16,7 +16,7 @@
 
 package vo
 
-import "github.com/cloudwego/eino/schema"
+import "github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 
 type ChatFlowEvent string
 
@@ -83,7 +83,7 @@ type ErrorDetail struct {
 }
 
 type SuggestInfo struct {
-	UserInput    *schema.Message `json:"user_input,omitempty"`
-	AnswerInput  *schema.Message `json:"answer,omitempty"`
+	UserInput    *einobridge.Message `json:"user_input,omitempty"`
+	AnswerInput  *einobridge.Message `json:"answer,omitempty"`
 	PersonaInput *string         `json:"persona_input,omitempty"`
 }

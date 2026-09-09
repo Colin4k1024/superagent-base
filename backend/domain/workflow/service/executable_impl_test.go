@@ -17,11 +17,11 @@
 package service
 
 import (
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	"context"
 	"errors"
 	"testing"
 
-	"github.com/cloudwego/eino/schema"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 
@@ -51,7 +51,7 @@ func TestImpl_handleHistory(t *testing.T) {
 		shouldFetch           bool
 		expectErr             bool
 		expectedHistory       []*crossmessage.WfMessage
-		expectedSchemaHistory []*schema.Message
+		expectedSchemaHistory []*einobridge.Message
 	}{
 		{
 			name:          "historyRounds is zero",
@@ -75,16 +75,16 @@ func TestImpl_handleHistory(t *testing.T) {
 				msgSvc.EXPECT().GetLatestRunIDs(gomock.Any(), gomock.Any()).Return([]int64{1, 2}, nil).AnyTimes()
 				msgSvc.EXPECT().GetMessagesByRunIDs(gomock.Any(), gomock.Any()).Return(&crossmessage.GetMessagesByRunIDsResponse{
 					Messages: []*crossmessage.WfMessage{{ID: 1}},
-					SchemaMessages: []*schema.Message{{
-						Role:    schema.User,
+					SchemaMessages: []*einobridge.Message{{
+						Role:    einobridge.User,
 						Content: "123",
 					}},
 				}, nil).AnyTimes()
 			},
 			expectErr:       false,
 			expectedHistory: []*crossmessage.WfMessage{{ID: 1}},
-			expectedSchemaHistory: []*schema.Message{{
-				Role:    schema.User,
+			expectedSchemaHistory: []*einobridge.Message{{
+				Role:    einobridge.User,
 				Content: "123",
 			}},
 		},
@@ -99,8 +99,8 @@ func TestImpl_handleHistory(t *testing.T) {
 				msgSvc.EXPECT().GetLatestRunIDs(gomock.Any(), gomock.Any()).Return([]int64{3, 4}, nil).AnyTimes()
 				msgSvc.EXPECT().GetMessagesByRunIDs(gomock.Any(), gomock.Any()).Return(&crossmessage.GetMessagesByRunIDsResponse{
 					Messages: []*crossmessage.WfMessage{{ID: 2}},
-					SchemaMessages: []*schema.Message{{
-						Role:    schema.Assistant,
+					SchemaMessages: []*einobridge.Message{{
+						Role:    einobridge.Assistant,
 						Content: "123",
 					}},
 				}, nil).AnyTimes()
@@ -113,8 +113,8 @@ func TestImpl_handleHistory(t *testing.T) {
 			},
 			expectErr:       false,
 			expectedHistory: []*crossmessage.WfMessage{{ID: 2}},
-			expectedSchemaHistory: []*schema.Message{{
-				Role:    schema.Assistant,
+			expectedSchemaHistory: []*einobridge.Message{{
+				Role:    einobridge.Assistant,
 				Content: "123",
 			}},
 		},

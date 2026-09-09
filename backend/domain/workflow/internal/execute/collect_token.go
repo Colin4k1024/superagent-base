@@ -17,12 +17,12 @@
 package execute
 
 import (
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	"context"
 	"sync"
 
 	"github.com/cloudwego/eino/callbacks"
 	"github.com/cloudwego/eino/components/model"
-	"github.com/cloudwego/eino/schema"
 	callbacks2 "github.com/cloudwego/eino/utils/callbacks"
 
 	"github.com/superagent-ai/superagent-base/backend/pkg/safego"
@@ -149,7 +149,7 @@ func GetTokenCallbackHandler() callbacks.Handler {
 			c.wg.Done()
 			return ctx
 		},
-		OnEndWithStreamOutput: func(ctx context.Context, runInfo *callbacks.RunInfo, output *schema.StreamReader[*model.CallbackOutput]) context.Context {
+		OnEndWithStreamOutput: func(ctx context.Context, runInfo *callbacks.RunInfo, output *einobridge.StreamReader[*model.CallbackOutput]) context.Context {
 			c := getTokenCollector(ctx)
 			if c == nil {
 				output.Close()

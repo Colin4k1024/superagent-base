@@ -17,6 +17,7 @@
 package compose
 
 import (
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	"context"
 	"fmt"
 	"runtime/debug"
@@ -26,7 +27,6 @@ import (
 	"github.com/superagent-ai/superagent-base/backend/types/consts"
 
 	einoCompose "github.com/cloudwego/eino/compose"
-	"github.com/cloudwego/eino/schema"
 
 	model "github.com/superagent-ai/superagent-base/backend/crossdomain/workflow/model"
 	wf "github.com/superagent-ai/superagent-base/backend/domain/workflow"
@@ -48,7 +48,7 @@ type WorkflowRunner struct {
 	input     string
 	resumeReq *entity.ResumeRequest
 	schema    *schema2.WorkflowSchema
-	sw        *schema.StreamWriter[*entity.Message]
+	sw        *einobridge.StreamWriter[*entity.Message]
 	container *execute.StreamContainer
 	config    model.ExecuteConfig
 
@@ -60,7 +60,7 @@ type WorkflowRunner struct {
 type workflowRunOptions struct {
 	input              string
 	resumeReq          *entity.ResumeRequest
-	streamWriter       *schema.StreamWriter[*entity.Message]
+	streamWriter       *einobridge.StreamWriter[*entity.Message]
 	rootTokenCollector *execute.TokenCollector
 }
 
@@ -76,7 +76,7 @@ func WithResumeReq(resumeReq *entity.ResumeRequest) WorkflowRunnerOption {
 		opts.resumeReq = resumeReq
 	}
 }
-func WithStreamWriter(sw *schema.StreamWriter[*entity.Message]) WorkflowRunnerOption {
+func WithStreamWriter(sw *einobridge.StreamWriter[*entity.Message]) WorkflowRunnerOption {
 	return func(opts *workflowRunOptions) {
 		opts.streamWriter = sw
 	}

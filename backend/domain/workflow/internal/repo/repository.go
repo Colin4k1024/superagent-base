@@ -17,6 +17,7 @@
 package repo
 
 import (
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	"context"
 	"errors"
 	"fmt"
@@ -24,7 +25,6 @@ import (
 	"time"
 
 	einoCompose "github.com/cloudwego/eino/compose"
-	"github.com/cloudwego/eino/schema"
 	"golang.org/x/exp/maps"
 	"gorm.io/gen"
 	"gorm.io/gen/field"
@@ -1463,7 +1463,7 @@ func (r *RepositoryImpl) WorkflowAsTool(ctx context.Context, policy vo.GetPolicy
 	name := fmt.Sprintf("ts_%s_%s", wfEntity.Name, wfEntity.Name)
 	desc := wfEntity.Desc
 
-	var params map[string]*schema.ParameterInfo
+	var params map[string]*einobridge.ParameterInfo
 
 	for _, tInfo := range wfEntity.InputParams {
 		if p, ok := inputParamsConfigMap[tInfo.Name]; ok && p.LocalDisable {
@@ -1475,15 +1475,15 @@ func (r *RepositoryImpl) WorkflowAsTool(ctx context.Context, policy vo.GetPolicy
 		}
 
 		if params == nil {
-			params = make(map[string]*schema.ParameterInfo)
+			params = make(map[string]*einobridge.ParameterInfo)
 		}
 		params[tInfo.Name] = param
 	}
 
-	toolInfo := &schema.ToolInfo{
+	toolInfo := &einobridge.ToolInfo{
 		Name:        name,
 		Desc:        desc,
-		ParamsOneOf: schema.NewParamsOneOfByParams(params),
+		ParamsOneOf: einobridge.NewParamsOneOfByParams(params),
 	}
 
 	workflowSC, err := adaptor.CanvasToWorkflowSchema(ctx, &canvas)
@@ -1503,11 +1503,11 @@ func (r *RepositoryImpl) WorkflowAsTool(ctx context.Context, policy vo.GetPolicy
 		return nil, vo.WrapError(errno.ErrWorkflowCompileFail, err)
 	}
 
-	type streamFunc func(ctx context.Context, in map[string]any, opts ...einoCompose.Option) (*schema.StreamReader[map[string]any], error)
+	type streamFunc func(ctx context.Context, in map[string]any, opts ...einoCompose.Option) (*einobridge.StreamReader[map[string]any], error)
 
 	if wf.StreamRun() {
 		convertStream := func(stream streamFunc) streamFunc {
-			return func(ctx context.Context, in map[string]any, opts ...einoCompose.Option) (*schema.StreamReader[map[string]any], error) {
+			return func(ctx context.Context, in map[string]any, opts ...einoCompose.Option) (*einobridge.StreamReader[map[string]any], error) {
 				if len(inputParamsConfigMap) == 0 {
 					return stream(ctx, in, opts...)
 				}

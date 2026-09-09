@@ -17,13 +17,13 @@
 package compose
 
 import (
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	"context"
 	"fmt"
 	"strings"
 
 	"github.com/cloudwego/eino/components/model"
 	"github.com/cloudwego/eino/compose"
-	"github.com/cloudwego/eino/schema"
 
 	workflow2 "github.com/superagent-ai/superagent-base/backend/api/model/workflow"
 	crossmessage "github.com/superagent-ai/superagent-base/backend/crossdomain/message"
@@ -77,7 +77,7 @@ func init() {
 	_ = compose.RegisterSerializableType[workflowModel.BizType]("biz_type")
 	_ = compose.RegisterSerializableType[*execute.AppVariables]("app_variables")
 	_ = compose.RegisterSerializableType[workflow2.WorkflowMode]("workflow_mode")
-	_ = compose.RegisterSerializableType[*schema.Message]("schema_message")
+	_ = compose.RegisterSerializableType[*einobridge.Message]("schema_message")
 	_ = compose.RegisterSerializableType[*crossmessage.WfMessage]("history_messages")
 	_ = compose.RegisterSerializableType[*crossmessage.Content]("content")
 	_ = compose.RegisterSerializableType[*model.PromptTokenDetails]("prompt_token_details")
@@ -321,7 +321,7 @@ func statePreHandler(s *schema2.NodeSchema, stream bool) compose.GraphAddNodeOpt
 	}
 
 	if s.FullSources != nil {
-		streamHandlers = append(streamHandlers, func(ctx context.Context, in *schema.StreamReader[map[string]any], state *State) (*schema.StreamReader[map[string]any], error) {
+		streamHandlers = append(streamHandlers, func(ctx context.Context, in *einobridge.StreamReader[map[string]any], state *State) (*einobridge.StreamReader[map[string]any], error) {
 			resolved, err := nodes.ResolveStreamSources(ctx, s.FullSources, state, state)
 			if err != nil {
 				return nil, err
@@ -338,7 +338,7 @@ func statePreHandler(s *schema2.NodeSchema, stream bool) compose.GraphAddNodeOpt
 	}
 
 	if len(streamHandlers) > 0 {
-		streamHandler := func(ctx context.Context, in *schema.StreamReader[map[string]any], state *State) (*schema.StreamReader[map[string]any], error) {
+		streamHandler := func(ctx context.Context, in *einobridge.StreamReader[map[string]any], state *State) (*einobridge.StreamReader[map[string]any], error) {
 			var err error
 			for _, h := range streamHandlers {
 				in, err = h(ctx, in, state)
@@ -445,7 +445,7 @@ func streamStatePreHandlerForVars(s *schema2.NodeSchema) compose.StreamStatePreH
 	varStoreHandler := variable.GetVariableHandler()
 	intermediateVarStore := &nodes.ParentIntermediateStore{}
 
-	return func(ctx context.Context, in *schema.StreamReader[map[string]any], state *State) (*schema.StreamReader[map[string]any], error) {
+	return func(ctx context.Context, in *einobridge.StreamReader[map[string]any], state *State) (*einobridge.StreamReader[map[string]any], error) {
 		var (
 			variables = make(map[string]any)
 			opts      = make([]variable.OptionFn, 0, 1)
@@ -500,9 +500,9 @@ func streamStatePreHandlerForVars(s *schema2.NodeSchema) compose.StreamStatePreH
 			nodes.SetMapValue(variables, input.Path, v)
 		}
 
-		variablesStream := schema.StreamReaderFromArray([]map[string]any{variables})
+		variablesStream := einobridge.StreamReaderFromArray([]map[string]any{variables})
 
-		return schema.MergeStreamReaders([]*schema.StreamReader[map[string]any]{in, variablesStream}), nil
+		return einobridge.MergeStreamReaders([]*einobridge.StreamReader[map[string]any]{in, variablesStream}), nil
 	}
 }
 
@@ -513,7 +513,7 @@ func statePostHandler(s *schema2.NodeSchema, stream bool) compose.GraphAddNodeOp
 	)
 
 	if stream {
-		streamHandlers = append(streamHandlers, func(ctx context.Context, out *schema.StreamReader[map[string]any], state *State) (*schema.StreamReader[map[string]any], error) {
+		streamHandlers = append(streamHandlers, func(ctx context.Context, out *einobridge.StreamReader[map[string]any], state *State) (*einobridge.StreamReader[map[string]any], error) {
 			state.ExecutedNodes[s.Key] = true
 			return out, nil
 		})
@@ -523,7 +523,7 @@ func statePostHandler(s *schema2.NodeSchema, stream bool) compose.GraphAddNodeOp
 			streamHandlers = append(streamHandlers, forVars)
 		}
 
-		streamHandler := func(ctx context.Context, in *schema.StreamReader[map[string]any], state *State) (*schema.StreamReader[map[string]any], error) {
+		streamHandler := func(ctx context.Context, in *einobridge.StreamReader[map[string]any], state *State) (*einobridge.StreamReader[map[string]any], error) {
 			var err error
 			for _, h := range streamHandlers {
 				in, err = h(ctx, in, state)
@@ -657,7 +657,7 @@ func streamStatePostHandlerForVars(s *schema2.NodeSchema) compose.StreamStatePos
 	}
 
 	varStoreHandler := variable.GetVariableHandler()
-	return func(ctx context.Context, in *schema.StreamReader[map[string]any], state *State) (*schema.StreamReader[map[string]any], error) {
+	return func(ctx context.Context, in *einobridge.StreamReader[map[string]any], state *State) (*einobridge.StreamReader[map[string]any], error) {
 		var (
 			variables = make(map[string]any)
 			opts      = make([]variable.OptionFn, 0, 1)
@@ -710,9 +710,9 @@ func streamStatePostHandlerForVars(s *schema2.NodeSchema) compose.StreamStatePos
 			nodes.SetMapValue(variables, input.Path, v)
 		}
 
-		variablesStream := schema.StreamReaderFromArray([]map[string]any{variables})
+		variablesStream := einobridge.StreamReaderFromArray([]map[string]any{variables})
 
-		return schema.MergeStreamReaders([]*schema.StreamReader[map[string]any]{in, variablesStream}), nil
+		return einobridge.MergeStreamReaders([]*einobridge.StreamReader[map[string]any]{in, variablesStream}), nil
 	}
 }
 
