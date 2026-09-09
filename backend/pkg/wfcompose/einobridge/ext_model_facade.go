@@ -30,123 +30,280 @@
  * limitations under the License.
  */
 
-// ext_model_facade re-exports cloudwego/eino-ext model provider types as
-// prefixed aliases so callers avoid importing eino-ext directly (S4).
+// ext_model_facade defines native config types and constructor functions for
+// all model providers.  Each constructor creates a native provider (which
+// implements wfcompose.ToolCallingChatModel with zero eino-ext imports) and
+// wraps it with NewModelAdapter so the result satisfies eino's
+// model.ToolCallingChatModel interface expected by the compose/react/adk layer.
+//
+// This file has ZERO cloudwego/eino-ext imports.
 package einobridge
 
 import (
 	"context"
 
-	arkmodel "github.com/cloudwego/eino-ext/components/model/ark"
-	"github.com/cloudwego/eino-ext/components/model/claude"
-	"github.com/cloudwego/eino-ext/components/model/deepseek"
-	"github.com/cloudwego/eino-ext/components/model/gemini"
-	"github.com/cloudwego/eino-ext/components/model/ollama"
-	"github.com/cloudwego/eino-ext/components/model/openai"
-	"github.com/cloudwego/eino-ext/components/model/qwen"
+	"github.com/cloudwego/eino/components/model"
+
+	claudeprovider "github.com/superagent-ai/superagent-base/backend/pkg/llm/providers/claude"
+	geminiprovider "github.com/superagent-ai/superagent-base/backend/pkg/llm/providers/gemini"
+	openaiprovider "github.com/superagent-ai/superagent-base/backend/pkg/llm/providers/openai"
+	volcmodel "github.com/volcengine/volcengine-go-sdk/service/arkruntime/model"
 )
 
-
 // ---------------------------------------------------------------------------
-// ark model provider
-
+// OpenAI model provider
 // ---------------------------------------------------------------------------
 
-type ArkChatModelConfig = arkmodel.ChatModelConfig
-type ArkResponseFormat = arkmodel.ResponseFormat
-type ArkChatModel = arkmodel.ChatModel
-
-func ArkNewChatModel(ctx context.Context, config *ArkChatModelConfig) (*ArkChatModel, error) {
-	return arkmodel.NewChatModel(ctx, config)
-}
-
-
-// ---------------------------------------------------------------------------
-// claude model provider
-
-// ---------------------------------------------------------------------------
-
-type ClaudeConfig = claude.Config
-type ClaudeThinking = claude.Thinking
-type ClaudeChatModel = claude.ChatModel
-
-func ClaudeNewChatModel(ctx context.Context, config *ClaudeConfig) (*ClaudeChatModel, error) {
-	return claude.NewChatModel(ctx, config)
-}
-
-
-// ---------------------------------------------------------------------------
-// deepseek model provider
-
-// ---------------------------------------------------------------------------
-
-type DeepSeekChatModelConfig = deepseek.ChatModelConfig
-type DeepSeekChatModel = deepseek.ChatModel
-type DeepSeekResponseFormatType = deepseek.ResponseFormatType
+type OpenAIChatModelConfig = openaiprovider.ChatModelConfig
+type OpenAIChatCompletionResponseFormat = openaiprovider.ResponseFormat
 
 const (
-	DeepSeekResponseFormatTypeText         = deepseek.ResponseFormatTypeText
-	DeepSeekResponseFormatTypeJSONObject   = deepseek.ResponseFormatTypeJSONObject
+	OpenAIChatCompletionResponseFormatTypeText       = openaiprovider.ResponseFormatTypeText
+	OpenAIChatCompletionResponseFormatTypeJSONObject = openaiprovider.ResponseFormatTypeJSONObject
+	OpenAIChatCompletionResponseFormatTypeJSONSchema = openaiprovider.ResponseFormatTypeJSONSchema
 )
 
-func DeepSeekNewChatModel(ctx context.Context, config *DeepSeekChatModelConfig) (*DeepSeekChatModel, error) {
-	return deepseek.NewChatModel(ctx, config)
+func OpenAINewChatModel(ctx context.Context, config *OpenAIChatModelConfig) (model.ToolCallingChatModel, error) {
+	provider, err := openaiprovider.NewChatModel(ctx, config)
+	if err != nil {
+		return nil, err
+	}
+	return NewModelAdapter(provider), nil
 }
 
-
 // ---------------------------------------------------------------------------
-// gemini model provider
-
+// Ark model provider (OpenAI-compatible, uses volcengine SDK types)
 // ---------------------------------------------------------------------------
 
-type GeminiModelConfig = gemini.Config
-type GeminiChatModel = gemini.ChatModel
-
-func GeminiNewChatModel(ctx context.Context, config *GeminiModelConfig) (*GeminiChatModel, error) {
-	return gemini.NewChatModel(ctx, config)
+type ArkChatModelConfig struct {
+	APIKey              string                 `json:"api_key"`
+	BaseURL             string                 `json:"base_url"`
+	Region              string                 `json:"region"`
+	Model               string                 `json:"model"`
+	MaxTokens           *int                   `json:"max_tokens,omitempty"`
+	MaxCompletionTokens *int                   `json:"max_completion_tokens,omitempty"`
+	Temperature         *float32               `json:"temperature,omitempty"`
+	TopP                *float32               `json:"top_p,omitempty"`
+	Stop                []string               `json:"stop,omitempty"`
+	FrequencyPenalty    *float32               `json:"frequency_penalty,omitempty"`
+	PresencePenalty     *float32               `json:"presence_penalty,omitempty"`
+	ResponseFormat      *ArkResponseFormat     `json:"response_format,omitempty"`
+	Thinking            *volcmodel.Thinking     `json:"thinking,omitempty"`
 }
 
-
-// ---------------------------------------------------------------------------
-// ollama model provider
-
-// ---------------------------------------------------------------------------
-
-type OllamaChatModelConfig = ollama.ChatModelConfig
-type OllamaChatModel = ollama.ChatModel
-
-func OllamaNewChatModel(ctx context.Context, config *OllamaChatModelConfig) (*OllamaChatModel, error) {
-	return ollama.NewChatModel(ctx, config)
+type ArkResponseFormat struct {
+	Type       volcmodel.ResponseFormatType                `json:"type"`
+	JSONSchema *volcmodel.ResponseFormatJSONSchemaJSONSchemaParam `json:"json_schema,omitempty"`
 }
 
+func ArkNewChatModel(ctx context.Context, config *ArkChatModelConfig) (model.ToolCallingChatModel, error) {
+	openaiConf := &openaiprovider.ChatModelConfig{
+		APIKey:            config.APIKey,
+		BaseURL:           config.BaseURL,
+		Model:             config.Model,
+		Temperature:       config.Temperature,
+		TopP:              config.TopP,
+		MaxTokens:         config.MaxTokens,
+		FrequencyPenalty:  config.FrequencyPenalty,
+		PresencePenalty:   config.PresencePenalty,
+	}
+	if config.ResponseFormat != nil {
+		openaiConf.ResponseFormat = &openaiprovider.ResponseFormat{
+			Type: string(config.ResponseFormat.Type),
+		}
+	}
+	if config.Thinking != nil {
+		enabled := config.Thinking.Type != volcmodel.ThinkingTypeDisabled
+		openaiConf.EnableThinking = &enabled
+	}
+	if config.Region != "" {
+		openaiConf.ExtraFields = map[string]any{"region": config.Region}
+	}
+	provider, err := openaiprovider.NewChatModel(ctx, openaiConf)
+	if err != nil {
+		return nil, err
+	}
+	return NewModelAdapter(provider), nil
+}
 
 // ---------------------------------------------------------------------------
-// openai model provider
-
+// Claude model provider
 // ---------------------------------------------------------------------------
 
-type OpenAIChatModelConfig = openai.ChatModelConfig
-type OpenAIChatCompletionResponseFormat = openai.ChatCompletionResponseFormat
-type OpenAIChatModel = openai.ChatModel
+type ClaudeConfig = claudeprovider.Config
+type ClaudeThinking = claudeprovider.ThinkingConfig
+
+func ClaudeNewChatModel(ctx context.Context, config *ClaudeConfig) (model.ToolCallingChatModel, error) {
+	provider, err := claudeprovider.NewChatModel(ctx, config)
+	if err != nil {
+		return nil, err
+	}
+	return NewModelAdapter(provider), nil
+}
+
+// ---------------------------------------------------------------------------
+// DeepSeek model provider (OpenAI-compatible)
+// ---------------------------------------------------------------------------
+
+type DeepSeekChatModelConfig struct {
+	APIKey              string                   `json:"api_key"`
+	BaseURL             string                   `json:"base_url"`
+	Model               string                   `json:"model"`
+	MaxTokens           int                      `json:"max_tokens,omitempty"`
+	Temperature         float32                  `json:"temperature,omitempty"`
+	TopP                float32                  `json:"top_p,omitempty"`
+	Stop                []string                 `json:"stop,omitempty"`
+	FrequencyPenalty    float32                  `json:"frequency_penalty,omitempty"`
+	PresencePenalty     float32                  `json:"presence_penalty,omitempty"`
+	ResponseFormatType  DeepSeekResponseFormatType `json:"response_format_type,omitempty"`
+}
+
+type DeepSeekResponseFormatType string
 
 const (
-	OpenAIChatCompletionResponseFormatTypeText         = openai.ChatCompletionResponseFormatTypeText
-	OpenAIChatCompletionResponseFormatTypeJSONObject   = openai.ChatCompletionResponseFormatTypeJSONObject
+	DeepSeekResponseFormatTypeText       DeepSeekResponseFormatType = "text"
+	DeepSeekResponseFormatTypeJSONObject DeepSeekResponseFormatType = "json_object"
 )
 
-func OpenAINewChatModel(ctx context.Context, config *OpenAIChatModelConfig) (*OpenAIChatModel, error) {
-	return openai.NewChatModel(ctx, config)
+func DeepSeekNewChatModel(ctx context.Context, config *DeepSeekChatModelConfig) (model.ToolCallingChatModel, error) {
+	openaiConf := &openaiprovider.ChatModelConfig{
+		APIKey:           config.APIKey,
+		BaseURL:          config.BaseURL,
+		Model:            config.Model,
+		FrequencyPenalty: ptrOfFloat32(config.FrequencyPenalty),
+		PresencePenalty:  ptrOfFloat32(config.PresencePenalty),
+	}
+	if config.Temperature != 0 {
+		openaiConf.Temperature = ptrOfFloat32(config.Temperature)
+	}
+	if config.MaxTokens != 0 {
+		openaiConf.MaxTokens = ptrOfInt(config.MaxTokens)
+	}
+	if config.TopP != 0 {
+		openaiConf.TopP = ptrOfFloat32(config.TopP)
+	}
+	if config.ResponseFormatType != "" {
+		openaiConf.ResponseFormat = &openaiprovider.ResponseFormat{
+			Type: string(config.ResponseFormatType),
+		}
+	}
+	provider, err := openaiprovider.NewChatModel(ctx, openaiConf)
+	if err != nil {
+		return nil, err
+	}
+	return NewModelAdapter(provider), nil
 }
 
-
 // ---------------------------------------------------------------------------
-// qwen model provider
-
+// Gemini model provider
 // ---------------------------------------------------------------------------
 
-type QwenChatModelConfig = qwen.ChatModelConfig
-type QwenChatModel = qwen.ChatModel
+type GeminiModelConfig = geminiprovider.Config
 
-func QwenNewChatModel(ctx context.Context, config *QwenChatModelConfig) (*QwenChatModel, error) {
-	return qwen.NewChatModel(ctx, config)
+func GeminiNewChatModel(ctx context.Context, config *GeminiModelConfig) (model.ToolCallingChatModel, error) {
+	provider, err := geminiprovider.NewChatModel(ctx, config)
+	if err != nil {
+		return nil, err
+	}
+	return NewModelAdapter(provider), nil
 }
+
+// ---------------------------------------------------------------------------
+// Ollama model provider (OpenAI-compatible)
+// ---------------------------------------------------------------------------
+
+type OllamaChatModelConfig struct {
+	BaseURL  string             `json:"base_url"`
+	Model    string            `json:"model"`
+	Options  *OllamaOptions    `json:"options,omitempty"`
+	Thinking *OllamaThinkValue `json:"thinking,omitempty"`
+}
+
+type OllamaOptions struct {
+	Temperature      float32 `json:"temperature,omitempty"`
+	TopP             float32 `json:"top_p,omitempty"`
+	TopK             int     `json:"top_k,omitempty"`
+	FrequencyPenalty float32 `json:"frequency_penalty,omitempty"`
+	PresencePenalty  float32 `json:"presence_penalty,omitempty"`
+}
+
+type OllamaThinkValue struct {
+	Value *bool `json:"value,omitempty"`
+}
+
+func OllamaNewChatModel(ctx context.Context, config *OllamaChatModelConfig) (model.ToolCallingChatModel, error) {
+	openaiConf := &openaiprovider.ChatModelConfig{
+		APIKey:  "ollama",
+		BaseURL: config.BaseURL,
+		Model:   config.Model,
+	}
+	if config.Options != nil {
+		if config.Options.Temperature != 0 {
+			openaiConf.Temperature = ptrOfFloat32(config.Options.Temperature)
+		}
+		if config.Options.TopP != 0 {
+			openaiConf.TopP = ptrOfFloat32(config.Options.TopP)
+		}
+		if config.Options.FrequencyPenalty != 0 {
+			openaiConf.FrequencyPenalty = ptrOfFloat32(config.Options.FrequencyPenalty)
+		}
+		if config.Options.PresencePenalty != 0 {
+			openaiConf.PresencePenalty = ptrOfFloat32(config.Options.PresencePenalty)
+		}
+	}
+	if config.Thinking != nil && config.Thinking.Value != nil {
+		openaiConf.EnableThinking = config.Thinking.Value
+	}
+	provider, err := openaiprovider.NewChatModel(ctx, openaiConf)
+	if err != nil {
+		return nil, err
+	}
+	return NewModelAdapter(provider), nil
+}
+
+// ---------------------------------------------------------------------------
+// Qwen model provider (OpenAI-compatible)
+// ---------------------------------------------------------------------------
+
+type QwenChatModelConfig struct {
+	APIKey            string                              `json:"api_key"`
+	BaseURL           string                              `json:"base_url"`
+	Model             string                              `json:"model"`
+	MaxTokens         *int                                `json:"max_tokens,omitempty"`
+	Temperature       *float32                            `json:"temperature,omitempty"`
+	TopP              *float32                            `json:"top_p,omitempty"`
+	Stop              []string                            `json:"stop,omitempty"`
+	FrequencyPenalty  *float32                            `json:"frequency_penalty,omitempty"`
+	PresencePenalty   *float32                            `json:"presence_penalty,omitempty"`
+	ResponseFormat    *OpenAIChatCompletionResponseFormat  `json:"response_format,omitempty"`
+	EnableThinking   *bool                               `json:"enable_thinking,omitempty"`
+}
+
+func QwenNewChatModel(ctx context.Context, config *QwenChatModelConfig) (model.ToolCallingChatModel, error) {
+	openaiConf := &openaiprovider.ChatModelConfig{
+		APIKey:           config.APIKey,
+		BaseURL:          config.BaseURL,
+		Model:            config.Model,
+		Temperature:      config.Temperature,
+		TopP:             config.TopP,
+		MaxTokens:        config.MaxTokens,
+		FrequencyPenalty: config.FrequencyPenalty,
+		PresencePenalty:  config.PresencePenalty,
+		EnableThinking:   config.EnableThinking,
+	}
+	if config.ResponseFormat != nil {
+		openaiConf.ResponseFormat = config.ResponseFormat
+	}
+	provider, err := openaiprovider.NewChatModel(ctx, openaiConf)
+	if err != nil {
+		return nil, err
+	}
+	return NewModelAdapter(provider), nil
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+func ptrOfFloat32(v float32) *float32 { return &v }
+func ptrOfInt(v int) *int             { return &v }

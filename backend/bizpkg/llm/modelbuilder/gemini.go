@@ -53,11 +53,15 @@ func (g *geminiModelBuilder) applyParamsToGeminiConfig(conf *einobridge.GeminiMo
 		return
 	}
 
-	conf.TopK = params.TopK
+	if params.TopK != nil {
+		k := int(*params.TopK)
+		conf.TopK = &k
+	}
 	conf.TopP = params.TopP
 
 	if params.Temperature != nil {
-		conf.Temperature = ptr.Of(*params.Temperature)
+		t := float64(*params.Temperature)
+		conf.Temperature = &t
 	}
 
 	if params.MaxTokens != 0 {

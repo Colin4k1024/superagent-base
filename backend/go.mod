@@ -18,18 +18,6 @@ require (
 	github.com/bytedance/mockey v1.4.6
 	github.com/bytedance/sonic v1.15.0
 	github.com/cloudwego/eino v0.9.0-beta.1
-	github.com/cloudwego/eino-ext/components/embedding/ark v0.1.0
-	github.com/cloudwego/eino-ext/components/embedding/gemini v0.0.0-20250814083140-54b99ff82f8e
-	github.com/cloudwego/eino-ext/components/embedding/ollama v0.0.0-20250728060543-79ec300857b8
-	github.com/cloudwego/eino-ext/components/embedding/openai v0.0.0-20250522060253-ddb617598b09
-	github.com/cloudwego/eino-ext/components/model/ark v0.1.68
-	github.com/cloudwego/eino-ext/components/model/claude v0.1.18
-	github.com/cloudwego/eino-ext/components/model/deepseek v0.1.6
-	github.com/cloudwego/eino-ext/components/model/gemini v0.1.30
-	github.com/cloudwego/eino-ext/components/model/ollama v0.1.3
-	github.com/cloudwego/eino-ext/components/model/openai v0.1.1
-	github.com/cloudwego/eino-ext/components/model/qwen v0.0.0-20250612061754-5a3deb091dc5
-	github.com/cloudwego/eino-ext/libs/acl/openai v0.0.0-20250918130948-16e3a249e721 // indirect
 	github.com/cloudwego/hertz v0.10.2
 	github.com/dimchansky/utfbom v1.1.1
 	github.com/elastic/go-elasticsearch/v7 v7.17.10
@@ -48,7 +36,7 @@ require (
 	github.com/mohae/deepcopy v0.0.0-20170929034955-c48cc78d4826
 	github.com/nikolalohinski/gonja v1.5.3 // indirect
 	github.com/nsqio/go-nsq v1.1.0
-	github.com/ollama/ollama v0.9.6 // indirect
+	github.com/ollama/ollama v0.9.6
 	github.com/onsi/gomega v1.35.1
 	github.com/pingcap/tidb/pkg/parser v0.0.0-20250417044355-c5882b1f6c58
 	github.com/pkg/errors v0.9.1
@@ -87,7 +75,7 @@ require (
 	cloud.google.com/go/compute/metadata v0.9.0 // indirect
 	filippo.io/edwards25519 v1.1.0 // indirect
 	github.com/alicebob/gopher-json v0.0.0-20230218143504-906a9b012302 // indirect
-	github.com/anthropics/anthropic-sdk-go v1.26.0 // indirect
+	github.com/anthropics/anthropic-sdk-go v1.26.0
 	github.com/avast/retry-go v3.0.0+incompatible // indirect
 	github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.6.11 // indirect
 	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.18.35 // indirect
@@ -109,7 +97,6 @@ require (
 	github.com/cloudwego/base64x v0.1.6 // indirect
 	github.com/cloudwego/gopkg v0.1.4 // indirect
 	github.com/cloudwego/netpoll v0.7.0 // indirect
-	github.com/cohesion-org/deepseek-go v1.3.4 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
@@ -165,7 +152,7 @@ require (
 	github.com/mailru/easyjson v0.9.0 // indirect
 	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-sqlite3 v1.14.22 // indirect
-	github.com/meguminnnnnnnnn/go-openai v0.0.0-20250821095446-07791bea23a0 // indirect
+	github.com/meguminnnnnnnnn/go-openai v0.0.0-20250821095446-07791bea23a0
 	github.com/minio/crc64nvme v1.0.1 // indirect
 	github.com/minio/md5-simd v1.1.2 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
@@ -206,7 +193,6 @@ require (
 	github.com/yuin/gopher-lua v1.1.1 // indirect
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
-	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.68.0 // indirect
 	go.opentelemetry.io/otel v1.45.0
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.45.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.20.0
@@ -222,7 +208,6 @@ require (
 	golang.org/x/net v0.57.0
 	golang.org/x/sys v0.47.0 // indirect
 	golang.org/x/text v0.40.0 // indirect
-	golang.org/x/time v0.15.0 // indirect
 	golang.org/x/tools v0.47.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20260803160001-6ac0973c030d // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260807164820-c8921c73eeea // indirect
@@ -240,16 +225,13 @@ require (
 
 require (
 	github.com/apache/pulsar-client-go v0.16.0
-	github.com/cloudwego/eino-ext/devops v0.1.9
 	github.com/eino-contrib/jsonschema v1.0.3
-	github.com/eino-contrib/ollama v0.1.0
 	github.com/nats-io/nats.go v1.34.1
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp v1.45.0
 	google.golang.org/adk/v2 v2.3.0
 )
 
 require (
-	cloud.google.com/go/auth/oauth2adapt v0.2.8 // indirect
 	github.com/99designs/go-keychain v0.0.0-20191008050251-8e49817e8af4 // indirect
 	github.com/99designs/keyring v1.2.1 // indirect
 	github.com/AthenZ/athenz v1.12.13 // indirect
@@ -258,7 +240,6 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/signin v1.5.4 // indirect
 	github.com/bahlo/generic-list-go v0.2.0 // indirect
 	github.com/bits-and-blooms/bitset v1.4.0 // indirect
-	github.com/bmatcuk/doublestar/v4 v4.10.0 // indirect
 	github.com/buger/jsonparser v1.1.1 // indirect
 	github.com/cenkalti/backoff/v5 v5.0.3 // indirect
 	github.com/danieljoos/wincred v1.1.2 // indirect
@@ -273,7 +254,6 @@ require (
 	github.com/google/safehtml v0.1.0 // indirect
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510 // indirect
 	github.com/googleapis/gax-go/v2 v2.23.0 // indirect
-	github.com/gorilla/mux v1.8.1 // indirect
 	github.com/gsterjov/go-libsecret v0.0.0-20161001094733-a6f4afe4910c // indirect
 	github.com/hamba/avro/v2 v2.26.0 // indirect
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
