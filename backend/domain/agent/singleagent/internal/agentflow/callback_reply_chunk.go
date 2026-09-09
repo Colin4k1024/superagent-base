@@ -41,9 +41,9 @@ import (
 )
 
 func newReplyCallback(_ context.Context, executeID string, returnDirectlyTools map[string]struct{}) (clb callbacks.Handler,
-	sr *schema.StreamReader[*entity.AgentEvent], sw *schema.StreamWriter[*entity.AgentEvent],
+	sr *wfcompose.StreamReader[*entity.AgentEvent], sw *wfcompose.StreamWriter[*entity.AgentEvent],
 ) {
-	sr, sw = schema.Pipe[*entity.AgentEvent](10)
+	sr, sw = wfcompose.Pipe[*entity.AgentEvent](10)
 
 	rcc := &replyChunkCallback{
 		sw:                  sw,
@@ -62,7 +62,7 @@ func newReplyCallback(_ context.Context, executeID string, returnDirectlyTools m
 }
 
 type replyChunkCallback struct {
-	sw                  *schema.StreamWriter[*entity.AgentEvent]
+	sw                  *wfcompose.StreamWriter[*entity.AgentEvent]
 	executeID           string
 	returnDirectlyTools map[string]struct{}
 }
@@ -82,11 +82,11 @@ func (r *replyChunkCallback) OnError(ctx context.Context, info *callbacks.RunInf
 			toolMessageEvent := &entity.AgentEvent{
 				EventType: singleagent.EventTypeOfToolsMessage,
 				ToolsMessage: []*wfcompose.Message{
-					einobridge.WrapMessage(&schema.Message{
-						Role:       schema.Tool,
+					&wfcompose.Message{
+						Role:       wfcompose.RoleTool,
 						Content:    "directly streaming reply",
 						ToolCallID: interruptData.ToolCallID,
-					}),
+					},
 				},
 			}
 			r.sw.Send(toolMessageEvent, nil)
@@ -118,7 +118,7 @@ func (r *replyChunkCallback) OnStart(ctx context.Context, info *callbacks.RunInf
 		}
 		ae := &entity.AgentEvent{
 			EventType: singleagent.EventTypeOfFuncCall,
-			FuncCall:  einobridge.WrapMessage(convToolsNodeCallbackInput(input)),
+			FuncCall:  convToolsNodeCallbackInput(input),
 		}
 		r.sw.Send(ae, nil)
 	}
@@ -144,15 +144,15 @@ func (r *replyChunkCallback) OnEnd(ctx context.Context, info *callbacks.RunInfo,
 		if len(result) > 0 {
 			for _, item := range result {
 				var event *entity.AgentEvent
-				if item.Role == schema.Tool {
+				if item.Role == wfcompose.RoleTool {
 					event = &entity.AgentEvent{
 						EventType:    singleagent.EventTypeOfToolsMessage,
-						ToolsMessage: []*wfcompose.Message{einobridge.WrapMessage(item)},
+						ToolsMessage: []*wfcompose.Message{item},
 					}
 				} else {
 					event = &entity.AgentEvent{
 						EventType: singleagent.EventTypeOfFuncCall,
-						FuncCall:  einobridge.WrapMessage(item),
+						FuncCall:  item,
 					}
 				}
 				r.sw.Send(event, nil)
@@ -166,7 +166,7 @@ func (r *replyChunkCallback) OnEnd(ctx context.Context, info *callbacks.RunInfo,
 			for _, item := range sg {
 				suggestionEvent := &entity.AgentEvent{
 					EventType: singleagent.EventTypeOfSuggest,
-					Suggest:   einobridge.WrapMessage(item),
+					Suggest:   item,
 				}
 				r.sw.Send(suggestionEvent, nil)
 			}
@@ -208,7 +208,7 @@ func (r *replyChunkCallback) OnEndWithStreamOutput(ctx context.Context, info *ca
 
 		r.sw.Send(&entity.AgentEvent{
 			EventType:    singleagent.EventTypeOfToolsMessage,
-			ToolsMessage: einobridge.WrapMessageSlice(toolsMessage),
+			ToolsMessage: toolsMessage,
 		}, nil)
 		return ctx
 	default:
@@ -269,10 +269,10 @@ func convInterruptEventType(interruptEvent any) singleagent.InterruptEventType {
 	return interruptEventType
 }
 
-func (r *replyChunkCallback) concatToolsNodeOutput(ctx context.Context, output *schema.StreamReader[callbacks.CallbackOutput]) ([]*schema.Message, error) {
-	var toolsMsgChunks [][]*schema.Message
-	var sr *schema.StreamReader[*schema.Message]
-	var sw *schema.StreamWriter[*schema.Message]
+func (r *replyChunkCallback) concatToolsNodeOutput(ctx context.Context, output *schema.StreamReader[callbacks.CallbackOutput]) ([]*wfcompose.Message, error) {
+	var toolsMsgChunks [][]*wfcompose.Message
+	var sr *wfcompose.StreamReader[*wfcompose.Message]
+	var sw *wfcompose.StreamWriter[*wfcompose.Message]
 	defer func() {
 		if sw != nil {
 			sw.Close()
@@ -299,7 +299,7 @@ func (r *replyChunkCallback) concatToolsNodeOutput(ctx context.Context, output *
 
 		if !isToolsMsgChunksInit {
 			isToolsMsgChunksInit = true
-			toolsMsgChunks = make([][]*schema.Message, len(msgs))
+			toolsMsgChunks = make([][]*wfcompose.Message, len(msgs))
 		}
 
 		for mIndex, msg := range msgs {
@@ -317,10 +317,10 @@ func (r *replyChunkCallback) concatToolsNodeOutput(ctx context.Context, output *
 
 				if _, ok := returnDirectToolsMap[mIndex]; ok {
 					if !streamInitialized {
-						sr, sw = schema.Pipe[*schema.Message](5)
+						sr, sw = wfcompose.Pipe[*wfcompose.Message](5)
 						r.sw.Send(&entity.AgentEvent{
 							EventType:             singleagent.EventTypeOfToolsAsChatModelStream,
-							ToolAsChatModelAnswer: einobridge.WrapMessageStreamReader(sr),
+							ToolAsChatModelAnswer: sr,
 						}, nil)
 						streamInitialized = true
 					}
@@ -328,55 +328,55 @@ func (r *replyChunkCallback) concatToolsNodeOutput(ctx context.Context, output *
 				}
 			}
 			if toolsMsgChunks[mIndex] == nil {
-				toolsMsgChunks[mIndex] = []*schema.Message{msg}
+				toolsMsgChunks[mIndex] = []*wfcompose.Message{msg}
 			} else {
 				toolsMsgChunks[mIndex] = append(toolsMsgChunks[mIndex], msg)
 			}
 		}
 	}
 
-	toolMessages := make([]*schema.Message, 0, len(toolsMsgChunks))
+	toolMessages := make([]*wfcompose.Message, 0, len(toolsMsgChunks))
 
 	for _, msgChunks := range toolsMsgChunks {
-		msg, err := schema.ConcatMessages(msgChunks)
+		msg, err := schema.ConcatMessages(einobridge.UnwrapMessageSlice(msgChunks))
 		if err != nil {
 			return nil, err
 		}
-		toolMessages = append(toolMessages, msg)
+		toolMessages = append(toolMessages, einobridge.WrapMessage(msg))
 	}
 
 	return toolMessages, nil
 }
 
-func convToolsNodeCallbackInput(input callbacks.CallbackInput) *schema.Message {
+func convToolsNodeCallbackInput(input callbacks.CallbackInput) *wfcompose.Message {
 	switch t := input.(type) {
 	case *schema.Message:
-		return t
+		return einobridge.WrapMessage(t)
 	default:
 		return nil
 	}
 }
 
-func convToolsNodeCallbackOutput(output callbacks.CallbackOutput) []*schema.Message {
+func convToolsNodeCallbackOutput(output callbacks.CallbackOutput) []*wfcompose.Message {
 	switch t := output.(type) {
 	case []*schema.Message:
-		return t
+		return einobridge.WrapMessageSlice(t)
 	default:
 		return nil
 	}
 }
 
-func convToolsPreRetrieverCallbackInput(output callbacks.CallbackOutput) []*schema.Message {
+func convToolsPreRetrieverCallbackInput(output callbacks.CallbackOutput) []*wfcompose.Message {
 	switch t := output.(type) {
 	case []*schema.Message:
-		return t
+		return einobridge.WrapMessageSlice(t)
 	default:
 		return nil
 	}
 }
 
-func convSuggestionNodeCallbackOutput(output callbacks.CallbackInput) []*schema.Message {
-	var sg []*schema.Message
+func convSuggestionNodeCallbackOutput(output callbacks.CallbackInput) []*wfcompose.Message {
+	var sg []*wfcompose.Message
 
 	switch so := output.(type) {
 	case *schema.Message:
@@ -387,11 +387,8 @@ func convSuggestionNodeCallbackOutput(output callbacks.CallbackInput) []*schema.
 
 			if err == nil && len(suggestions) > 0 {
 				for _, suggestion := range suggestions {
-					sm := &schema.Message{
-						Role:         so.Role,
-						Content:      suggestion,
-						ResponseMeta: so.ResponseMeta,
-					}
+					sm := einobridge.WrapMessage(so)
+					sm.Content = suggestion
 					sg = append(sg, sm)
 				}
 			}

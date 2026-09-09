@@ -17,16 +17,16 @@
 package agentflow
 
 import (
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose"
 	"fmt"
 	"strings"
 	"testing"
 
-	"github.com/cloudwego/eino/schema"
 )
 
 func TestBuildAgent(t *testing.T) {
 
-	// 	sr, sw := schema.Pipe[*schema.Message](2)
+	// 	sr, sw := wfcompose.Pipe[*wfcompose.Message](2)
 	// 	sw.Send(schema.AssistantMessage("to be great", nil), nil)
 	// 	sw.Close()
 	// 	arkModel := mockChatModel.NewMockToolCallingChatModel(ctrl)
@@ -186,7 +186,7 @@ func TestBuildAgent(t *testing.T) {
 
 	// 	req := &AgentRequest{
 	// 		Input: schema.UserMessage("How should a person grow professionally?"),
-	// 		History: []*schema.Message{
+	// 		History: []*wfcompose.Message{
 	// 			schema.UserMessage("my name is ZhangSan, 25 years old, the position is artificial intelligence application development"),
 	// 		},
 	// 	}
@@ -229,7 +229,7 @@ func TestBuildAgent(t *testing.T) {
 	//	}
 }
 
-func formatDocuments(docs []*schema.Document) string {
+func formatDocuments(docs []*wfcompose.Document) string {
 	var sb strings.Builder
 	for i, doc := range docs {
 		sb.WriteString(fmt.Sprintf("\n[seg: %v]: %v", i, doc.String()))

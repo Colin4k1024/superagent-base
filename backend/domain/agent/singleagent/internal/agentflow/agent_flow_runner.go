@@ -24,7 +24,6 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/cloudwego/eino/compose"
-	"github.com/cloudwego/eino/schema"
 	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose"
 	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 
@@ -52,15 +51,15 @@ func einoOpt(o wfcompose.Option) compose.Option {
 }
 
 type AgentState struct {
-	Messages                 []*schema.Message
-	UserInput                *schema.Message
+	Messages                 []*wfcompose.Message
+	UserInput                *wfcompose.Message
 	ReturnDirectlyToolCallID string
 }
 
 type AgentRequest struct {
 	UserID  string
-	Input   *schema.Message
-	History []*schema.Message
+	Input   *wfcompose.Message
+	History []*wfcompose.Message
 
 	Identity *singleagent.AgentIdentity
 
@@ -70,7 +69,7 @@ type AgentRequest struct {
 }
 
 type AgentRunner struct {
-	runner            compose.Runnable[*AgentRequest, *schema.Message]
+	runner            compose.Runnable[*AgentRequest, *wfcompose.Message]
 	requireCheckpoint bool
 
 	returnDirectlyTools map[string]struct{}
@@ -79,7 +78,7 @@ type AgentRunner struct {
 }
 
 func (r *AgentRunner) StreamExecute(ctx context.Context, req *AgentRequest) (
-	sr *schema.StreamReader[*entity.AgentEvent], err error,
+	sr *wfcompose.StreamReader[*entity.AgentEvent], err error,
 ) {
 	executeID := uuid.New()
 
@@ -146,10 +145,10 @@ func (r *AgentRunner) StreamExecute(ctx context.Context, req *AgentRequest) (
 	return sr, nil
 }
 
-func (r *AgentRunner) processWfMidAnswerStream(_ context.Context, sw *schema.StreamWriter[*entity.AgentEvent], wfStream *wfcompose.StreamReader[*crossworkflow.WorkflowMessage]) {
+func (r *AgentRunner) processWfMidAnswerStream(_ context.Context, sw *wfcompose.StreamWriter[*entity.AgentEvent], wfStream *wfcompose.StreamReader[*crossworkflow.WorkflowMessage]) {
 	streamInitialized := false
-	var srT *schema.StreamReader[*schema.Message]
-	var swT *schema.StreamWriter[*schema.Message]
+	var srT *wfcompose.StreamReader[*wfcompose.Message]
+	var swT *wfcompose.StreamWriter[*wfcompose.Message]
 	defer func() {
 		if swT != nil {
 			swT.Close()
@@ -171,14 +170,14 @@ func (r *AgentRunner) processWfMidAnswerStream(_ context.Context, sw *schema.Str
 		}
 		if !streamInitialized {
 			streamInitialized = true
-			srT, swT = schema.Pipe[*schema.Message](5)
+			srT, swT = wfcompose.Pipe[*wfcompose.Message](5)
 			sw.Send(&entity.AgentEvent{
 				EventType:     singleagent.EventTypeOfToolMidAnswer,
-				ToolMidAnswer: einobridge.WrapMessageStreamReader(srT),
+				ToolMidAnswer: srT,
 			}, nil)
 		}
-		swT.Send(&schema.Message{
-			Role:    msg.DataMessage.Role,
+		swT.Send(&wfcompose.Message{
+			Role:    wfcompose.RoleType(msg.DataMessage.Role),
 			Content: msg.DataMessage.Content,
 			Extra: func(msg *crossworkflow.WorkflowMessage) map[string]any {
 
@@ -201,53 +200,53 @@ func (r *AgentRunner) PreHandlerReq(ctx context.Context, req *AgentRequest) *Age
 	return req
 }
 
-func (r *AgentRunner) preHandlerInput(input *schema.Message) *schema.Message {
-	var multiContent []schema.ChatMessagePart
+func (r *AgentRunner) preHandlerInput(input *wfcompose.Message) *wfcompose.Message {
+	var multiContent []wfcompose.ChatMessagePart
 
 	if len(input.MultiContent) == 0 {
 		return input
 	}
 
-	unSupportMultiPart := make([]schema.ChatMessagePart, 0, len(input.MultiContent))
+	unSupportMultiPart := make([]wfcompose.ChatMessagePart, 0, len(input.MultiContent))
 
 	for _, v := range input.MultiContent {
 		switch v.Type {
-		case schema.ChatMessagePartTypeImageURL:
+		case wfcompose.ChatMessagePartTypeImageURL:
 			if !r.isSupportImage() {
 				unSupportMultiPart = append(unSupportMultiPart, v)
 			} else {
 				v.ImageURL = transImageURLToBase64(v.ImageURL, r.enableLocalFileToLLMWithBase64())
 				multiContent = append(multiContent, v)
 			}
-		case schema.ChatMessagePartTypeFileURL:
+		case wfcompose.ChatMessagePartTypeFileURL:
 			if !r.isSupportFile() {
 				unSupportMultiPart = append(unSupportMultiPart, v)
 			} else {
 				v.FileURL = transFileURLToBase64(v.FileURL, r.enableLocalFileToLLMWithBase64())
 				multiContent = append(multiContent, v)
 			}
-		case schema.ChatMessagePartTypeAudioURL:
+		case wfcompose.ChatMessagePartTypeAudioURL:
 			if !r.isSupportAudio() {
 				unSupportMultiPart = append(unSupportMultiPart, v)
 			} else {
 				v.AudioURL = transAudioURLToBase64(v.AudioURL, r.enableLocalFileToLLMWithBase64())
 				multiContent = append(multiContent, v)
 			}
-		case schema.ChatMessagePartTypeVideoURL:
+		case wfcompose.ChatMessagePartTypeVideoURL:
 			if !r.isSupportVideo() {
 				unSupportMultiPart = append(unSupportMultiPart, v)
 			} else {
 				v.VideoURL = transVideoURLToBase64(v.VideoURL, r.enableLocalFileToLLMWithBase64())
 				multiContent = append(multiContent, v)
 			}
-		case schema.ChatMessagePartTypeText:
+		case wfcompose.ChatMessagePartTypeText:
 		default:
 			multiContent = append(multiContent, v)
 		}
 	}
 
 	for _, v := range input.MultiContent {
-		if v.Type != schema.ChatMessagePartTypeText {
+		if v.Type != wfcompose.ChatMessagePartTypeText {
 			continue
 		}
 
@@ -266,19 +265,19 @@ func (r *AgentRunner) preHandlerInput(input *schema.Message) *schema.Message {
 	input.MultiContent = multiContent
 	return input
 }
-func concatContentString(textContent string, unSupportTypeURL []schema.ChatMessagePart) string {
+func concatContentString(textContent string, unSupportTypeURL []wfcompose.ChatMessagePart) string {
 	if len(unSupportTypeURL) == 0 {
 		return textContent
 	}
 	for _, v := range unSupportTypeURL {
 		switch v.Type {
-		case schema.ChatMessagePartTypeImageURL:
+		case wfcompose.ChatMessagePartTypeImageURL:
 			textContent += "  this is a image:" + v.ImageURL.URL
-		case schema.ChatMessagePartTypeFileURL:
+		case wfcompose.ChatMessagePartTypeFileURL:
 			textContent += "  this is a file:" + v.FileURL.URL
-		case schema.ChatMessagePartTypeAudioURL:
+		case wfcompose.ChatMessagePartTypeAudioURL:
 			textContent += "  this is a audio:" + v.AudioURL.URL
-		case schema.ChatMessagePartTypeVideoURL:
+		case wfcompose.ChatMessagePartTypeVideoURL:
 			textContent += "  this is a video:" + v.VideoURL.URL
 		default:
 		}
@@ -286,10 +285,10 @@ func concatContentString(textContent string, unSupportTypeURL []schema.ChatMessa
 	return textContent
 }
 
-func (r *AgentRunner) preHandlerHistory(history []*schema.Message) []*schema.Message {
-	var hm []*schema.Message
+func (r *AgentRunner) preHandlerHistory(history []*wfcompose.Message) []*wfcompose.Message {
+	var hm []*wfcompose.Message
 	for _, msg := range history {
-		if msg.Role == schema.User {
+		if msg.Role == wfcompose.RoleUser {
 			msg = r.preHandlerInput(msg)
 		}
 		hm = append(hm, msg)
@@ -317,7 +316,7 @@ func (r *AgentRunner) enableLocalFileToLLMWithBase64() bool {
 	return r.modelInfo.EnableBase64URL
 }
 
-func transImageURLToBase64(imageUrl *schema.ChatMessageImageURL, enableBase64Url bool) *schema.ChatMessageImageURL {
+func transImageURLToBase64(imageUrl *wfcompose.ChatMessageImageURL, enableBase64Url bool) *wfcompose.ChatMessageImageURL {
 	if !enableBase64Url {
 		return imageUrl
 	}
@@ -330,7 +329,7 @@ func transImageURLToBase64(imageUrl *schema.ChatMessageImageURL, enableBase64Url
 	return imageUrl
 }
 
-func transFileURLToBase64(fileUrl *schema.ChatMessageFileURL, enableBase64Url bool) *schema.ChatMessageFileURL {
+func transFileURLToBase64(fileUrl *wfcompose.ChatMessageFileURL, enableBase64Url bool) *wfcompose.ChatMessageFileURL {
 
 	if !enableBase64Url {
 		return fileUrl
@@ -344,7 +343,7 @@ func transFileURLToBase64(fileUrl *schema.ChatMessageFileURL, enableBase64Url bo
 	return fileUrl
 }
 
-func transAudioURLToBase64(audioUrl *schema.ChatMessageAudioURL, enableBase64Url bool) *schema.ChatMessageAudioURL {
+func transAudioURLToBase64(audioUrl *wfcompose.ChatMessageAudioURL, enableBase64Url bool) *wfcompose.ChatMessageAudioURL {
 
 	if !enableBase64Url {
 		return audioUrl
@@ -358,7 +357,7 @@ func transAudioURLToBase64(audioUrl *schema.ChatMessageAudioURL, enableBase64Url
 	return audioUrl
 }
 
-func transVideoURLToBase64(videoUrl *schema.ChatMessageVideoURL, enableBase64Url bool) *schema.ChatMessageVideoURL {
+func transVideoURLToBase64(videoUrl *wfcompose.ChatMessageVideoURL, enableBase64Url bool) *wfcompose.ChatMessageVideoURL {
 
 	if !enableBase64Url {
 		return videoUrl

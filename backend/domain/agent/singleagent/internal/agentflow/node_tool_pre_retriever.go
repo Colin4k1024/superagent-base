@@ -17,10 +17,10 @@
 package agentflow
 
 import (
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose"
 	"context"
 	"encoding/json"
 
-	"github.com/cloudwego/eino/schema"
 	"github.com/google/uuid"
 
 	agentrun "github.com/superagent-ai/superagent-base/backend/crossdomain/agentrun/model"
@@ -39,12 +39,12 @@ func newPreToolRetriever(conf *toolPreCallConf) *toolPreCallConf {
 	return &toolPreCallConf{}
 }
 
-func (pr *toolPreCallConf) toolPreRetrieve(ctx context.Context, ar *AgentRequest) ([]*schema.Message, error) {
+func (pr *toolPreCallConf) toolPreRetrieve(ctx context.Context, ar *AgentRequest) ([]*wfcompose.Message, error) {
 	if len(ar.PreCallTools) == 0 {
 		return nil, nil
 	}
 
-	var tms []*schema.Message
+	var tms []*wfcompose.Message
 	for _, item := range ar.PreCallTools {
 
 		var toolResp string
@@ -112,12 +112,12 @@ func (pr *toolPreCallConf) toolPreRetrieve(ctx context.Context, ar *AgentRequest
 		if toolResp != "" {
 			uID := uuid.New()
 			toolCallID := "call_" + uID.String()
-			tms = append(tms, &schema.Message{
-				Role: schema.Assistant,
-				ToolCalls: []schema.ToolCall{
+			tms = append(tms, &wfcompose.Message{
+				Role: wfcompose.RoleAssistant,
+				ToolCalls: []wfcompose.ToolCall{
 					{
 						Type: "function",
-						Function: schema.FunctionCall{
+						Function: wfcompose.FunctionCall{
 							Name:      item.ToolName,
 							Arguments: item.Arguments,
 						},
@@ -126,8 +126,8 @@ func (pr *toolPreCallConf) toolPreRetrieve(ctx context.Context, ar *AgentRequest
 				},
 			})
 
-			tms = append(tms, &schema.Message{
-				Role:       schema.Tool,
+			tms = append(tms, &wfcompose.Message{
+				Role:       wfcompose.RoleTool,
 				Content:    toolResp,
 				ToolCallID: toolCallID,
 			})

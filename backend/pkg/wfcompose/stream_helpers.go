@@ -33,6 +33,7 @@
 package wfcompose
 
 import (
+	"sync"
 	"io"
 )
 
@@ -129,4 +130,70 @@ func MergeStreamReaders[T any](readers []*StreamReader[T]) *StreamReader[T] {
 			}
 		}
 	})
+}
+
+// Pipe creates a paired StreamReader/StreamWriter backed by a buffered
+// channel. Data sent via StreamWriter.Send becomes available on
+// StreamReader.Recv. Closing the writer causes the reader to eventually
+// return io.EOF. This mirrors schema.Pipe from eino.
+func Pipe[T any](cap int) (*StreamReader[T], *StreamWriter[T]) {
+	ch := make(chan T, cap)
+	errCh := make(chan error, 1)
+	closed := false
+
+	mu := new(sync.Mutex)
+
+	reader := &StreamReader[T]{
+		recv: func() (T, error) {
+			var zero T
+			select {
+			case err, ok := <-errCh:
+				if !ok {
+					return zero, io.EOF
+				}
+				return zero, err
+			case v, ok := <-ch:
+				if !ok {
+					return zero, io.EOF
+				}
+				return v, nil
+			}
+		},
+		close: func() {
+			mu.Lock()
+			defer mu.Unlock()
+			if closed {
+				return
+			}
+			closed = true
+			close(ch)
+		},
+	}
+
+	writer := &StreamWriter[T]{
+		send: func(v T, err error) {
+			if err != nil {
+				mu.Lock()
+				if !closed {
+					closed = true
+					errCh <- err
+					close(ch)
+				}
+				mu.Unlock()
+				return
+			}
+			ch <- v
+		},
+		close: func() {
+			mu.Lock()
+			defer mu.Unlock()
+			if closed {
+				return
+			}
+			closed = true
+			close(ch)
+		},
+	}
+
+	return reader, writer
 }

@@ -17,12 +17,12 @@
 package agentflow
 
 import (
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose"
 	"context"
 
-	"github.com/cloudwego/eino/schema"
 )
 
-func suggestParser(ctx context.Context, message *schema.Message) (*schema.Message, error) {
+func suggestParser(ctx context.Context, message *wfcompose.Message) (*wfcompose.Message, error) {
 
 	return message, nil
 }

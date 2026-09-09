@@ -25,6 +25,7 @@ import (
 
 	"github.com/superagent-ai/superagent-base/backend/api/model/app/bot_common"
 	"github.com/superagent-ai/superagent-base/backend/bizpkg/llm/modelbuilder"
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	"github.com/superagent-ai/superagent-base/backend/pkg/lang/ptr"
 )
 
@@ -62,16 +63,26 @@ func newSuggestGraph(_ context.Context, conf *Config, chatModel modelbuilder.Too
 	suggestGraph := compose.NewGraph[[]*schema.Message, *schema.Message]()
 	suggestPromptVars := &suggestPromptVariables{}
 	_ = suggestGraph.AddLambdaNode(keyOfSuggestPromptVariables,
-		compose.InvokableLambda[[]*schema.Message, map[string]any](suggestPromptVars.AssembleSuggestPromptVariables))
+		compose.InvokableLambda[[]*schema.Message, map[string]any](func(ctx context.Context, vb []*schema.Message) (map[string]any, error) {
+		return suggestPromptVars.AssembleSuggestPromptVariables(ctx, einobridge.WrapMessageSlice(vb))
+	}))
 
 	_ = suggestGraph.AddLambdaNode(keyOfSuggestPersonParse,
-		compose.InvokableLambda[[]*schema.Message, string](sp.RenderPersona),
+		compose.InvokableLambda[[]*schema.Message, string](func(ctx context.Context, vb []*schema.Message) (string, error) {
+		return sp.RenderPersona(ctx, einobridge.WrapMessageSlice(vb))
+	}),
 		compose.WithOutputKey(keyOfSuggestPersonParse),
 	)
 
 	_ = suggestGraph.AddChatTemplateNode(keyOfSuggestTemplate, suggestPrompt)
 	_ = suggestGraph.AddChatModelNode(keyOfSuggestChatModel, chatModel, compose.WithNodeName(keyOfSuggestChatModel))
-	_ = suggestGraph.AddLambdaNode(keyOfSuggestParser, compose.InvokableLambda[*schema.Message, *schema.Message](suggestParser), compose.WithNodeName(keyOfSuggestParser))
+	_ = suggestGraph.AddLambdaNode(keyOfSuggestParser, compose.InvokableLambda[*schema.Message, *schema.Message](func(ctx context.Context, msg *schema.Message) (*schema.Message, error) {
+		wfMsg, err := suggestParser(ctx, einobridge.WrapMessage(msg))
+		if err != nil {
+			return nil, err
+		}
+		return einobridge.UnwrapMessage(wfMsg), nil
+	}), compose.WithNodeName(keyOfSuggestParser))
 
 	_ = suggestGraph.AddEdge(compose.START, keyOfSuggestPromptVariables)
 	_ = suggestGraph.AddEdge(compose.START, keyOfSuggestPersonParse)

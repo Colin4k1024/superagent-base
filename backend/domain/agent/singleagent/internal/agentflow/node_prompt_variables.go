@@ -17,11 +17,11 @@
 package agentflow
 
 import (
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose"
 	"context"
 	"fmt"
 	"time"
 
-	"github.com/cloudwego/eino/schema"
 
 	"github.com/superagent-ai/superagent-base/backend/domain/agent/singleagent/entity"
 )
@@ -43,7 +43,7 @@ func (p *promptVariables) AssemblePromptVariables(ctx context.Context, req *Agen
 	variables[placeholderOfAgentName] = p.Agent.Name
 
 	if req.Input != nil {
-		variables[placeholderOfUserInput] = []*schema.Message{req.Input}
+		variables[placeholderOfUserInput] = []*wfcompose.Message{req.Input}
 	}
 
 	// Handling conversation history

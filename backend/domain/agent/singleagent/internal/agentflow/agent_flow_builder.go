@@ -17,6 +17,7 @@
 package agentflow
 
 import (
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose"
 	"context"
 	"fmt"
 	"regexp"
@@ -24,7 +25,6 @@ import (
 
 	"github.com/cloudwego/eino/components/tool"
 	"github.com/cloudwego/eino/compose"
-	"github.com/cloudwego/eino/schema"
 
 	"github.com/superagent-ai/superagent-base/backend/bizpkg/llm/modelbuilder"
 	"github.com/superagent-ai/superagent-base/backend/domain/agent/singleagent/entity"
@@ -184,7 +184,7 @@ func BuildAgent(ctx context.Context, conf *Config) (r *AgentRunner, err error) {
 
 	suggestGraph, nsg := newSuggestGraph(ctx, conf, chatModel)
 
-	g := compose.NewGraph[*AgentRequest, *schema.Message](
+	g := compose.NewGraph[*AgentRequest, *wfcompose.Message](
 		compose.WithGenLocalState(func(ctx context.Context) (state *AgentState) {
 			return &AgentState{}
 		}))
@@ -201,16 +201,16 @@ func BuildAgent(ctx context.Context, conf *Config) (r *AgentRunner, err error) {
 		compose.InvokableLambda[*AgentRequest, map[string]any](promptVars.AssemblePromptVariables))
 
 	_ = g.AddLambdaNode(keyOfKnowledgeRetriever,
-		compose.InvokableLambda[*AgentRequest, []*schema.Document](kr.Retrieve),
+		compose.InvokableLambda[*AgentRequest, []*wfcompose.Document](kr.Retrieve),
 		compose.WithNodeName(keyOfKnowledgeRetriever))
 
 	_ = g.AddLambdaNode(keyOfToolsPreRetriever,
-		compose.InvokableLambda[*AgentRequest, []*schema.Message](tr.toolPreRetrieve),
+		compose.InvokableLambda[*AgentRequest, []*wfcompose.Message](tr.toolPreRetrieve),
 		compose.WithOutputKey(keyOfToolsPreRetriever),
 		compose.WithNodeName(keyOfToolsPreRetriever),
 	)
 	_ = g.AddLambdaNode(keyOfKnowledgeRetrieverPack,
-		compose.InvokableLambda[[]*schema.Document, string](kr.PackRetrieveResultInfo),
+		compose.InvokableLambda[[]*wfcompose.Document, string](kr.PackRetrieveResultInfo),
 		compose.WithOutputKey(placeholderOfKnowledge),
 	)
 	_ = g.AddChatTemplateNode(keyOfPromptTemplate, chatPrompt)
@@ -224,8 +224,8 @@ func BuildAgent(ctx context.Context, conf *Config) (r *AgentRunner, err error) {
 	}
 
 	if nsg {
-		_ = g.AddLambdaNode(keyOfSuggestPreInputParse, compose.ToList[*schema.Message](),
-			compose.WithStatePostHandler(func(ctx context.Context, out []*schema.Message, state *AgentState) ([]*schema.Message, error) {
+		_ = g.AddLambdaNode(keyOfSuggestPreInputParse, compose.ToList[*wfcompose.Message](),
+			compose.WithStatePostHandler(func(ctx context.Context, out []*wfcompose.Message, state *AgentState) ([]*wfcompose.Message, error) {
 				out = append(out, state.UserInput)
 				return out, nil
 			}),
