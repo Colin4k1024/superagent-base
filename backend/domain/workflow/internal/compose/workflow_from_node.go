@@ -17,22 +17,22 @@
 package compose
 
 import (
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	"context"
 
-	"github.com/cloudwego/eino/compose"
 
 	workflow2 "github.com/superagent-ai/superagent-base/backend/domain/workflow"
 	"github.com/superagent-ai/superagent-base/backend/domain/workflow/entity/vo"
 	"github.com/superagent-ai/superagent-base/backend/domain/workflow/internal/schema"
 )
 
-func NewWorkflowFromNode(ctx context.Context, sc *schema.WorkflowSchema, nodeKey vo.NodeKey, opts ...compose.GraphCompileOption) (
+func NewWorkflowFromNode(ctx context.Context, sc *schema.WorkflowSchema, nodeKey vo.NodeKey, opts ...einobridge.GraphCompileOption) (
 	*Workflow, error) {
 	sc.Init()
 	ns := sc.GetNode(nodeKey)
 
 	wf := &Workflow{
-		workflow:          compose.NewWorkflow[map[string]any, map[string]any](compose.WithGenLocalState(GenState())),
+		workflow:          einobridge.NewWorkflow[map[string]any, map[string]any](einobridge.WithGenLocalState(GenState())),
 		hierarchy:         sc.Hierarchy,
 		connections:       sc.Connections,
 		schema:            sc,
@@ -69,10 +69,10 @@ func NewWorkflowFromNode(ctx context.Context, sc *schema.WorkflowSchema, nodeKey
 
 	wf.End().AddInput(string(nodeKey))
 
-	var compileOpts []compose.GraphCompileOption
+	var compileOpts []einobridge.GraphCompileOption
 	compileOpts = append(compileOpts, opts...)
 	if wf.requireCheckpoint {
-		compileOpts = append(compileOpts, compose.WithCheckPointStore(workflow2.GetRepository()))
+		compileOpts = append(compileOpts, einobridge.WithCheckPointStore(workflow2.GetRepository()))
 	}
 
 	r, err := wf.Compile(ctx, compileOpts...)

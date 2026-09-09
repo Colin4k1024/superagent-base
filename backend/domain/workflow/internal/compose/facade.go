@@ -42,7 +42,6 @@ package compose
 import (
 	"context"
 
-	einoCompose "github.com/cloudwego/eino/compose"
 
 	workflowModel "github.com/superagent-ai/superagent-base/backend/crossdomain/workflow/model"
 	"github.com/superagent-ai/superagent-base/backend/domain/workflow/entity"
@@ -54,9 +53,9 @@ import (
 )
 
 // IsInterrupt reports whether err carries an eino interrupt signal. It wraps
-// einoCompose.ExtractInterruptInfo for callers that only need the boolean.
+// einobridge.ExtractInterruptInfo for callers that only need the boolean.
 func IsInterrupt(err error) bool {
-	_, ok := einoCompose.ExtractInterruptInfo(err)
+	_, ok := einobridge.ExtractInterruptInfo(err)
 	return ok
 }
 
@@ -74,8 +73,8 @@ func NewMessagePipe() (*wfcompose.StreamReader[*entity.Message], WorkflowRunnerO
 // WithToolsNodeOption(WithToolOption(...)) chain used when a workflow is
 // invoked as a tool within an agent run.
 func WithToolExecuteConfig(cfg workflowModel.ExecuteConfig) wfcompose.Option {
-	return einobridge.WrapOption(einoCompose.WithToolsNodeOption(
-		einoCompose.WithToolOption(execute.WithExecuteConfig(cfg))))
+	return einobridge.WrapOption(einobridge.WithToolsNodeOption(
+		einobridge.WithToolOption(execute.WithExecuteConfig(cfg))))
 }
 
 // WithToolResume builds the workflow-as-tool "resume" runner option as a
@@ -87,8 +86,8 @@ func WithToolResume(resumingEvent *entity.ToolInterruptEvent, resumeData string,
 	for callID, event := range allInterruptEvents {
 		toolCallID2ExeID[callID] = event.ExecuteID
 	}
-	return einobridge.WrapOption(einoCompose.WithToolsNodeOption(
-		einoCompose.WithToolOption(
+	return einobridge.WrapOption(einobridge.WithToolsNodeOption(
+		einobridge.WithToolOption(
 			execute.WithResume(&entity.ResumeRequest{
 				ExecuteID:  resumingEvent.ExecuteID,
 				EventID:    resumingEvent.ID,
@@ -107,5 +106,5 @@ func WithMessagePipe() (wfcompose.Option, *wfcompose.StreamReader[*entity.Messag
 // execution) and applies the graph name derived from the workflow ID. It wraps
 // NewWorkflowFromNode + eino's WithGraphName so callers avoid importing eino.
 func NewWorkflowFromNodeNamed(ctx context.Context, sc *wfSchema.WorkflowSchema, nodeKey vo.NodeKey, graphName string) (*Workflow, error) {
-	return NewWorkflowFromNode(ctx, sc, nodeKey, einoCompose.WithGraphName(graphName))
+	return NewWorkflowFromNode(ctx, sc, nodeKey, einobridge.WithGraphName(graphName))
 }

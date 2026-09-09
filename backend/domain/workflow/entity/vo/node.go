@@ -23,7 +23,6 @@ import (
 	"fmt"
 
 
-	"github.com/cloudwego/eino/compose"
 	"github.com/superagent-ai/superagent-base/backend/bizpkg/debugutil"
 	"github.com/superagent-ai/superagent-base/backend/pkg/errorx"
 	"github.com/superagent-ai/superagent-base/backend/pkg/sonic"
@@ -33,13 +32,13 @@ import (
 type NodeKey string
 
 type FieldInfo struct {
-	Path   compose.FieldPath `json:"path"`
+	Path   einobridge.FieldPath `json:"path"`
 	Source FieldSource       `json:"source"`
 }
 
 type Reference struct {
 	FromNodeKey NodeKey           `json:"from_node_key,omitempty"`
-	FromPath    compose.FieldPath `json:"from_path"`
+	FromPath    einobridge.FieldPath `json:"from_path"`
 
 	VariableType *GlobalVarType `json:"variable_type,omitempty"`
 }

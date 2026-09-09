@@ -25,7 +25,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/cloudwego/eino/compose"
 	"github.com/spf13/cast"
 
 	"github.com/superagent-ai/superagent-base/backend/bizpkg/llm/modelbuilder"
@@ -130,7 +129,7 @@ func (c *Config) Build(ctx context.Context, _ *schema2.NodeSchema, _ ...schema2.
 		return nil, err
 	}
 
-	chain := compose.NewChain[map[string]any, *einobridge.Message]()
+	chain := einobridge.NewChain[map[string]any, *einobridge.Message]()
 
 	spt := ternary.IFElse[string](c.IsFastMode, FastModeSystemIntentPrompt, SystemIntentPrompt)
 
@@ -267,7 +266,7 @@ const classificationID = "classificationId"
 type IntentDetector struct {
 	isFastMode         bool
 	systemPrompt       string
-	runner             compose.Runnable[map[string]any, *einobridge.Message]
+	runner             einobridge.Runnable[map[string]any, *einobridge.Message]
 	ChatHistorySetting *vo.ChatHistorySetting
 }
 

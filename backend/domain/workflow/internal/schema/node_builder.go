@@ -17,14 +17,14 @@
 package schema
 
 import (
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	"context"
 
-	"github.com/cloudwego/eino/compose"
 )
 
 type BuildOptions struct {
 	WS    *WorkflowSchema
-	Inner compose.Runnable[map[string]any, map[string]any]
+	Inner einobridge.Runnable[map[string]any, map[string]any]
 }
 
 func GetBuildOptions(opts ...BuildOption) *BuildOptions {
@@ -43,7 +43,7 @@ func WithWorkflowSchema(ws *WorkflowSchema) BuildOption {
 	}
 }
 
-func WithInnerWorkflow(inner compose.Runnable[map[string]any, map[string]any]) BuildOption {
+func WithInnerWorkflow(inner einobridge.Runnable[map[string]any, map[string]any]) BuildOption {
 	return func(options *BuildOptions) {
 		options.Inner = inner
 	}

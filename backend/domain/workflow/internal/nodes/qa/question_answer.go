@@ -26,7 +26,6 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/cloudwego/eino/compose"
 
 	"github.com/superagent-ai/superagent-base/backend/bizpkg/llm/modelbuilder"
 	"github.com/superagent-ai/superagent-base/backend/domain/workflow"
@@ -134,7 +133,7 @@ func (c *Config) Adapt(_ context.Context, n *vo.Node, _ ...nodes.AdaptOption) (*
 			}
 			c.FixedChoices = options
 		case DynamicChoices:
-			inputSources, err := convert.CanvasBlockInputToFieldInfo(qaConf.DynamicOption, compose.FieldPath{DynamicChoicesKey}, n.Parent())
+			inputSources, err := convert.CanvasBlockInputToFieldInfo(qaConf.DynamicOption, einobridge.FieldPath{DynamicChoicesKey}, n.Parent())
 			if err != nil {
 				return nil, err
 			}
@@ -420,7 +419,7 @@ func (q *QuestionAnswer) Invoke(ctx context.Context, in map[string]any) (out map
 	}
 
 	if interruptedButNotResumed { // previously interrupted but not resumed this time, interrupt immediately
-		return nil, compose.InterruptAndRerun
+		return nil, einobridge.InterruptAndRerun
 	}
 
 	out = make(map[string]any)
@@ -495,7 +494,7 @@ func (q *QuestionAnswer) Invoke(ctx context.Context, in map[string]any) (out map
 				formattedChoices = append(formattedChoices, formattedChoice)
 			}
 		case DynamicChoices:
-			dynamicChoices, ok := nodes.TakeMapValue(in, compose.FieldPath{DynamicChoicesKey})
+			dynamicChoices, ok := nodes.TakeMapValue(in, einobridge.FieldPath{DynamicChoicesKey})
 			if !ok || len(dynamicChoices.([]any)) == 0 {
 				return nil, vo.NewError(errno.ErrQuestionOptionsEmpty)
 			}
@@ -619,11 +618,11 @@ func (q *QuestionAnswer) extractCurrentState(ctx context.Context) (
 		resumeData         string
 		resumed            bool
 	)
-	_ = compose.ProcessState(ctx, func(_ context.Context, state nodes.IntermediateResultStore) error {
+	_ = einobridge.ProcessState(ctx, func(_ context.Context, state nodes.IntermediateResultStore) error {
 		intermediateResult = state.GetIntermediateResult(q.nodeKey)
 		return nil
 	})
-	_ = compose.ProcessState(ctx, func(_ context.Context, state nodes.InterruptEventStore) error {
+	_ = einobridge.ProcessState(ctx, func(_ context.Context, state nodes.InterruptEventStore) error {
 		resumeData, resumed = state.GetAndClearResumeData(q.nodeKey)
 		return nil
 	})
@@ -642,7 +641,7 @@ func (q *QuestionAnswer) extractCurrentState(ctx context.Context) (
 		aResult = answers.([]string)
 		if resumed {
 			newAnswers := append(slices.Clone(aResult), resumeData)
-			_ = compose.ProcessState(ctx, func(_ context.Context, state nodes.IntermediateResultStore) error {
+			_ = einobridge.ProcessState(ctx, func(_ context.Context, state nodes.IntermediateResultStore) error {
 				state.SetIntermediateResult(q.nodeKey, map[string]any{
 					QuestionsKey: questions,
 					AnswersKey:   newAnswers,
@@ -742,12 +741,12 @@ func (q *QuestionAnswer) interrupt(ctx context.Context, newQuestion string, choi
 			ChoicesKey:  choices,
 		})
 
-	_ = compose.ProcessState(ctx, func(ctx context.Context, state nodes.IntermediateResultStore) error {
+	_ = einobridge.ProcessState(ctx, func(ctx context.Context, state nodes.IntermediateResultStore) error {
 		state.SetIntermediateResult(q.nodeKey, intermediateResult)
 		return nil
 	})
 
-	return compose.NewInterruptAndRerunErr(event)
+	return einobridge.NewInterruptAndRerunErr(event)
 }
 
 func intToAlphabet(num int) string {

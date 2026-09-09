@@ -17,11 +17,11 @@
 package plugin
 
 import (
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	"context"
 	"fmt"
 	"strconv"
 
-	"github.com/cloudwego/eino/compose"
 
 	"github.com/superagent-ai/superagent-base/backend/api/model/app/bot_common"
 	workflowModel "github.com/superagent-ai/superagent-base/backend/crossdomain/workflow/model"
@@ -125,7 +125,7 @@ func (p *Plugin) Invoke(ctx context.Context, parameters map[string]any) (ret map
 		PluginFrom:    p.pluginFrom,
 	}, p.toolID, exeCfg)
 	if err != nil {
-		if extra, ok := compose.IsInterruptRerunError(err); ok {
+		if extra, ok := einobridge.IsInterruptRerunError(err); ok {
 			// TODO: temporarily replace interrupt with real error, because frontend cannot handle interrupt for now
 			interruptData := extra.(*entity.InterruptEvent).InterruptData
 			return nil, vo.NewError(errno.ErrAuthorizationRequired, errorx.KV("extra", interruptData))

@@ -17,11 +17,11 @@
 package compose
 
 import (
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	"context"
 	"fmt"
 	"runtime/debug"
 
-	"github.com/cloudwego/eino/compose"
 
 	"github.com/superagent-ai/superagent-base/backend/domain/workflow/entity"
 	"github.com/superagent-ai/superagent-base/backend/domain/workflow/entity/vo"
@@ -34,12 +34,12 @@ import (
 )
 
 type Node struct {
-	Lambda *compose.Lambda
+	Lambda *einobridge.Lambda
 }
 
 // New instantiates the actual node type from NodeSchema.
 func New(ctx context.Context, s *schema.NodeSchema,
-	inner compose.Runnable[map[string]any, map[string]any], // inner workflow for composite node
+	inner einobridge.Runnable[map[string]any, map[string]any], // inner workflow for composite node
 	sc *schema.WorkflowSchema, // the workflow this NodeSchema is in
 	deps *dependencyInfo, // the dependency for this node pre-calculated by workflow engine
 	requireCheckpoint bool,

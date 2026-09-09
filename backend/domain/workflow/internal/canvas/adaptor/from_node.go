@@ -17,10 +17,10 @@
 package adaptor
 
 import (
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	"context"
 	"fmt"
 
-	einoCompose "github.com/cloudwego/eino/compose"
 	"golang.org/x/exp/maps"
 
 	"github.com/superagent-ai/superagent-base/backend/domain/workflow/entity"
@@ -100,14 +100,14 @@ func WorkflowSchemaFromNode(ctx context.Context, c *vo.Canvas, nodeID string) (
 
 	const inputFillerKey = "input_filler"
 	connections = append(connections, &schema.Connection{
-		FromNode: einoCompose.START,
+		FromNode: einobridge.START,
 		ToNode:   inputFillerKey,
 	}, &schema.Connection{
 		FromNode: inputFillerKey,
 		ToNode:   ns.Key,
 	}, &schema.Connection{
 		FromNode: ns.Key,
-		ToNode:   einoCompose.END,
+		ToNode:   einobridge.END,
 	})
 	if len(n.Edges) > 0 { // only need to keep the connections for inner nodes of composite node
 		for i := range n.Edges {
@@ -129,7 +129,7 @@ func WorkflowSchemaFromNode(ctx context.Context, c *vo.Canvas, nodeID string) (
 
 	startOutputTypes := maps.Clone(ns.InputTypes)
 
-	// For chosen node, change input sources to be from einoCompose.START,
+	// For chosen node, change input sources to be from einobridge.START,
 	// unless it's static value or from variables.
 	// Also change the FromPath to be the same as Path.
 	newInputSources := make([]*vo.FieldInfo, 0, len(ns.InputSources))
@@ -153,7 +153,7 @@ func WorkflowSchemaFromNode(ctx context.Context, c *vo.Canvas, nodeID string) (
 	}
 	ns.InputSources = newInputSources
 
-	// for inner node, change input sources to be from einoCompose.START,
+	// for inner node, change input sources to be from einobridge.START,
 	// unless it's static value, from variables, from parent, or from other inner nodes
 	// Also change the FromPath to be the same as Path.
 	for key := range innerNodes {
@@ -205,14 +205,14 @@ func WorkflowSchemaFromNode(ctx context.Context, c *vo.Canvas, nodeID string) (
 	inputFiller := &schema.NodeSchema{
 		Key:    inputFillerKey,
 		Type:   entity.NodeTypeLambda,
-		Lambda: einoCompose.InvokableLambda(i),
+		Lambda: einobridge.InvokableLambda(i),
 		InputSources: []*vo.FieldInfo{
 			{
-				Path: einoCompose.FieldPath{},
+				Path: einobridge.FieldPath{},
 				Source: vo.FieldSource{
 					Ref: &vo.Reference{
-						FromNodeKey: einoCompose.START,
-						FromPath:    einoCompose.FieldPath{},
+						FromNodeKey: einobridge.START,
+						FromPath:    einobridge.FieldPath{},
 					},
 				},
 			},

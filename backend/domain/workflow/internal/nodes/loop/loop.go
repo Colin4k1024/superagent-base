@@ -17,13 +17,13 @@
 package loop
 
 import (
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	"context"
 	"errors"
 	"fmt"
 	"math"
 	"reflect"
 
-	"github.com/cloudwego/eino/compose"
 
 	"github.com/superagent-ai/superagent-base/backend/domain/workflow/entity"
 	"github.com/superagent-ai/superagent-base/backend/domain/workflow/entity/vo"
@@ -38,7 +38,7 @@ import (
 type Loop struct {
 	outputs    map[string]*vo.FieldSource
 	outputVars map[string]string
-	inner      compose.Runnable[map[string]any, map[string]any]
+	inner      einobridge.Runnable[map[string]any, map[string]any]
 	nodeKey    vo.NodeKey
 
 	loopType         Type
@@ -79,7 +79,7 @@ func (c *Config) Adapt(_ context.Context, n *vo.Node, _ ...nodes.AdaptOption) (*
 		intermediateVars[param.Name] = tInfo
 
 		ns.SetInputType(param.Name, tInfo)
-		sources, err := convert.CanvasBlockInputToFieldInfo(param.Input, compose.FieldPath{param.Name}, nil)
+		sources, err := convert.CanvasBlockInputToFieldInfo(param.Input, einobridge.FieldPath{param.Name}, nil)
 		if err != nil {
 			return nil, err
 		}
@@ -113,7 +113,7 @@ func (c *Config) Adapt(_ context.Context, n *vo.Node, _ ...nodes.AdaptOption) (*
 		}
 		ns.SetInputType(Count, typeInfo)
 
-		sources, err := convert.CanvasBlockInputToFieldInfo(loopCount, compose.FieldPath{Count}, nil)
+		sources, err := convert.CanvasBlockInputToFieldInfo(loopCount, einobridge.FieldPath{Count}, nil)
 		if err != nil {
 			return nil, err
 		}
@@ -220,7 +220,7 @@ func (l *Loop) Invoke(ctx context.Context, in map[string]any, opts ...nodes.Node
 
 	arrays := make(map[string][]any, len(l.inputArrays))
 	for _, arrayKey := range l.inputArrays {
-		a, ok := nodes.TakeMapValue(in, compose.FieldPath{arrayKey})
+		a, ok := nodes.TakeMapValue(in, einobridge.FieldPath{arrayKey})
 		if !ok {
 			return nil, fmt.Errorf("incoming array not present in input: %s", arrayKey)
 		}
@@ -235,7 +235,7 @@ func (l *Loop) Invoke(ctx context.Context, in map[string]any, opts ...nodes.Node
 		output           map[string]any
 		hasBreak         = any(false)
 	)
-	err = compose.ProcessState(ctx, func(ctx context.Context, getter nodes.NestedWorkflowAware) error {
+	err = einobridge.ProcessState(ctx, func(ctx context.Context, getter nodes.NestedWorkflowAware) error {
 		var e error
 		existingCState, _, e = getter.GetNestedWorkflowState(l.nodeKey)
 		if e != nil {
@@ -262,7 +262,7 @@ func (l *Loop) Invoke(ctx context.Context, in map[string]any, opts ...nodes.Node
 
 		intermediateVars = make(map[string]*any, len(l.intermediateVars))
 		for varKey := range l.intermediateVars {
-			v, ok := nodes.TakeMapValue(in, compose.FieldPath{varKey})
+			v, ok := nodes.TakeMapValue(in, einobridge.FieldPath{varKey})
 			if !ok {
 				return nil, fmt.Errorf("incoming intermediate variable not present in input: %s", varKey)
 			}
@@ -320,7 +320,7 @@ func (l *Loop) Invoke(ctx context.Context, in map[string]any, opts ...nodes.Node
 	setIthOutput := func(i int, taskOutput map[string]any) {
 		for arrayKey := range l.outputs {
 			source := l.outputs[arrayKey]
-			fromValue, ok := nodes.TakeMapValue(taskOutput, append(compose.FieldPath{string(source.Ref.FromNodeKey)}, source.Ref.FromPath...))
+			fromValue, ok := nodes.TakeMapValue(taskOutput, append(einobridge.FieldPath{string(source.Ref.FromNodeKey)}, source.Ref.FromPath...))
 			if ok {
 				output[arrayKey] = append(output[arrayKey].([]any), fromValue)
 			}
@@ -329,7 +329,7 @@ func (l *Loop) Invoke(ctx context.Context, in map[string]any, opts ...nodes.Node
 
 	var (
 		index2Done          = map[int]bool{}
-		index2InterruptInfo = map[int]*compose.InterruptInfo{}
+		index2InterruptInfo = map[int]*einobridge.InterruptInfo{}
 		resumed             = map[int]bool{}
 	)
 
@@ -368,20 +368,20 @@ func (l *Loop) Invoke(ctx context.Context, in map[string]any, opts ...nodes.Node
 		ithOpts = append(ithOpts, options.GetOptsForIndexed(i)...)
 
 		if checkpointID != "" {
-			ithOpts = append(ithOpts, compose.WithCheckPointID(checkpointID))
+			ithOpts = append(ithOpts, einobridge.WithCheckPointID(checkpointID))
 		}
 
 		if len(options.GetResumeIndexes()) > 0 {
 			stateModifier, ok := options.GetResumeIndexes()[i]
 			if ok {
 				fmt.Println("has state modifier for ith run: ", i, ", checkpointID: ", checkpointID)
-				ithOpts = append(ithOpts, compose.WithStateModifier(stateModifier))
+				ithOpts = append(ithOpts, einobridge.WithStateModifier(stateModifier))
 			}
 		}
 
 		taskOutput, err := l.inner.Invoke(subCtx, input, ithOpts...)
 		if err != nil {
-			info, ok := compose.ExtractInterruptInfo(err)
+			info, ok := einobridge.ExtractInterruptInfo(err)
 			if !ok {
 				return nil, err
 			}
@@ -430,16 +430,16 @@ func (l *Loop) Invoke(ctx context.Context, in map[string]any, opts ...nodes.Node
 			NestedInterruptInfo: index2InterruptInfo, // only emit the newly generated interruptInfo
 		}
 
-		err := compose.ProcessState(ctx, func(ctx context.Context, setter nodes.NestedWorkflowAware) error {
+		err := einobridge.ProcessState(ctx, func(ctx context.Context, setter nodes.NestedWorkflowAware) error {
 			return setter.SaveNestedWorkflowState(l.nodeKey, compState)
 		})
 		if err != nil {
 			return nil, err
 		}
 
-		return nil, compose.NewInterruptAndRerunErr(iEvent)
+		return nil, einobridge.NewInterruptAndRerunErr(iEvent)
 	} else {
-		err := compose.ProcessState(ctx, func(ctx context.Context, setter nodes.NestedWorkflowAware) error {
+		err := einobridge.ProcessState(ctx, func(ctx context.Context, setter nodes.NestedWorkflowAware) error {
 			return setter.SaveNestedWorkflowState(l.nodeKey, compState)
 		})
 		if err != nil {
@@ -466,7 +466,7 @@ func (l *Loop) getMaxIter(in map[string]any) (int, error) {
 	switch l.loopType {
 	case ByArray:
 		for _, arrayKey := range l.inputArrays {
-			a, ok := nodes.TakeMapValue(in, compose.FieldPath{arrayKey})
+			a, ok := nodes.TakeMapValue(in, einobridge.FieldPath{arrayKey})
 			if !ok {
 				return 0, fmt.Errorf("incoming array not present in input: %s", arrayKey)
 			}
@@ -481,7 +481,7 @@ func (l *Loop) getMaxIter(in map[string]any) (int, error) {
 			}
 		}
 	case ByIteration:
-		iter, ok := nodes.TakeMapValue(in, compose.FieldPath{Count})
+		iter, ok := nodes.TakeMapValue(in, einobridge.FieldPath{Count})
 		if !ok {
 			return 0, errors.New("incoming LoopCount not present in input when loop type is ByIteration")
 		}

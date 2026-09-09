@@ -17,7 +17,7 @@
 package schema
 
 import (
-	"github.com/cloudwego/eino/compose"
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 
 	"github.com/superagent-ai/superagent-base/backend/domain/workflow/entity"
 	"github.com/superagent-ai/superagent-base/backend/domain/workflow/entity/vo"
@@ -77,7 +77,7 @@ type NodeSchema struct {
 
 	// Lambda directly sets the node to be an Eino Lambda.
 	// NOTE: not serializable, used ONLY for internal test.
-	Lambda *compose.Lambda
+	Lambda *einobridge.Lambda
 }
 
 type RequireCheckpoint interface {

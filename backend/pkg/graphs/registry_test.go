@@ -36,7 +36,6 @@ import (
 	"context"
 	"testing"
 
-	"github.com/cloudwego/eino/compose"
 	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 )
 
@@ -55,7 +54,7 @@ func TestRegister_And_Get(t *testing.T) {
 	defer cleanRegistry(name)
 
 	called := false
-	factory := GraphFactory(func(ctx context.Context) (compose.Runnable[[]*einobridge.Message, *einobridge.Message], error) {
+	factory := GraphFactory(func(ctx context.Context) (einobridge.Runnable[[]*einobridge.Message, *einobridge.Message], error) {
 		called = true
 		return nil, nil
 	})
@@ -88,7 +87,7 @@ func TestList(t *testing.T) {
 	nameB := "test-list-beta"
 	defer cleanRegistry(nameA, nameB)
 
-	noop := GraphFactory(func(ctx context.Context) (compose.Runnable[[]*einobridge.Message, *einobridge.Message], error) {
+	noop := GraphFactory(func(ctx context.Context) (einobridge.Runnable[[]*einobridge.Message, *einobridge.Message], error) {
 		return nil, nil
 	})
 
@@ -112,7 +111,7 @@ func TestRegister_Duplicate_Panics(t *testing.T) {
 	name := "test-register-duplicate"
 	defer cleanRegistry(name)
 
-	noop := GraphFactory(func(ctx context.Context) (compose.Runnable[[]*einobridge.Message, *einobridge.Message], error) {
+	noop := GraphFactory(func(ctx context.Context) (einobridge.Runnable[[]*einobridge.Message, *einobridge.Message], error) {
 		return nil, nil
 	})
 
@@ -127,8 +126,8 @@ func TestRegister_Duplicate_Panics(t *testing.T) {
 }
 
 func TestCompileGraph(t *testing.T) {
-	buildFn := func(ctx context.Context) (*compose.Graph[[]*einobridge.Message, *einobridge.Message], error) {
-		g := compose.NewGraph[[]*einobridge.Message, *einobridge.Message]()
+	buildFn := func(ctx context.Context) (*einobridge.Graph[[]*einobridge.Message, *einobridge.Message], error) {
+		g := einobridge.NewGraph[[]*einobridge.Message, *einobridge.Message]()
 		return g, nil
 	}
 

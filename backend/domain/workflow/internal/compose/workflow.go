@@ -17,6 +17,7 @@
 package compose
 
 import (
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	"context"
 	"errors"
 	"fmt"
@@ -24,7 +25,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/cloudwego/eino/compose"
 
 	workflow2 "github.com/superagent-ai/superagent-base/backend/domain/workflow"
 	"github.com/superagent-ai/superagent-base/backend/domain/workflow/entity"
@@ -34,18 +34,18 @@ import (
 	"github.com/superagent-ai/superagent-base/backend/pkg/safego"
 )
 
-type workflow = compose.Workflow[map[string]any, map[string]any]
+type workflow = einobridge.Workflow[map[string]any, map[string]any]
 
 type Workflow struct { // TODO: too many fields in this struct, cut them down to the absolutely essentials
 	*workflow
 	hierarchy         map[vo.NodeKey]vo.NodeKey
 	connections       []*schema.Connection
 	requireCheckpoint bool
-	entry             *compose.WorkflowNode
+	entry             *einobridge.WorkflowNode
 	inner             bool
 	fromNode          bool // this workflow is constructed from a single node, without Entry or Exit nodes
 	streamRun         bool
-	Runner            compose.Runnable[map[string]any, map[string]any] // TODO: this will be unexported eventually
+	Runner            einobridge.Runnable[map[string]any, map[string]any] // TODO: this will be unexported eventually
 	input             map[string]*vo.TypeInfo
 	output            map[string]*vo.TypeInfo
 	terminatePlan     vo.TerminatePlan
@@ -84,7 +84,7 @@ func NewWorkflow(ctx context.Context, sc *schema.WorkflowSchema, opts ...Workflo
 	sc.Init()
 
 	wf := &Workflow{
-		workflow:    compose.NewWorkflow[map[string]any, map[string]any](compose.WithGenLocalState(GenState())),
+		workflow:    einobridge.NewWorkflow[map[string]any, map[string]any](einobridge.WithGenLocalState(GenState())),
 		hierarchy:   sc.Hierarchy,
 		connections: sc.Connections,
 		schema:      sc,
@@ -140,12 +140,12 @@ func NewWorkflow(ctx context.Context, sc *schema.WorkflowSchema, opts ...Workflo
 		}
 	}
 
-	var compileOpts []compose.GraphCompileOption
+	var compileOpts []einobridge.GraphCompileOption
 	if wf.requireCheckpoint {
-		compileOpts = append(compileOpts, compose.WithCheckPointStore(workflow2.GetRepository()))
+		compileOpts = append(compileOpts, einobridge.WithCheckPointStore(workflow2.GetRepository()))
 	}
 	if wfOpts.idAsName {
-		compileOpts = append(compileOpts, compose.WithGraphName(strconv.FormatInt(wfOpts.wfID, 10)))
+		compileOpts = append(compileOpts, einobridge.WithGraphName(strconv.FormatInt(wfOpts.wfID, 10)))
 	}
 
 	r, err := wf.Compile(ctx, compileOpts...)
@@ -157,7 +157,7 @@ func NewWorkflow(ctx context.Context, sc *schema.WorkflowSchema, opts ...Workflo
 	return wf, nil
 }
 
-func (w *Workflow) AsyncRun(ctx context.Context, in map[string]any, opts ...compose.Option) {
+func (w *Workflow) AsyncRun(ctx context.Context, in map[string]any, opts ...einobridge.Option) {
 	if w.streamRun {
 		safego.Go(ctx, func() {
 			_, _ = w.Runner.Stream(ctx, in, opts...)
@@ -170,7 +170,7 @@ func (w *Workflow) AsyncRun(ctx context.Context, in map[string]any, opts ...comp
 	})
 }
 
-func (w *Workflow) SyncRun(ctx context.Context, in map[string]any, opts ...compose.Option) (map[string]any, error) {
+func (w *Workflow) SyncRun(ctx context.Context, in map[string]any, opts ...einobridge.Option) (map[string]any, error) {
 	return w.Runner.Invoke(ctx, in, opts...)
 }
 
@@ -191,8 +191,8 @@ func (w *Workflow) TerminatePlan() vo.TerminatePlan {
 }
 
 type innerWorkflowInfo struct {
-	inner      compose.Runnable[map[string]any, map[string]any]
-	carryOvers map[vo.NodeKey][]*compose.FieldMapping
+	inner      einobridge.Runnable[map[string]any, map[string]any]
+	carryOvers map[vo.NodeKey][]*einobridge.FieldMapping
 }
 
 func (w *Workflow) AddNode(ctx context.Context, ns *schema.NodeSchema) error {
@@ -209,11 +209,11 @@ func (w *Workflow) AddCompositeNode(ctx context.Context, cNode *schema.Composite
 	return err
 }
 
-func (w *Workflow) addInnerNode(ctx context.Context, cNode *schema.NodeSchema) (map[vo.NodeKey][]*compose.FieldMapping, error) {
+func (w *Workflow) addInnerNode(ctx context.Context, cNode *schema.NodeSchema) (map[vo.NodeKey][]*einobridge.FieldMapping, error) {
 	return w.addNodeInternal(ctx, cNode, nil)
 }
 
-func (w *Workflow) addNodeInternal(ctx context.Context, ns *schema.NodeSchema, inner *innerWorkflowInfo) (map[vo.NodeKey][]*compose.FieldMapping, error) {
+func (w *Workflow) addNodeInternal(ctx context.Context, ns *schema.NodeSchema, inner *innerWorkflowInfo) (map[vo.NodeKey][]*einobridge.FieldMapping, error) {
 	key := ns.Key
 	var deps *dependencyInfo
 
@@ -228,7 +228,7 @@ func (w *Workflow) addNodeInternal(ctx context.Context, ns *schema.NodeSchema, i
 		}
 	}
 
-	var innerWorkflow compose.Runnable[map[string]any, map[string]any]
+	var innerWorkflow einobridge.Runnable[map[string]any, map[string]any]
 	if inner != nil {
 		innerWorkflow = inner.inner
 	}
@@ -238,8 +238,8 @@ func (w *Workflow) addNodeInternal(ctx context.Context, ns *schema.NodeSchema, i
 		return nil, err
 	}
 
-	var opts []compose.GraphAddNodeOpt
-	opts = append(opts, compose.WithNodeName(string(ns.Key)))
+	var opts []einobridge.GraphAddNodeOpt
+	opts = append(opts, einobridge.WithNodeName(string(ns.Key)))
 
 	preHandler := statePreHandler(ns, w.streamRun)
 	if preHandler != nil {
@@ -251,7 +251,7 @@ func (w *Workflow) addNodeInternal(ctx context.Context, ns *schema.NodeSchema, i
 		opts = append(opts, postHandler)
 	}
 
-	var wNode *compose.WorkflowNode
+	var wNode *einobridge.WorkflowNode
 	if ins.Lambda != nil {
 		wNode = w.AddLambdaNode(string(key), ins.Lambda, opts...)
 	} else {
@@ -271,11 +271,11 @@ func (w *Workflow) addNodeInternal(ctx context.Context, ns *schema.NodeSchema, i
 	}
 
 	for fromNodeKey := range deps.inputsNoDirectDependencyFull {
-		wNode.AddInputWithOptions(string(fromNodeKey), nil, compose.WithNoDirectDependency())
+		wNode.AddInputWithOptions(string(fromNodeKey), nil, einobridge.WithNoDirectDependency())
 	}
 
 	for fromNodeKey, fieldMappings := range deps.inputsNoDirectDependency {
-		wNode.AddInputWithOptions(string(fromNodeKey), fieldMappings, compose.WithNoDirectDependency())
+		wNode.AddInputWithOptions(string(fromNodeKey), fieldMappings, einobridge.WithNoDirectDependency())
 	}
 
 	for i := range deps.dependencies {
@@ -315,13 +315,13 @@ func (w *Workflow) addNodeInternal(ctx context.Context, ns *schema.NodeSchema, i
 	return deps.inputsForParent, nil
 }
 
-func (w *Workflow) Compile(ctx context.Context, opts ...compose.GraphCompileOption) (compose.Runnable[map[string]any, map[string]any], error) {
+func (w *Workflow) Compile(ctx context.Context, opts ...einobridge.GraphCompileOption) (einobridge.Runnable[map[string]any, map[string]any], error) {
 	if !w.inner && !w.fromNode {
 		if w.entry == nil {
 			return nil, fmt.Errorf("entry node is not set")
 		}
 
-		w.entry.AddInput(compose.START)
+		w.entry.AddInput(einobridge.START)
 		w.End().AddInput(entity.ExitNodeKey)
 	}
 
@@ -347,7 +347,7 @@ func (w *Workflow) getInnerWorkflow(ctx context.Context, cNode *schema.Composite
 	}
 
 	inner := &Workflow{
-		workflow:          compose.NewWorkflow[map[string]any, map[string]any](compose.WithGenLocalState(GenState())),
+		workflow:          einobridge.NewWorkflow[map[string]any, map[string]any](einobridge.WithGenLocalState(GenState())),
 		hierarchy:         w.hierarchy, // we keep the entire hierarchy because inner workflow nodes can refer to parent nodes' outputs
 		connections:       innerConnections,
 		inner:             true,
@@ -355,7 +355,7 @@ func (w *Workflow) getInnerWorkflow(ctx context.Context, cNode *schema.Composite
 		schema:            w.schema,
 	}
 
-	carryOvers := make(map[vo.NodeKey][]*compose.FieldMapping)
+	carryOvers := make(map[vo.NodeKey][]*einobridge.FieldMapping)
 
 	for key := range innerNodes {
 		inputsForParent, err := inner.addInnerNode(ctx, innerNodes[key])
@@ -388,11 +388,11 @@ func (w *Workflow) getInnerWorkflow(ctx context.Context, cNode *schema.Composite
 	}
 
 	for fromNodeKey := range endDeps.inputsNoDirectDependencyFull {
-		n.AddInputWithOptions(string(fromNodeKey), nil, compose.WithNoDirectDependency())
+		n.AddInputWithOptions(string(fromNodeKey), nil, einobridge.WithNoDirectDependency())
 	}
 
 	for fromNodeKey, fieldMappings := range endDeps.inputsNoDirectDependency {
-		n.AddInputWithOptions(string(fromNodeKey), fieldMappings, compose.WithNoDirectDependency())
+		n.AddInputWithOptions(string(fromNodeKey), fieldMappings, einobridge.WithNoDirectDependency())
 	}
 
 	for i := range endDeps.dependencies {
@@ -403,9 +403,9 @@ func (w *Workflow) getInnerWorkflow(ctx context.Context, cNode *schema.Composite
 		n.SetStaticValue(endDeps.staticValues[i].path, endDeps.staticValues[i].val)
 	}
 
-	var opts []compose.GraphCompileOption
+	var opts []einobridge.GraphCompileOption
 	if inner.requireCheckpoint {
-		opts = append(opts, compose.WithCheckPointStore(workflow2.GetRepository()))
+		opts = append(opts, einobridge.WithCheckPointStore(workflow2.GetRepository()))
 	}
 
 	r, err := inner.Compile(ctx, opts...)
@@ -420,17 +420,17 @@ func (w *Workflow) getInnerWorkflow(ctx context.Context, cNode *schema.Composite
 }
 
 type dependencyInfo struct {
-	inputs                       map[vo.NodeKey][]*compose.FieldMapping
+	inputs                       map[vo.NodeKey][]*einobridge.FieldMapping
 	inputsFull                   map[vo.NodeKey]struct{}
 	dependencies                 []vo.NodeKey
-	inputsNoDirectDependency     map[vo.NodeKey][]*compose.FieldMapping
+	inputsNoDirectDependency     map[vo.NodeKey][]*einobridge.FieldMapping
 	inputsNoDirectDependencyFull map[vo.NodeKey]struct{}
 	staticValues                 []*staticValue
 	variableInfos                []*variableInfo
-	inputsForParent              map[vo.NodeKey][]*compose.FieldMapping
+	inputsForParent              map[vo.NodeKey][]*einobridge.FieldMapping
 }
 
-func (d *dependencyInfo) merge(mappings map[vo.NodeKey][]*compose.FieldMapping) error {
+func (d *dependencyInfo) merge(mappings map[vo.NodeKey][]*einobridge.FieldMapping) error {
 	for nKey, fms := range mappings {
 		if _, ok := d.inputsFull[nKey]; ok {
 			return fmt.Errorf("duplicate input for node: %s", nKey)
@@ -496,7 +496,7 @@ func (d *dependencyInfo) merge(mappings map[vo.NodeKey][]*compose.FieldMapping) 
 // we will not try to drill, instead, just take value using a.b.c.
 func (d *dependencyInfo) arrayDrillDown(allNS map[vo.NodeKey]*schema.NodeSchema) error {
 	for nKey, fms := range d.inputs {
-		if nKey == compose.START { // reference to START node would NEVER need to do array drill down
+		if nKey == einobridge.START { // reference to START node would NEVER need to do array drill down
 			continue
 		}
 
@@ -517,7 +517,7 @@ func (d *dependencyInfo) arrayDrillDown(allNS map[vo.NodeKey]*schema.NodeSchema)
 	}
 
 	for nKey, fms := range d.inputsNoDirectDependency {
-		if nKey == compose.START {
+		if nKey == einobridge.START {
 			continue
 		}
 
@@ -540,7 +540,7 @@ func (d *dependencyInfo) arrayDrillDown(allNS map[vo.NodeKey]*schema.NodeSchema)
 	return nil
 }
 
-func arrayDrillDown(nKey vo.NodeKey, fm *compose.FieldMapping, types map[string]*vo.TypeInfo) (*compose.FieldMapping, error) {
+func arrayDrillDown(nKey vo.NodeKey, fm *einobridge.FieldMapping, types map[string]*vo.TypeInfo) (*einobridge.FieldMapping, error) {
 	fromPath := fm.FromPath()
 	if len(fromPath) <= 1 { // no need to drill down
 		return fm, nil
@@ -607,33 +607,33 @@ func arrayDrillDown(nKey vo.NodeKey, fm *compose.FieldMapping, types map[string]
 		return a, nil
 	}
 
-	newFM := compose.ToFieldPath(fm.ToPath(), compose.WithCustomExtractor(extractor))
+	newFM := einobridge.ToFieldPath(fm.ToPath(), einobridge.WithCustomExtractor(extractor))
 	return newFM, nil
 }
 
 type staticValue struct {
 	val  any
-	path compose.FieldPath
+	path einobridge.FieldPath
 }
 
 type variableInfo struct {
 	varType  vo.GlobalVarType
-	fromPath compose.FieldPath
-	toPath   compose.FieldPath
+	fromPath einobridge.FieldPath
+	toPath   einobridge.FieldPath
 }
 
 func (w *Workflow) resolveDependencies(n vo.NodeKey, sourceWithPaths []*vo.FieldInfo) (*dependencyInfo, error) {
 	var (
-		inputs                       = make(map[vo.NodeKey][]*compose.FieldMapping)
+		inputs                       = make(map[vo.NodeKey][]*einobridge.FieldMapping)
 		inputFull                    map[vo.NodeKey]struct{}
 		dependencies                 []vo.NodeKey
-		inputsNoDirectDependency     = make(map[vo.NodeKey][]*compose.FieldMapping)
+		inputsNoDirectDependency     = make(map[vo.NodeKey][]*einobridge.FieldMapping)
 		inputsNoDirectDependencyFull map[vo.NodeKey]struct{}
 		staticValues                 []*staticValue
 		variableInfos                []*variableInfo
 
 		// inputsForParent contains all the field mappings from any nodes of the parent workflow
-		inputsForParent = make(map[vo.NodeKey][]*compose.FieldMapping)
+		inputsForParent = make(map[vo.NodeKey][]*einobridge.FieldMapping)
 	)
 
 	connMap := make(map[vo.NodeKey]schema.Connection)
@@ -677,7 +677,7 @@ func (w *Workflow) resolveDependencies(n vo.NodeKey, sourceWithPaths []*vo.Field
 						}
 						inputFull[fromNode] = struct{}{}
 					} else {
-						inputs[fromNode] = append(inputs[fromNode], compose.MapFieldPaths(swp.Source.Ref.FromPath, swp.Path))
+						inputs[fromNode] = append(inputs[fromNode], einobridge.MapFieldPaths(swp.Source.Ref.FromPath, swp.Path))
 					}
 				} else { // indirect dependency
 					if len(swp.Source.Ref.FromPath) == 0 && len(swp.Path) == 0 {
@@ -687,7 +687,7 @@ func (w *Workflow) resolveDependencies(n vo.NodeKey, sourceWithPaths []*vo.Field
 						inputsNoDirectDependencyFull[fromNode] = struct{}{}
 					} else {
 						inputsNoDirectDependency[fromNode] = append(inputsNoDirectDependency[fromNode],
-							compose.MapFieldPaths(swp.Source.Ref.FromPath, swp.Path))
+							einobridge.MapFieldPaths(swp.Source.Ref.FromPath, swp.Path))
 					}
 				}
 			} else if ok := schema.IsBelowOneLevel(w.hierarchy, n, fromNode); ok {
@@ -701,23 +701,23 @@ func (w *Workflow) resolveDependencies(n vo.NodeKey, sourceWithPaths []*vo.Field
 				}
 
 				if firstNodesInInnerWorkflow { // one of the first nodes in sub workflow
-					inputs[compose.START] = append(inputs[compose.START],
-						compose.MapFieldPaths(
+					inputs[einobridge.START] = append(inputs[einobridge.START],
+						einobridge.MapFieldPaths(
 							// the START node of inner workflow will proxy for the fields required from parent workflow
 							// the field path within START node is prepended by the parent node key
-							joinFieldPath(append(compose.FieldPath{string(fromNode)}, swp.Source.Ref.FromPath...)),
+							joinFieldPath(append(einobridge.FieldPath{string(fromNode)}, swp.Source.Ref.FromPath...)),
 							swp.Path))
 				} else { // not one of the first nodes in sub workflow, either succeeds other nodes or succeeds branches
-					inputsNoDirectDependency[compose.START] = append(inputsNoDirectDependency[compose.START],
-						compose.MapFieldPaths(
+					inputsNoDirectDependency[einobridge.START] = append(inputsNoDirectDependency[einobridge.START],
+						einobridge.MapFieldPaths(
 							// same as above, the START node of inner workflow proxies for the fields from parent workflow
-							joinFieldPath(append(compose.FieldPath{string(fromNode)}, swp.Source.Ref.FromPath...)),
+							joinFieldPath(append(einobridge.FieldPath{string(fromNode)}, swp.Source.Ref.FromPath...)),
 							swp.Path))
 				}
 
-				fieldMapping := compose.MapFieldPaths(swp.Source.Ref.FromPath,
+				fieldMapping := einobridge.MapFieldPaths(swp.Source.Ref.FromPath,
 					// our parent node will proxy for these field mappings, prepending the 'fromNode' to paths
-					joinFieldPath(append(compose.FieldPath{string(fromNode)}, swp.Source.Ref.FromPath...)))
+					joinFieldPath(append(einobridge.FieldPath{string(fromNode)}, swp.Source.Ref.FromPath...)))
 				added := false
 				for _, existedFieldMapping := range inputsForParent[fromNode] {
 					if existedFieldMapping.Equals(fieldMapping) {
@@ -741,7 +741,7 @@ func (w *Workflow) resolveDependencies(n vo.NodeKey, sourceWithPaths []*vo.Field
 		}
 
 		if schema.IsBelowOneLevel(w.hierarchy, n, fromNodeKey) {
-			fromNodeKey = compose.START
+			fromNodeKey = einobridge.START
 		} else if !schema.IsInSameWorkflow(w.hierarchy, n, fromNodeKey) {
 			continue
 		}
@@ -780,7 +780,7 @@ func (w *Workflow) resolveDependencies(n vo.NodeKey, sourceWithPaths []*vo.Field
 
 const fieldPathSplitter = "#"
 
-func joinFieldPath(f compose.FieldPath) compose.FieldPath {
+func joinFieldPath(f einobridge.FieldPath) einobridge.FieldPath {
 	return []string{strings.Join(f, fieldPathSplitter)}
 }
 
@@ -788,9 +788,9 @@ func (w *Workflow) resolveDependenciesAsParent(n vo.NodeKey, sourceWithPaths []*
 	var (
 		// inputsFull and inputsNoDirectDependencyFull are NEVER used in this case,
 		// because a composite node MUST use explicit field mappings from inner nodes as its output.
-		inputs                   = make(map[vo.NodeKey][]*compose.FieldMapping)
+		inputs                   = make(map[vo.NodeKey][]*einobridge.FieldMapping)
 		dependencies             []vo.NodeKey
-		inputsNoDirectDependency = make(map[vo.NodeKey][]*compose.FieldMapping)
+		inputsNoDirectDependency = make(map[vo.NodeKey][]*einobridge.FieldMapping)
 		// although staticValues are not used for current composite nodes,
 		// they may be used in the future, so we calculate them none the less.
 		staticValues []*staticValue
@@ -836,9 +836,9 @@ func (w *Workflow) resolveDependenciesAsParent(n vo.NodeKey, sourceWithPaths []*
 
 			if ok := schema.IsParentOf(w.hierarchy, n, fromNode); ok {
 				if _, ok := connMap[fromNode]; ok { // direct dependency
-					inputs[fromNode] = append(inputs[fromNode], compose.MapFieldPaths(swp.Source.Ref.FromPath, append(compose.FieldPath{string(fromNode)}, swp.Source.Ref.FromPath...)))
+					inputs[fromNode] = append(inputs[fromNode], einobridge.MapFieldPaths(swp.Source.Ref.FromPath, append(einobridge.FieldPath{string(fromNode)}, swp.Source.Ref.FromPath...)))
 				} else { // indirect dependency
-					inputsNoDirectDependency[fromNode] = append(inputsNoDirectDependency[fromNode], compose.MapFieldPaths(swp.Source.Ref.FromPath, append(compose.FieldPath{string(fromNode)}, swp.Source.Ref.FromPath...)))
+					inputsNoDirectDependency[fromNode] = append(inputsNoDirectDependency[fromNode], einobridge.MapFieldPaths(swp.Source.Ref.FromPath, append(einobridge.FieldPath{string(fromNode)}, swp.Source.Ref.FromPath...)))
 				}
 			}
 		} else {
@@ -869,12 +869,12 @@ func (w *Workflow) resolveDependenciesAsParent(n vo.NodeKey, sourceWithPaths []*
 
 // addFieldMappingsWithDeduplication adds field mappings to carryOvers while avoiding duplicates
 func addFieldMappingsWithDeduplication(
-	carryOvers map[vo.NodeKey][]*compose.FieldMapping,
+	carryOvers map[vo.NodeKey][]*einobridge.FieldMapping,
 	fromNodeKey vo.NodeKey,
-	fieldMappings []*compose.FieldMapping,
+	fieldMappings []*einobridge.FieldMapping,
 ) {
 	if _, ok := carryOvers[fromNodeKey]; !ok {
-		carryOvers[fromNodeKey] = make([]*compose.FieldMapping, 0)
+		carryOvers[fromNodeKey] = make([]*einobridge.FieldMapping, 0)
 	}
 
 	for i := range fieldMappings {

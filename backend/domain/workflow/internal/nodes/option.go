@@ -17,8 +17,8 @@
 package nodes
 
 import (
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	"github.com/bytedance/sonic"
-	"github.com/cloudwego/eino/compose"
 
 	"github.com/superagent-ai/superagent-base/backend/domain/workflow/entity/vo"
 )
@@ -28,9 +28,9 @@ type NodeOptions struct {
 }
 
 type NestedWorkflowOptions struct {
-	optsForNested   []compose.Option
-	toResumeIndexes map[int]compose.StateModifier
-	optsForIndexed  map[int][]compose.Option
+	optsForNested   []einobridge.Option
+	toResumeIndexes map[int]einobridge.StateModifier
+	optsForIndexed  map[int][]einobridge.Option
 }
 
 type NodeOption struct {
@@ -41,7 +41,7 @@ type NodeOption struct {
 
 type NestedWorkflowOption func(*NestedWorkflowOptions)
 
-func WithOptsForNested(opts ...compose.Option) NodeOption {
+func WithOptsForNested(opts ...einobridge.Option) NodeOption {
 	return NodeOption{
 		apply: func(options *NodeOptions) {
 			if options.Nested == nil {
@@ -52,21 +52,21 @@ func WithOptsForNested(opts ...compose.Option) NodeOption {
 	}
 }
 
-func (c *NodeOptions) GetOptsForNested() []compose.Option {
+func (c *NodeOptions) GetOptsForNested() []einobridge.Option {
 	if c.Nested == nil {
 		return nil
 	}
 	return c.Nested.optsForNested
 }
 
-func WithResumeIndex(i int, m compose.StateModifier) NodeOption {
+func WithResumeIndex(i int, m einobridge.StateModifier) NodeOption {
 	return NodeOption{
 		apply: func(options *NodeOptions) {
 			if options.Nested == nil {
 				options.Nested = &NestedWorkflowOptions{}
 			}
 			if options.Nested.toResumeIndexes == nil {
-				options.Nested.toResumeIndexes = map[int]compose.StateModifier{}
+				options.Nested.toResumeIndexes = map[int]einobridge.StateModifier{}
 			}
 
 			options.Nested.toResumeIndexes[i] = m
@@ -74,28 +74,28 @@ func WithResumeIndex(i int, m compose.StateModifier) NodeOption {
 	}
 }
 
-func (c *NodeOptions) GetResumeIndexes() map[int]compose.StateModifier {
+func (c *NodeOptions) GetResumeIndexes() map[int]einobridge.StateModifier {
 	if c.Nested == nil {
 		return nil
 	}
 	return c.Nested.toResumeIndexes
 }
 
-func WithOptsForIndexed(index int, opts ...compose.Option) NodeOption {
+func WithOptsForIndexed(index int, opts ...einobridge.Option) NodeOption {
 	return NodeOption{
 		apply: func(options *NodeOptions) {
 			if options.Nested == nil {
 				options.Nested = &NestedWorkflowOptions{}
 			}
 			if options.Nested.optsForIndexed == nil {
-				options.Nested.optsForIndexed = map[int][]compose.Option{}
+				options.Nested.optsForIndexed = map[int][]einobridge.Option{}
 			}
 			options.Nested.optsForIndexed[index] = opts
 		},
 	}
 }
 
-func (c *NodeOptions) GetOptsForIndexed(index int) []compose.Option {
+func (c *NodeOptions) GetOptsForIndexed(index int) []einobridge.Option {
 	if c.Nested == nil {
 		return nil
 	}
@@ -153,7 +153,7 @@ func GetImplSpecificOptions[T any](base *T, opts ...NodeOption) *T {
 
 type NestedWorkflowState struct {
 	Index2Done          map[int]bool                   `json:"index_2_done,omitempty"`
-	Index2InterruptInfo map[int]*compose.InterruptInfo `json:"index_2_interrupt_info,omitempty"`
+	Index2InterruptInfo map[int]*einobridge.InterruptInfo `json:"index_2_interrupt_info,omitempty"`
 	FullOutput          map[string]any                 `json:"full_output,omitempty"`
 	IntermediateVars    map[string]any                 `json:"intermediate_vars,omitempty"`
 }

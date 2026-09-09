@@ -17,6 +17,7 @@
 package adaptor
 
 import (
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	"context"
 	"errors"
 	"fmt"
@@ -24,7 +25,6 @@ import (
 	"strconv"
 	"strings"
 
-	einoCompose "github.com/cloudwego/eino/compose"
 
 	model "github.com/superagent-ai/superagent-base/backend/crossdomain/workflow/model"
 	"github.com/superagent-ai/superagent-base/backend/domain/workflow"
@@ -273,7 +273,7 @@ func NodeToNodeSchema(ctx context.Context, n *vo.Node, c *vo.Canvas) ([]*schema.
 func EdgeToConnection(e *vo.Edge) *schema.Connection {
 	toNode := vo.NodeKey(e.TargetNodeID)
 	if len(e.SourcePortID) > 0 && (e.TargetPortID == "loop-function-inline-input" || e.TargetPortID == "batch-function-inline-input") {
-		toNode = einoCompose.END
+		toNode = einobridge.END
 	}
 
 	conn := &schema.Connection{

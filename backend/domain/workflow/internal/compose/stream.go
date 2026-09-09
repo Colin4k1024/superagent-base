@@ -17,9 +17,9 @@
 package compose
 
 import (
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	"fmt"
 
-	"github.com/cloudwego/eino/compose"
 
 	"github.com/superagent-ai/superagent-base/backend/domain/workflow/entity/vo"
 	"github.com/superagent-ai/superagent-base/backend/domain/workflow/internal/nodes"
@@ -150,7 +150,7 @@ func GetFullSources(s *schema.NodeSchema, sc *schema.WorkflowSchema, dep *depend
 			err        error
 		)
 		if len(fromNodeKey) > 0 {
-			if fromNodeKey == compose.START {
+			if fromNodeKey == einobridge.START {
 				streamType = schema.FieldNotStream // TODO: set start node to not stream for now until composite node supports transform
 			} else {
 				fromNode := sc.GetNode(fromNodeKey)

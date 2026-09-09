@@ -26,7 +26,6 @@ import (
 
 	"github.com/superagent-ai/superagent-base/backend/types/consts"
 
-	einoCompose "github.com/cloudwego/eino/compose"
 
 	model "github.com/superagent-ai/superagent-base/backend/crossdomain/workflow/model"
 	wf "github.com/superagent-ai/superagent-base/backend/domain/workflow"
@@ -107,7 +106,7 @@ func NewWorkflowRunner(b *entity.WorkflowBasic, sc *schema2.WorkflowSchema, conf
 func (r *WorkflowRunner) Prepare(ctx context.Context) (
 	context.Context,
 	int64,
-	[]einoCompose.Option,
+	[]einobridge.Option,
 	<-chan *execute.Event,
 	error,
 ) {
@@ -175,13 +174,13 @@ func (r *WorkflowRunner) Prepare(ctx context.Context) (
 	}
 
 	if interruptEvent != nil {
-		var stateOpt einoCompose.Option
+		var stateOpt einobridge.Option
 		stateModifier := GenStateModifierByEventType(interruptEvent.EventType,
 			interruptEvent.NodeKey, resumeReq.ResumeData, r.config)
 
 		if len(interruptEvent.NodePath) == 1 {
 			// this interrupt event is within the top level workflow
-			stateOpt = einoCompose.WithStateModifier(stateModifier)
+			stateOpt = einobridge.WithStateModifier(stateModifier)
 		} else {
 			currentI := len(interruptEvent.NodePath) - 2
 			path := interruptEvent.NodePath[currentI]
@@ -195,11 +194,11 @@ func (r *WorkflowRunner) Prepare(ctx context.Context) (
 
 				currentI--
 				parentNodeKey := interruptEvent.NodePath[currentI]
-				stateOpt = einoCompose.WithLambdaOption(
+				stateOpt = einobridge.WithLambdaOption(
 					nodes.WithResumeIndex(index, stateModifier)).DesignateNode(parentNodeKey)
 			} else { // this interrupt event is within a sub workflow
 				subWorkflowNodeKey := interruptEvent.NodePath[currentI]
-				stateOpt = einoCompose.WithLambdaOption(
+				stateOpt = einobridge.WithLambdaOption(
 					nodes.WithResumeIndex(0, stateModifier)).DesignateNode(subWorkflowNodeKey)
 			}
 

@@ -17,12 +17,12 @@
 package compose
 
 import (
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	"context"
 	"fmt"
 	"slices"
 	"strconv"
 
-	einoCompose "github.com/cloudwego/eino/compose"
 
 	model "github.com/superagent-ai/superagent-base/backend/crossdomain/workflow/model"
 	workflow2 "github.com/superagent-ai/superagent-base/backend/domain/workflow"
@@ -37,7 +37,7 @@ import (
 	"github.com/superagent-ai/superagent-base/backend/pkg/lang/ptr"
 )
 
-func (r *WorkflowRunner) designateOptions(ctx context.Context) ([]einoCompose.Option, error) {
+func (r *WorkflowRunner) designateOptions(ctx context.Context) ([]einobridge.Option, error) {
 	var (
 		wb           = r.basic
 		exeCfg       = r.config
@@ -61,12 +61,12 @@ func (r *WorkflowRunner) designateOptions(ctx context.Context) ([]einoCompose.Op
 		exeCfg,
 		workflowSC.NodeCount())
 
-	opts := []einoCompose.Option{einoCompose.WithCallbacks(rootHandler)}
+	opts := []einobridge.Option{einobridge.WithCallbacks(rootHandler)}
 
 	for key := range workflowSC.GetAllNodes() {
 		ns := workflowSC.GetAllNodes()[key]
 
-		var nodeOpt einoCompose.Option
+		var nodeOpt einobridge.Option
 		if ns.Type == entity.NodeTypeExit {
 			nodeOpt = nodeCallbackOption(key, ns.Name, eventChan, resumedEvent,
 				ptr.Of(ns.Configs.(*exit.Config).TerminatePlan))
@@ -120,29 +120,29 @@ func (r *WorkflowRunner) designateOptions(ctx context.Context) ([]einoCompose.Op
 	}
 
 	if workflowSC.RequireCheckpoint() {
-		opts = append(opts, einoCompose.WithCheckPointID(strconv.FormatInt(executeID, 10)))
+		opts = append(opts, einobridge.WithCheckPointID(strconv.FormatInt(executeID, 10)))
 	}
 
 	return opts, nil
 }
 
 func nodeCallbackOption(key vo.NodeKey, name string, eventChan chan *execute.Event, resumeEvent *entity.InterruptEvent,
-	terminatePlan *vo.TerminatePlan) einoCompose.Option {
-	return einoCompose.WithCallbacks(execute.NewNodeHandler(string(key), name, eventChan, resumeEvent, terminatePlan)).DesignateNode(string(key))
+	terminatePlan *vo.TerminatePlan) einobridge.Option {
+	return einobridge.WithCallbacks(execute.NewNodeHandler(string(key), name, eventChan, resumeEvent, terminatePlan)).DesignateNode(string(key))
 }
 
-func WrapOpt(opt einoCompose.Option, parentNodeKey vo.NodeKey) einoCompose.Option {
-	return einoCompose.WithLambdaOption(nodes.WithOptsForNested(opt)).DesignateNode(string(parentNodeKey))
+func WrapOpt(opt einobridge.Option, parentNodeKey vo.NodeKey) einobridge.Option {
+	return einobridge.WithLambdaOption(nodes.WithOptsForNested(opt)).DesignateNode(string(parentNodeKey))
 }
 
-func WrapOptWithIndex(opt einoCompose.Option, parentNodeKey vo.NodeKey, index int) einoCompose.Option {
-	return einoCompose.WithLambdaOption(nodes.WithOptsForIndexed(index, opt)).DesignateNode(string(parentNodeKey))
+func WrapOptWithIndex(opt einobridge.Option, parentNodeKey vo.NodeKey, index int) einobridge.Option {
+	return einobridge.WithLambdaOption(nodes.WithOptsForIndexed(index, opt)).DesignateNode(string(parentNodeKey))
 }
 
 func (r *WorkflowRunner) designateOptionsForSubWorkflow(ctx context.Context,
 	parentHandler *execute.WorkflowHandler,
 	ns *schema2.NodeSchema,
-	pathPrefix ...string) (opts []einoCompose.Option, err error) {
+	pathPrefix ...string) (opts []einobridge.Option, err error) {
 	var (
 		resumeEvent = r.interruptEvent
 		eventChan   = r.eventChan
@@ -155,14 +155,14 @@ func (r *WorkflowRunner) designateOptionsForSubWorkflow(ctx context.Context,
 		ns.SubWorkflowSchema.NodeCount(),
 	)
 
-	opts = append(opts, WrapOpt(einoCompose.WithCallbacks(subHandler), ns.Key))
+	opts = append(opts, WrapOpt(einobridge.WithCallbacks(subHandler), ns.Key))
 
 	workflowSC := ns.SubWorkflowSchema
 	for key := range workflowSC.GetAllNodes() {
 		subNS := workflowSC.GetAllNodes()[key]
 		fullPath := append(slices.Clone(pathPrefix), string(subNS.Key))
 
-		var nodeOpt einoCompose.Option
+		var nodeOpt einobridge.Option
 		if subNS.Type == entity.NodeTypeExit {
 			nodeOpt = nodeCallbackOption(key, subNS.Name, eventChan, resumeEvent,
 				ptr.Of(subNS.Configs.(*exit.Config).TerminatePlan))
@@ -223,7 +223,7 @@ func (r *WorkflowRunner) designateOptionsForSubWorkflow(ctx context.Context,
 
 func llmToolCallbackOptions(ctx context.Context, ns *schema2.NodeSchema, eventChan chan *execute.Event,
 	container *execute.StreamContainer) (
-	opts []einoCompose.Option, err error) {
+	opts []einobridge.Option, err error) {
 	// this is a LLM node.
 	// check if it has any tools, if no tools, then no callback options needed
 	// for each tool, extract the entity.FunctionInfo, create the ToolHandler, and add the callback option
@@ -274,14 +274,14 @@ func llmToolCallbackOptions(ctx context.Context, ns *schema2.NodeSchema, eventCh
 				}
 
 				toolHandler := execute.NewToolHandler(eventChan, funcInfo)
-				opt := einoCompose.WithCallbacks(toolHandler)
-				opt = einoCompose.WithLambdaOption(nodes.WithOptsForNested(opt)).DesignateNode(string(ns.Key))
+				opt := einobridge.WithCallbacks(toolHandler)
+				opt = einobridge.WithLambdaOption(nodes.WithOptsForNested(opt)).DesignateNode(string(ns.Key))
 				opts = append(opts, opt)
 			}
 
 			if container != nil {
 				toolMsgOpt := llm.WithToolWorkflowStreamContainer(container)
-				opt := einoCompose.WithLambdaOption(toolMsgOpt).DesignateNode(string(ns.Key))
+				opt := einobridge.WithLambdaOption(toolMsgOpt).DesignateNode(string(ns.Key))
 				opts = append(opts, opt)
 			}
 		}
@@ -319,8 +319,8 @@ func llmToolCallbackOptions(ctx context.Context, ns *schema2.NodeSchema, eventCh
 				}
 
 				toolHandler := execute.NewToolHandler(eventChan, funcInfo)
-				opt := einoCompose.WithCallbacks(toolHandler)
-				opt = einoCompose.WithLambdaOption(nodes.WithOptsForNested(opt)).DesignateNode(string(ns.Key))
+				opt := einobridge.WithCallbacks(toolHandler)
+				opt = einobridge.WithLambdaOption(nodes.WithOptsForNested(opt)).DesignateNode(string(ns.Key))
 				opts = append(opts, opt)
 			}
 		}

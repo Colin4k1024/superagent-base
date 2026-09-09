@@ -58,7 +58,6 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/cloudwego/eino/compose"
 	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 )
 
@@ -69,8 +68,8 @@ import (
 //
 // The standard graph type is []*einobridge.Message → *einobridge.Message, which maps
 // naturally to the Agent.Chat interface.  Use CompileGraph to wrap the
-// *compose.Graph builder function Eino Dev generates.
-type GraphFactory func(ctx context.Context) (compose.Runnable[[]*einobridge.Message, *einobridge.Message], error)
+// *einobridge.Graph builder function Eino Dev generates.
+type GraphFactory func(ctx context.Context) (einobridge.Runnable[[]*einobridge.Message, *einobridge.Message], error)
 
 var (
 	mu       sync.RWMutex
@@ -108,22 +107,22 @@ func List() []string {
 	return names
 }
 
-// CompileGraph is a convenience wrapper: it turns the *compose.Graph builder
+// CompileGraph is a convenience wrapper: it turns the *einobridge.Graph builder
 // function that Eino Dev generates into a GraphFactory.
 //
 // Usage:
 //
 //	// Eino Dev generated:
-//	func BuildMyFlow(ctx context.Context) (*compose.Graph[[]*einobridge.Message, *einobridge.Message], error) { ... }
+//	func BuildMyFlow(ctx context.Context) (*einobridge.Graph[[]*einobridge.Message, *einobridge.Message], error) { ... }
 //
 //	// Register it:
 //	func init() {
 //	    graphs.Register("my-flow", graphs.CompileGraph(BuildMyFlow))
 //	}
 func CompileGraph(
-	build func(ctx context.Context) (*compose.Graph[[]*einobridge.Message, *einobridge.Message], error),
+	build func(ctx context.Context) (*einobridge.Graph[[]*einobridge.Message, *einobridge.Message], error),
 ) GraphFactory {
-	return func(ctx context.Context) (compose.Runnable[[]*einobridge.Message, *einobridge.Message], error) {
+	return func(ctx context.Context) (einobridge.Runnable[[]*einobridge.Message, *einobridge.Message], error) {
 		g, err := build(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("graphs: build graph: %w", err)

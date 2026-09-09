@@ -22,7 +22,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/cloudwego/eino/compose"
 
 	workflow2 "github.com/superagent-ai/superagent-base/backend/api/model/workflow"
 	crossmessage "github.com/superagent-ai/superagent-base/backend/crossdomain/message"
@@ -48,43 +47,43 @@ type State struct {
 }
 
 func init() {
-	_ = compose.RegisterSerializableType[*State]("schema_state")
-	_ = compose.RegisterSerializableType[vo.NodeKey]("node_key")
-	_ = compose.RegisterSerializableType[*execute.Context]("exe_context")
-	_ = compose.RegisterSerializableType[execute.RootCtx]("root_ctx")
-	_ = compose.RegisterSerializableType[*execute.SubWorkflowCtx]("sub_workflow_ctx")
-	_ = compose.RegisterSerializableType[*execute.NodeCtx]("node_ctx")
-	_ = compose.RegisterSerializableType[*execute.BatchInfo]("batch_info")
-	_ = compose.RegisterSerializableType[*execute.TokenCollector]("token_collector")
-	_ = compose.RegisterSerializableType[entity.NodeType]("node_type")
-	_ = compose.RegisterSerializableType[*entity.InterruptEvent]("interrupt_event")
-	_ = compose.RegisterSerializableType[workflow2.EventType]("workflow_event_type")
-	_ = compose.RegisterSerializableType[*einobridge.ModelTokenUsage]("model_token_usage")
-	_ = compose.RegisterSerializableType[*nodes.NestedWorkflowState]("composite_state")
-	_ = compose.RegisterSerializableType[*compose.InterruptInfo]("interrupt_info")
-	_ = compose.RegisterSerializableType[*schema2.SourceInfo]("source_info")
-	_ = compose.RegisterSerializableType[schema2.FieldStreamType]("field_stream_type")
-	_ = compose.RegisterSerializableType[compose.FieldPath]("field_path")
-	_ = compose.RegisterSerializableType[*entity.WorkflowBasic]("workflow_basic")
-	_ = compose.RegisterSerializableType[vo.TerminatePlan]("terminate_plan")
-	_ = compose.RegisterSerializableType[*entity.ToolInterruptEvent]("tool_interrupt_event")
-	_ = compose.RegisterSerializableType[workflowModel.ExecuteConfig]("execute_config")
-	_ = compose.RegisterSerializableType[workflowModel.ExecuteMode]("execute_mode")
-	_ = compose.RegisterSerializableType[workflowModel.TaskType]("task_type")
-	_ = compose.RegisterSerializableType[workflowModel.SyncPattern]("sync_pattern")
-	_ = compose.RegisterSerializableType[workflowModel.Locator]("wf_locator")
-	_ = compose.RegisterSerializableType[workflowModel.BizType]("biz_type")
-	_ = compose.RegisterSerializableType[*execute.AppVariables]("app_variables")
-	_ = compose.RegisterSerializableType[workflow2.WorkflowMode]("workflow_mode")
-	_ = compose.RegisterSerializableType[*einobridge.Message]("schema_message")
-	_ = compose.RegisterSerializableType[*crossmessage.WfMessage]("history_messages")
-	_ = compose.RegisterSerializableType[*crossmessage.Content]("content")
-	_ = compose.RegisterSerializableType[*einobridge.PromptTokenDetails]("prompt_token_details")
+	_ = einobridge.RegisterSerializableType[*State]("schema_state")
+	_ = einobridge.RegisterSerializableType[vo.NodeKey]("node_key")
+	_ = einobridge.RegisterSerializableType[*execute.Context]("exe_context")
+	_ = einobridge.RegisterSerializableType[execute.RootCtx]("root_ctx")
+	_ = einobridge.RegisterSerializableType[*execute.SubWorkflowCtx]("sub_workflow_ctx")
+	_ = einobridge.RegisterSerializableType[*execute.NodeCtx]("node_ctx")
+	_ = einobridge.RegisterSerializableType[*execute.BatchInfo]("batch_info")
+	_ = einobridge.RegisterSerializableType[*execute.TokenCollector]("token_collector")
+	_ = einobridge.RegisterSerializableType[entity.NodeType]("node_type")
+	_ = einobridge.RegisterSerializableType[*entity.InterruptEvent]("interrupt_event")
+	_ = einobridge.RegisterSerializableType[workflow2.EventType]("workflow_event_type")
+	_ = einobridge.RegisterSerializableType[*einobridge.ModelTokenUsage]("model_token_usage")
+	_ = einobridge.RegisterSerializableType[*nodes.NestedWorkflowState]("composite_state")
+	_ = einobridge.RegisterSerializableType[*einobridge.InterruptInfo]("interrupt_info")
+	_ = einobridge.RegisterSerializableType[*schema2.SourceInfo]("source_info")
+	_ = einobridge.RegisterSerializableType[schema2.FieldStreamType]("field_stream_type")
+	_ = einobridge.RegisterSerializableType[einobridge.FieldPath]("field_path")
+	_ = einobridge.RegisterSerializableType[*entity.WorkflowBasic]("workflow_basic")
+	_ = einobridge.RegisterSerializableType[vo.TerminatePlan]("terminate_plan")
+	_ = einobridge.RegisterSerializableType[*entity.ToolInterruptEvent]("tool_interrupt_event")
+	_ = einobridge.RegisterSerializableType[workflowModel.ExecuteConfig]("execute_config")
+	_ = einobridge.RegisterSerializableType[workflowModel.ExecuteMode]("execute_mode")
+	_ = einobridge.RegisterSerializableType[workflowModel.TaskType]("task_type")
+	_ = einobridge.RegisterSerializableType[workflowModel.SyncPattern]("sync_pattern")
+	_ = einobridge.RegisterSerializableType[workflowModel.Locator]("wf_locator")
+	_ = einobridge.RegisterSerializableType[workflowModel.BizType]("biz_type")
+	_ = einobridge.RegisterSerializableType[*execute.AppVariables]("app_variables")
+	_ = einobridge.RegisterSerializableType[workflow2.WorkflowMode]("workflow_mode")
+	_ = einobridge.RegisterSerializableType[*einobridge.Message]("schema_message")
+	_ = einobridge.RegisterSerializableType[*crossmessage.WfMessage]("history_messages")
+	_ = einobridge.RegisterSerializableType[*crossmessage.Content]("content")
+	_ = einobridge.RegisterSerializableType[*einobridge.PromptTokenDetails]("prompt_token_details")
 
-	_ = compose.RegisterSerializableType[*vo.TypeInfo]("type_info")
-	_ = compose.RegisterSerializableType[vo.DataType]("data_type")
-	_ = compose.RegisterSerializableType[vo.FileSubType]("file_sub_type")
-	_ = compose.RegisterSerializableType[*workflowModel.FileInfo]("file_info")
+	_ = einobridge.RegisterSerializableType[*vo.TypeInfo]("type_info")
+	_ = einobridge.RegisterSerializableType[vo.DataType]("data_type")
+	_ = einobridge.RegisterSerializableType[vo.FileSubType]("file_sub_type")
+	_ = einobridge.RegisterSerializableType[*workflowModel.FileInfo]("file_info")
 }
 
 func (s *State) GetNodeCtx(key vo.NodeKey) (*execute.Context, bool, error) {
@@ -192,7 +191,7 @@ func (s *State) GetAllDynamicStreamTypes(nodeKey vo.NodeKey) (map[string]schema2
 	return result, nil
 }
 
-func (s *State) GetSourceForPath(nodeKey vo.NodeKey, path compose.FieldPath) *schema2.SourceInfo {
+func (s *State) GetSourceForPath(nodeKey vo.NodeKey, path einobridge.FieldPath) *schema2.SourceInfo {
 	if len(s.SourceInfos) == 0 {
 		return nil
 	}
@@ -222,7 +221,7 @@ func (s *State) GetFullSources(nodeKey vo.NodeKey) map[string]*schema2.SourceInf
 }
 
 func (s *State) NodeExecuted(key vo.NodeKey) bool {
-	if key == compose.START {
+	if key == einobridge.START {
 		return true
 	}
 	_, ok := s.ExecutedNodes[key]
@@ -247,7 +246,7 @@ func (s *State) GetIntermediateResult(nodeKey vo.NodeKey) map[string]any {
 	return s.IntermediateResult[nodeKey]
 }
 
-func GenState() compose.GenLocalState[*State] {
+func GenState() einobridge.GenLocalState[*State] {
 	return func(ctx context.Context) (state *State) {
 		return &State{
 			Inputs:               make(map[vo.NodeKey]map[string]any),
@@ -261,10 +260,10 @@ func GenState() compose.GenLocalState[*State] {
 	}
 }
 
-func statePreHandler(s *schema2.NodeSchema, stream bool) compose.GraphAddNodeOpt {
+func statePreHandler(s *schema2.NodeSchema, stream bool) einobridge.GraphAddNodeOpt {
 	var (
-		handlers       []compose.StatePreHandler[map[string]any, *State]
-		streamHandlers []compose.StreamStatePreHandler[map[string]any, *State]
+		handlers       []einobridge.StatePreHandler[map[string]any, *State]
+		streamHandlers []einobridge.StreamStatePreHandler[map[string]any, *State]
 	)
 
 	if entity.NodeMetaByNodeType(s.Type).PersistInputOnInterrupt {
@@ -316,7 +315,7 @@ func statePreHandler(s *schema2.NodeSchema, stream bool) compose.GraphAddNodeOpt
 
 			return in, nil
 		}
-		return compose.WithStatePreHandler(stateHandler)
+		return einobridge.WithStatePreHandler(stateHandler)
 	}
 
 	if s.FullSources != nil {
@@ -347,13 +346,13 @@ func statePreHandler(s *schema2.NodeSchema, stream bool) compose.GraphAddNodeOpt
 			}
 			return in, nil
 		}
-		return compose.WithStreamStatePreHandler(streamHandler)
+		return einobridge.WithStreamStatePreHandler(streamHandler)
 	}
 
 	return nil
 }
 
-func statePreHandlerForVars(s *schema2.NodeSchema) compose.StatePreHandler[map[string]any, *State] {
+func statePreHandlerForVars(s *schema2.NodeSchema) einobridge.StatePreHandler[map[string]any, *State] {
 	// checkout the node's inputs, if it has any variable, use the state's variableHandler to get the variables and set them to the input
 	var vars []*vo.FieldInfo
 	for _, input := range s.InputSources {
@@ -428,7 +427,7 @@ func statePreHandlerForVars(s *schema2.NodeSchema) compose.StatePreHandler[map[s
 	}
 }
 
-func streamStatePreHandlerForVars(s *schema2.NodeSchema) compose.StreamStatePreHandler[map[string]any, *State] {
+func streamStatePreHandlerForVars(s *schema2.NodeSchema) einobridge.StreamStatePreHandler[map[string]any, *State] {
 	// checkout the node's inputs, if it has any variables, get the variables and merge them with the input
 	var vars []*vo.FieldInfo
 	for _, input := range s.InputSources {
@@ -505,10 +504,10 @@ func streamStatePreHandlerForVars(s *schema2.NodeSchema) compose.StreamStatePreH
 	}
 }
 
-func statePostHandler(s *schema2.NodeSchema, stream bool) compose.GraphAddNodeOpt {
+func statePostHandler(s *schema2.NodeSchema, stream bool) einobridge.GraphAddNodeOpt {
 	var (
-		handlers       []compose.StatePostHandler[map[string]any, *State]
-		streamHandlers []compose.StreamStatePostHandler[map[string]any, *State]
+		handlers       []einobridge.StatePostHandler[map[string]any, *State]
+		streamHandlers []einobridge.StreamStatePostHandler[map[string]any, *State]
 	)
 
 	if stream {
@@ -532,7 +531,7 @@ func statePostHandler(s *schema2.NodeSchema, stream bool) compose.GraphAddNodeOp
 			}
 			return in, nil
 		}
-		return compose.WithStreamStatePostHandler(streamHandler)
+		return einobridge.WithStreamStatePostHandler(streamHandler)
 	}
 
 	handlers = append(handlers, func(ctx context.Context, out map[string]any, state *State) (map[string]any, error) {
@@ -557,10 +556,10 @@ func statePostHandler(s *schema2.NodeSchema, stream bool) compose.GraphAddNodeOp
 		return in, nil
 	}
 
-	return compose.WithStatePostHandler(handler)
+	return einobridge.WithStatePostHandler(handler)
 }
 
-func statePostHandlerForVars(s *schema2.NodeSchema) compose.StatePostHandler[map[string]any, *State] {
+func statePostHandlerForVars(s *schema2.NodeSchema) einobridge.StatePostHandler[map[string]any, *State] {
 	// checkout the node's output sources, if it has any variable,
 	// use the state's variableHandler to get the variables and set them to the output
 	var vars []*vo.FieldInfo
@@ -638,7 +637,7 @@ func statePostHandlerForVars(s *schema2.NodeSchema) compose.StatePostHandler[map
 	}
 }
 
-func streamStatePostHandlerForVars(s *schema2.NodeSchema) compose.StreamStatePostHandler[map[string]any, *State] {
+func streamStatePostHandlerForVars(s *schema2.NodeSchema) einobridge.StreamStatePostHandler[map[string]any, *State] {
 	// checkout the node's output sources, if it has any variables, get the variables and merge them with the output
 	var vars []*vo.FieldInfo
 	for _, output := range s.OutputSources {
@@ -718,8 +717,8 @@ func streamStatePostHandlerForVars(s *schema2.NodeSchema) compose.StreamStatePos
 func GenStateModifierByEventType(_ entity.InterruptEventType,
 	nodeKey vo.NodeKey,
 	resumeData string,
-	_ workflowModel.ExecuteConfig) (stateModifier compose.StateModifier) {
-	stateModifier = func(ctx context.Context, path compose.NodePath, state any) (err error) {
+	_ workflowModel.ExecuteConfig) (stateModifier einobridge.StateModifier) {
+	stateModifier = func(ctx context.Context, path einobridge.NodePath, state any) (err error) {
 		state.(*State).ResumeData[nodeKey] = resumeData
 		return nil
 	}

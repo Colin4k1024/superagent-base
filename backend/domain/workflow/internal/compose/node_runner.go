@@ -24,7 +24,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cloudwego/eino/compose"
 	"golang.org/x/exp/maps"
 
 	"github.com/superagent-ai/superagent-base/backend/domain/workflow/entity"
@@ -57,17 +56,17 @@ type nodeRunConfig[O any] struct {
 	callbackInputConverter  func(context.Context, map[string]any) (*nodes.StructuredCallbackInput, error)
 	callbackOutputConverter func(context.Context, map[string]any) (*nodes.StructuredCallbackOutput, error)
 	init                    []func(context.Context) (context.Context, error)
-	i                       compose.Invoke[map[string]any, map[string]any, O]
-	s                       compose.Stream[map[string]any, map[string]any, O]
-	c                       compose.Collect[map[string]any, map[string]any, O]
-	t                       compose.Transform[map[string]any, map[string]any, O]
+	i                       einobridge.Invoke2[map[string]any, map[string]any, O]
+	s                       einobridge.StreamFunc[map[string]any, map[string]any, O]
+	c                       einobridge.Collect[map[string]any, map[string]any, O]
+	t                       einobridge.Transform2[map[string]any, map[string]any, O]
 }
 
 func newNodeRunConfig[O any](ns *schema2.NodeSchema,
-	i compose.Invoke[map[string]any, map[string]any, O],
-	s compose.Stream[map[string]any, map[string]any, O],
-	c compose.Collect[map[string]any, map[string]any, O],
-	t compose.Transform[map[string]any, map[string]any, O],
+	i einobridge.Invoke2[map[string]any, map[string]any, O],
+	s einobridge.StreamFunc[map[string]any, map[string]any, O],
+	c einobridge.Collect[map[string]any, map[string]any, O],
+	t einobridge.Transform2[map[string]any, map[string]any, O],
 	opts *newNodeOptions) *nodeRunConfig[O] {
 	meta := entity.NodeMetaByNodeType(ns.Type)
 
@@ -156,16 +155,16 @@ func newNodeRunConfig[O any](ns *schema2.NodeSchema,
 }
 
 func newNodeRunConfigWOOpt(ns *schema2.NodeSchema,
-	i compose.InvokeWOOpt[map[string]any, map[string]any],
-	s compose.StreamWOOpt[map[string]any, map[string]any],
-	c compose.CollectWOOpt[map[string]any, map[string]any],
-	t compose.TransformWOOpts[map[string]any, map[string]any],
+	i einobridge.InvokeWOOpt[map[string]any, map[string]any],
+	s einobridge.StreamWOOpt[map[string]any, map[string]any],
+	c einobridge.CollectWOOpt[map[string]any, map[string]any],
+	t einobridge.TransformWOOpts[map[string]any, map[string]any],
 	opts *newNodeOptions) *nodeRunConfig[any] {
 	var (
-		iWO compose.Invoke[map[string]any, map[string]any, any]
-		sWO compose.Stream[map[string]any, map[string]any, any]
-		cWO compose.Collect[map[string]any, map[string]any, any]
-		tWO compose.Transform[map[string]any, map[string]any, any]
+		iWO einobridge.Invoke2[map[string]any, map[string]any, any]
+		sWO einobridge.StreamFunc[map[string]any, map[string]any, any]
+		cWO einobridge.Collect[map[string]any, map[string]any, any]
+		tWO einobridge.Transform2[map[string]any, map[string]any, any]
 	)
 
 	if i != nil {
@@ -246,10 +245,10 @@ func toNode(ns *schema2.NodeSchema, r any) *Node {
 
 	if wOpt {
 		var (
-			i compose.Invoke[map[string]any, map[string]any, nodes.NodeOption]
-			s compose.Stream[map[string]any, map[string]any, nodes.NodeOption]
-			c compose.Collect[map[string]any, map[string]any, nodes.NodeOption]
-			t compose.Transform[map[string]any, map[string]any, nodes.NodeOption]
+			i einobridge.Invoke2[map[string]any, map[string]any, nodes.NodeOption]
+			s einobridge.StreamFunc[map[string]any, map[string]any, nodes.NodeOption]
+			c einobridge.Collect[map[string]any, map[string]any, nodes.NodeOption]
+			t einobridge.Transform2[map[string]any, map[string]any, nodes.NodeOption]
 		)
 
 		if iWOpt != nil {
@@ -288,10 +287,10 @@ func toNode(ns *schema2.NodeSchema, r any) *Node {
 	}
 
 	var (
-		i compose.InvokeWOOpt[map[string]any, map[string]any]
-		s compose.StreamWOOpt[map[string]any, map[string]any]
-		c compose.CollectWOOpt[map[string]any, map[string]any]
-		t compose.TransformWOOpts[map[string]any, map[string]any]
+		i einobridge.InvokeWOOpt[map[string]any, map[string]any]
+		s einobridge.StreamWOOpt[map[string]any, map[string]any]
+		c einobridge.CollectWOOpt[map[string]any, map[string]any]
+		t einobridge.TransformWOOpts[map[string]any, map[string]any]
 	)
 
 	if iWOOpt != nil {
@@ -552,11 +551,11 @@ func (nc *nodeRunConfig[O]) transform() func(ctx context.Context, input *einobri
 }
 
 func (nc *nodeRunConfig[O]) toNode() *Node {
-	var opts []compose.LambdaOpt
-	opts = append(opts, compose.WithLambdaType(string(nc.nodeType)))
-	opts = append(opts, compose.WithLambdaCallbackEnable(true))
+	var opts []einobridge.LambdaOpt
+	opts = append(opts, einobridge.WithLambdaType(string(nc.nodeType)))
+	opts = append(opts, einobridge.WithLambdaCallbackEnable(true))
 
-	l, err := compose.AnyLambda(nc.invoke(), nc.stream(), nc.collect(), nc.transform(), opts...)
+	l, err := einobridge.AnyLambda(nc.invoke(), nc.stream(), nc.collect(), nc.transform(), opts...)
 	if err != nil {
 		panic(fmt.Sprintf("failed to create lambda for node %s, err: %v", nc.nodeName, err))
 	}
@@ -658,7 +657,7 @@ func (r *nodeRunner[O]) invoke(ctx context.Context, input map[string]any, opts .
 			return nil
 		})
 		if err != nil {
-			if _, ok := compose.IsInterruptRerunError(err); ok {
+			if _, ok := einobridge.IsInterruptRerunError(err); ok {
 				r.interrupted = true
 				return nil, err
 			}
@@ -695,7 +694,7 @@ func (r *nodeRunner[O]) stream(ctx context.Context, input map[string]any, opts .
 		})
 
 		if err != nil {
-			if _, ok := compose.IsInterruptRerunError(err); ok {
+			if _, ok := einobridge.IsInterruptRerunError(err); ok {
 				r.interrupted = true
 				return nil, err
 			}
@@ -740,7 +739,7 @@ func (r *nodeRunner[O]) collect(ctx context.Context, input *einobridge.StreamRea
 		})
 
 		if err != nil {
-			if _, ok := compose.IsInterruptRerunError(err); ok {
+			if _, ok := einobridge.IsInterruptRerunError(err); ok {
 				r.interrupted = true
 				return nil, err
 			}
@@ -785,7 +784,7 @@ func (r *nodeRunner[O]) transform(ctx context.Context, input *einobridge.StreamR
 			return nil
 		})
 		if err != nil {
-			if _, ok := compose.IsInterruptRerunError(err); ok {
+			if _, ok := einobridge.IsInterruptRerunError(err); ok {
 				r.interrupted = true
 				return nil, err
 			}

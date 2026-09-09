@@ -22,7 +22,6 @@ import (
 	"fmt"
 	"strings"
 
-	einoCompose "github.com/cloudwego/eino/compose"
 
 	workflowModel "github.com/superagent-ai/superagent-base/backend/crossdomain/workflow/model"
 	"github.com/superagent-ai/superagent-base/backend/pkg/lang/slices"
@@ -42,7 +41,7 @@ const answerKey = "output"
 
 type invokableWorkflow struct {
 	workflowTool
-	invoke func(ctx context.Context, input map[string]any, opts ...einoCompose.Option) (map[string]any, error)
+	invoke func(ctx context.Context, input map[string]any, opts ...einobridge.Option) (map[string]any, error)
 }
 
 type workflowTool struct {
@@ -54,7 +53,7 @@ type workflowTool struct {
 }
 
 func NewInvokableWorkflow(info *einobridge.ToolInfo,
-	invoke func(ctx context.Context, input map[string]any, opts ...einoCompose.Option) (map[string]any, error),
+	invoke func(ctx context.Context, input map[string]any, opts ...einobridge.Option) (map[string]any, error),
 	terminatePlan vo.TerminatePlan,
 	wfEntity *entity.Workflow,
 	sc *schema2.WorkflowSchema,
@@ -89,7 +88,7 @@ func resumeOnce(rInfo *entity.ResumeRequest, callID string, allIEs map[string]in
 func (wt *workflowTool) prepare(ctx context.Context, rInfo *entity.ResumeRequest,
 	argumentsInJSON string, opts ...einobridge.ToolOption) (
 	cancelCtx context.Context, executeID int64, input map[string]any,
-	lastEventChan <-chan *execute.Event, callOpts []einoCompose.Option, err error) {
+	lastEventChan <-chan *execute.Event, callOpts []einobridge.Option, err error) {
 	cfg := execute.GetExecuteConfig(opts...)
 
 	cfg.InputFileFields = slices.ToMap(wt.sc.GetAllNodesInputFileFields(ctx), func(e *workflowModel.FileInfo) (string, *workflowModel.FileInfo) {
@@ -149,7 +148,7 @@ func (i *invokableWorkflow) InvokableRun(ctx context.Context, argumentsInJSON st
 	rInfo, allIEs := execute.GetResumeRequest(opts...)
 	var (
 		previouslyInterrupted bool
-		callID                = einoCompose.GetToolCallID(ctx)
+		callID                = einobridge.GetToolCallID(ctx)
 		previousExecuteID     int64
 	)
 	for interruptedCallID := range allIEs {
@@ -174,7 +173,7 @@ func (i *invokableWorkflow) InvokableRun(ctx context.Context, argumentsInJSON st
 
 	if previouslyInterrupted && rInfo.ExecuteID != previousExecuteID {
 		logs.Infof("previous interrupted call ID: %s, previous execute ID: %d, current execute ID: %d. Not resuming, interrupt immediately", callID, previousExecuteID, rInfo.ExecuteID)
-		return "", einoCompose.InterruptAndRerun
+		return "", einobridge.InterruptAndRerun
 	}
 
 	defer resumeOnce(rInfo, callID, allIEs)
@@ -186,7 +185,7 @@ func (i *invokableWorkflow) InvokableRun(ctx context.Context, argumentsInJSON st
 
 	out, err := i.invoke(cancelCtx, in, callOpts...)
 	if err != nil {
-		if _, ok := einoCompose.ExtractInterruptInfo(err); ok {
+		if _, ok := einobridge.ExtractInterruptInfo(err); ok {
 			firstIE, found, err := i.repo.GetFirstInterruptEvent(ctx, executeID)
 			if err != nil {
 				return "", err
@@ -195,8 +194,8 @@ func (i *invokableWorkflow) InvokableRun(ctx context.Context, argumentsInJSON st
 				return "", fmt.Errorf("interrupt event does not exist, wfExeID: %d", executeID)
 			}
 
-			return "", einoCompose.NewInterruptAndRerunErr(&entity.ToolInterruptEvent{
-				ToolCallID:     einoCompose.GetToolCallID(ctx),
+			return "", einobridge.NewInterruptAndRerunErr(&entity.ToolInterruptEvent{
+				ToolCallID:     einobridge.GetToolCallID(ctx),
 				ToolName:       i.info.Name,
 				ExecuteID:      executeID,
 				InterruptEvent: firstIE,
@@ -259,11 +258,11 @@ func (i *invokableWorkflow) IsCallbacksEnabled() bool {
 
 type streamableWorkflow struct {
 	workflowTool
-	stream func(ctx context.Context, input map[string]any, opts ...einoCompose.Option) (*einobridge.StreamReader[map[string]any], error)
+	stream func(ctx context.Context, input map[string]any, opts ...einobridge.Option) (*einobridge.StreamReader[map[string]any], error)
 }
 
 func NewStreamableWorkflow(info *einobridge.ToolInfo,
-	stream func(ctx context.Context, input map[string]any, opts ...einoCompose.Option) (*einobridge.StreamReader[map[string]any], error),
+	stream func(ctx context.Context, input map[string]any, opts ...einobridge.Option) (*einobridge.StreamReader[map[string]any], error),
 	terminatePlan vo.TerminatePlan,
 	wfEntity *entity.Workflow,
 	sc *schema2.WorkflowSchema,
@@ -290,7 +289,7 @@ func (s *streamableWorkflow) StreamableRun(ctx context.Context, argumentsInJSON 
 	rInfo, allIEs := execute.GetResumeRequest(opts...)
 	var (
 		previouslyInterrupted bool
-		callID                = einoCompose.GetToolCallID(ctx)
+		callID                = einobridge.GetToolCallID(ctx)
 		previousExecuteID     int64
 		toolFinishChan        = make(chan struct{})
 	)
@@ -318,7 +317,7 @@ func (s *streamableWorkflow) StreamableRun(ctx context.Context, argumentsInJSON 
 
 	if previouslyInterrupted && rInfo.ExecuteID != previousExecuteID {
 		logs.Infof("previous interrupted call ID: %s, previous execute ID: %d, current execute ID: %d. Not resuming, interrupt immediately", callID, previousExecuteID, rInfo.ExecuteID)
-		return nil, einoCompose.InterruptAndRerun
+		return nil, einobridge.InterruptAndRerun
 	}
 
 	defer resumeOnce(rInfo, callID, allIEs)
@@ -330,7 +329,7 @@ func (s *streamableWorkflow) StreamableRun(ctx context.Context, argumentsInJSON 
 
 	outStream, err := s.stream(cancelCtx, in, callOpts...)
 	if err != nil {
-		if _, ok := einoCompose.ExtractInterruptInfo(err); ok {
+		if _, ok := einobridge.ExtractInterruptInfo(err); ok {
 			firstIE, found, err := s.repo.GetFirstInterruptEvent(ctx, executeID)
 			if err != nil {
 				return nil, err
@@ -339,8 +338,8 @@ func (s *streamableWorkflow) StreamableRun(ctx context.Context, argumentsInJSON 
 				return nil, fmt.Errorf("interrupt event does not exist, wfExeID: %d", executeID)
 			}
 
-			return nil, einoCompose.NewInterruptAndRerunErr(&entity.ToolInterruptEvent{
-				ToolCallID:     einoCompose.GetToolCallID(ctx),
+			return nil, einobridge.NewInterruptAndRerunErr(&entity.ToolInterruptEvent{
+				ToolCallID:     einobridge.GetToolCallID(ctx),
 				ToolName:       s.info.Name,
 				ExecuteID:      executeID,
 				InterruptEvent: firstIE,

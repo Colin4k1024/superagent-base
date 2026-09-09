@@ -24,7 +24,6 @@ import (
 	"strconv"
 	"time"
 
-	einoCompose "github.com/cloudwego/eino/compose"
 	"golang.org/x/exp/maps"
 	"gorm.io/gen"
 	"gorm.io/gen/field"
@@ -64,7 +63,7 @@ type RepositoryImpl struct {
 	query *query.Query
 	redis cache.Cmdable
 	tos   storage.Storage
-	einoCompose.CheckPointStore
+	einobridge.CheckPointStore
 	workflow.InterruptEventStore
 	workflow.CancelSignalStore
 	workflow.ExecuteHistoryStore
@@ -74,7 +73,7 @@ type RepositoryImpl struct {
 }
 
 func NewRepository(idgen idgen.IDGenerator, db *gorm.DB, redis cache.Cmdable, tos storage.Storage,
-	cpStore einoCompose.CheckPointStore, chatModel modelbuilder.BaseChatModel, workflowConfig workflow.WorkflowConfig) (workflow.Repository, error) {
+	cpStore einobridge.CheckPointStore, chatModel modelbuilder.BaseChatModel, workflowConfig workflow.WorkflowConfig) (workflow.Repository, error) {
 	var sg workflow.Suggester
 	var err error
 	if chatModel != nil {
@@ -1503,11 +1502,11 @@ func (r *RepositoryImpl) WorkflowAsTool(ctx context.Context, policy vo.GetPolicy
 		return nil, vo.WrapError(errno.ErrWorkflowCompileFail, err)
 	}
 
-	type streamFunc func(ctx context.Context, in map[string]any, opts ...einoCompose.Option) (*einobridge.StreamReader[map[string]any], error)
+	type streamFunc func(ctx context.Context, in map[string]any, opts ...einobridge.Option) (*einobridge.StreamReader[map[string]any], error)
 
 	if wf.StreamRun() {
 		convertStream := func(stream streamFunc) streamFunc {
-			return func(ctx context.Context, in map[string]any, opts ...einoCompose.Option) (*einobridge.StreamReader[map[string]any], error) {
+			return func(ctx context.Context, in map[string]any, opts ...einobridge.Option) (*einobridge.StreamReader[map[string]any], error) {
 				if len(inputParamsConfigMap) == 0 {
 					return stream(ctx, in, opts...)
 				}
@@ -1542,9 +1541,9 @@ func (r *RepositoryImpl) WorkflowAsTool(ctx context.Context, policy vo.GetPolicy
 		), nil
 	}
 
-	type invokeFunc func(ctx context.Context, in map[string]any, opts ...einoCompose.Option) (out map[string]any, err error)
+	type invokeFunc func(ctx context.Context, in map[string]any, opts ...einobridge.Option) (out map[string]any, err error)
 	convertInvoke := func(invoke invokeFunc) invokeFunc {
-		return func(ctx context.Context, in map[string]any, opts ...einoCompose.Option) (out map[string]any, err error) {
+		return func(ctx context.Context, in map[string]any, opts ...einobridge.Option) (out map[string]any, err error) {
 			if len(inputParamsCfg) == 0 && len(outputParamsCfg) == 0 {
 				return invoke(ctx, in, opts...)
 			}

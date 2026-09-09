@@ -17,10 +17,10 @@
 package entity
 
 import (
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	"fmt"
 
 	"github.com/bytedance/sonic"
-	"github.com/cloudwego/eino/compose"
 
 	"github.com/superagent-ai/superagent-base/backend/api/model/workflow"
 	"github.com/superagent-ai/superagent-base/backend/domain/workflow/entity/vo"
@@ -39,8 +39,8 @@ type InterruptEvent struct {
 
 	// index within composite node -> interrupt info for that index
 	// TODO: separate the following fields with InterruptEvent
-	NestedInterruptInfo      map[int]*compose.InterruptInfo `json:"nested_interrupt_info,omitempty"`
-	SubWorkflowInterruptInfo *compose.InterruptInfo         `json:"sub_workflow_interrupt_info,omitempty"`
+	NestedInterruptInfo      map[int]*einobridge.InterruptInfo `json:"nested_interrupt_info,omitempty"`
+	SubWorkflowInterruptInfo *einobridge.InterruptInfo         `json:"sub_workflow_interrupt_info,omitempty"`
 	ToolInterruptEvent       *ToolInterruptEvent            `json:"tool_interrupt_event,omitempty"`
 }
 

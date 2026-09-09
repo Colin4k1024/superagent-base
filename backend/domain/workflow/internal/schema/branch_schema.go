@@ -17,10 +17,10 @@
 package schema
 
 import (
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	"context"
 	"fmt"
 
-	"github.com/cloudwego/eino/compose"
 
 	"github.com/superagent-ai/superagent-base/backend/domain/workflow/entity/vo"
 )
@@ -100,7 +100,7 @@ func (bs *BranchSchema) OnlyException() bool {
 	return len(bs.Mappings) == 0 && len(bs.ExceptionMapping) > 0 && len(bs.DefaultMapping) > 0
 }
 
-func (bs *BranchSchema) GetExceptionBranch() *compose.GraphBranch {
+func (bs *BranchSchema) GetExceptionBranch() *einobridge.GraphBranch {
 	condition := func(ctx context.Context, in map[string]any) (map[string]bool, error) {
 		isSuccess, ok := in["isSuccess"]
 		if ok && isSuccess != nil && !isSuccess.(bool) {
@@ -119,10 +119,10 @@ func (bs *BranchSchema) GetExceptionBranch() *compose.GraphBranch {
 		endNodes[node] = true
 	}
 
-	return compose.NewGraphMultiBranch(condition, endNodes)
+	return einobridge.NewGraphMultiBranch(condition, endNodes)
 }
 
-func (bs *BranchSchema) GetFullBranch(ctx context.Context, bb BranchBuilder) (*compose.GraphBranch, error) {
+func (bs *BranchSchema) GetFullBranch(ctx context.Context, bb BranchBuilder) (*einobridge.GraphBranch, error) {
 	extractor, hasBranch := bb.BuildBranch(ctx)
 	if !hasBranch {
 		return nil, fmt.Errorf("branch expected but BranchBuilder thinks not. BranchSchema: %v", bs)
@@ -157,7 +157,7 @@ func (bs *BranchSchema) GetFullBranch(ctx context.Context, bb BranchBuilder) (*c
 			}
 		}
 
-		return compose.NewGraphMultiBranch(condition, endNodes), nil
+		return einobridge.NewGraphMultiBranch(condition, endNodes), nil
 	}
 
 	condition := func(ctx context.Context, in map[string]any) (map[string]bool, error) {
@@ -192,5 +192,5 @@ func (bs *BranchSchema) GetFullBranch(ctx context.Context, bb BranchBuilder) (*c
 		}
 	}
 
-	return compose.NewGraphMultiBranch(condition, endNodes), nil
+	return einobridge.NewGraphMultiBranch(condition, endNodes), nil
 }

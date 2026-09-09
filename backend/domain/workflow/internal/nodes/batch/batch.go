@@ -17,6 +17,7 @@
 package batch
 
 import (
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	"context"
 	"errors"
 	"fmt"
@@ -25,7 +26,6 @@ import (
 	"slices"
 	"sync"
 
-	"github.com/cloudwego/eino/compose"
 	"golang.org/x/exp/maps"
 
 	"github.com/superagent-ai/superagent-base/backend/domain/workflow/entity"
@@ -40,7 +40,7 @@ import (
 
 type Batch struct {
 	outputs       map[string]*vo.FieldSource
-	innerWorkflow compose.Runnable[map[string]any, map[string]any]
+	innerWorkflow einobridge.Runnable[map[string]any, map[string]any]
 	key           vo.NodeKey
 	inputArrays   []string
 }
@@ -60,13 +60,13 @@ func (c *Config) Adapt(_ context.Context, n *vo.Node, _ ...nodes.AdaptOption) (*
 	}
 
 	batchSizeField, err := convert.CanvasBlockInputToFieldInfo(n.Data.Inputs.BatchSize,
-		compose.FieldPath{MaxBatchSizeKey}, nil)
+		einobridge.FieldPath{MaxBatchSizeKey}, nil)
 	if err != nil {
 		return nil, err
 	}
 	ns.AddInputSource(batchSizeField...)
 	concurrentSizeField, err := convert.CanvasBlockInputToFieldInfo(n.Data.Inputs.ConcurrentSize,
-		compose.FieldPath{ConcurrentSizeKey}, nil)
+		einobridge.FieldPath{ConcurrentSizeKey}, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -160,7 +160,7 @@ func (b *Batch) Invoke(ctx context.Context, in map[string]any, opts ...nodes.Nod
 	arrays := make(map[string]any, len(b.inputArrays))
 	minLen := math.MaxInt64
 	for _, arrayKey := range b.inputArrays {
-		a, ok := nodes.TakeMapValue(in, compose.FieldPath{arrayKey})
+		a, ok := nodes.TakeMapValue(in, einobridge.FieldPath{arrayKey})
 		if !ok {
 			return nil, fmt.Errorf("incoming array not present in input: %s", arrayKey)
 		}
@@ -180,7 +180,7 @@ func (b *Batch) Invoke(ctx context.Context, in map[string]any, opts ...nodes.Nod
 
 	var maxIter, concurrency int64
 
-	maxIterAny, ok := nodes.TakeMapValue(in, compose.FieldPath{MaxBatchSizeKey})
+	maxIterAny, ok := nodes.TakeMapValue(in, einobridge.FieldPath{MaxBatchSizeKey})
 	if !ok {
 		return nil, fmt.Errorf("incoming max iteration not present in input: %s", in)
 	}
@@ -190,7 +190,7 @@ func (b *Batch) Invoke(ctx context.Context, in map[string]any, opts ...nodes.Nod
 		maxIter = 100
 	}
 
-	concurrencyAny, ok := nodes.TakeMapValue(in, compose.FieldPath{ConcurrentSizeKey})
+	concurrencyAny, ok := nodes.TakeMapValue(in, einobridge.FieldPath{ConcurrentSizeKey})
 	if !ok {
 		return nil, fmt.Errorf("incoming concurrency not present in input: %s", in)
 	}
@@ -244,10 +244,10 @@ func (b *Batch) Invoke(ctx context.Context, in map[string]any, opts ...nodes.Nod
 
 	setIthOutput := func(i int, taskOutput map[string]any) error {
 		for k, source := range b.outputs {
-			fromValue, _ := nodes.TakeMapValue(taskOutput, append(compose.FieldPath{string(source.Ref.FromNodeKey)},
+			fromValue, _ := nodes.TakeMapValue(taskOutput, append(einobridge.FieldPath{string(source.Ref.FromNodeKey)},
 				source.Ref.FromPath...))
 
-			toArray, ok := nodes.TakeMapValue(output, compose.FieldPath{k})
+			toArray, ok := nodes.TakeMapValue(output, einobridge.FieldPath{k})
 			if !ok {
 				return fmt.Errorf("key not present in outer workflow's output: %s", k)
 			}
@@ -260,7 +260,7 @@ func (b *Batch) Invoke(ctx context.Context, in map[string]any, opts ...nodes.Nod
 
 	options := nodes.GetCommonOptions(&nodes.NodeOptions{}, opts...)
 	var existingCState *nodes.NestedWorkflowState
-	err = compose.ProcessState(ctx, func(ctx context.Context, getter nodes.NestedWorkflowAware) error {
+	err = einobridge.ProcessState(ctx, func(ctx context.Context, getter nodes.NestedWorkflowAware) error {
 		var e error
 		existingCState, _, e = getter.GetNestedWorkflowState(b.key)
 		if e != nil {
@@ -281,7 +281,7 @@ func (b *Batch) Invoke(ctx context.Context, in map[string]any, opts ...nodes.Nod
 		wg                  sync.WaitGroup
 		mu                  sync.Mutex
 		index2Done          = map[int]bool{}
-		index2InterruptInfo = map[int]*compose.InterruptInfo{}
+		index2InterruptInfo = map[int]*einobridge.InterruptInfo{}
 		resumed             = map[int]bool{}
 	)
 
@@ -335,7 +335,7 @@ func (b *Batch) Invoke(ctx context.Context, in map[string]any, opts ...nodes.Nod
 		if subCheckpointID != "" {
 			logs.CtxInfof(ctx, "[testInterrupt] prepare %d th run for batch node %s, subCheckPointID %s",
 				i, b.key, subCheckpointID)
-			ithOpts = append(ithOpts, compose.WithCheckPointID(subCheckpointID))
+			ithOpts = append(ithOpts, einobridge.WithCheckPointID(subCheckpointID))
 		}
 
 		mu.Lock()
@@ -344,7 +344,7 @@ func (b *Batch) Invoke(ctx context.Context, in map[string]any, opts ...nodes.Nod
 			mu.Unlock()
 			if ok {
 				fmt.Println("has state modifier for ith run: ", i, ", checkpointID: ", subCheckpointID)
-				ithOpts = append(ithOpts, compose.WithStateModifier(stateModifier))
+				ithOpts = append(ithOpts, einobridge.WithStateModifier(stateModifier))
 			}
 		} else {
 			mu.Unlock()
@@ -354,7 +354,7 @@ func (b *Batch) Invoke(ctx context.Context, in map[string]any, opts ...nodes.Nod
 		// the output then needs to be concatenated.
 		taskOutput, err := b.innerWorkflow.Invoke(subCtx, input, ithOpts...)
 		if err != nil {
-			info, ok := compose.ExtractInterruptInfo(err)
+			info, ok := einobridge.ExtractInterruptInfo(err)
 			if !ok {
 				cancelFn(err)
 				return
@@ -435,16 +435,16 @@ func (b *Batch) Invoke(ctx context.Context, in map[string]any, opts ...nodes.Nod
 			NestedInterruptInfo: index2InterruptInfo, // only emit the newly generated interruptInfo
 		}
 
-		err := compose.ProcessState(ctx, func(ctx context.Context, setter nodes.NestedWorkflowAware) error {
+		err := einobridge.ProcessState(ctx, func(ctx context.Context, setter nodes.NestedWorkflowAware) error {
 			return setter.SaveNestedWorkflowState(b.key, compState)
 		})
 		if err != nil {
 			return nil, err
 		}
 
-		return nil, compose.NewInterruptAndRerunErr(iEvent)
+		return nil, einobridge.NewInterruptAndRerunErr(iEvent)
 	} else {
-		err := compose.ProcessState(ctx, func(ctx context.Context, setter nodes.NestedWorkflowAware) error {
+		err := einobridge.ProcessState(ctx, func(ctx context.Context, setter nodes.NestedWorkflowAware) error {
 			return setter.SaveNestedWorkflowState(b.key, compState)
 		})
 		if err != nil {
@@ -457,7 +457,7 @@ func (b *Batch) Invoke(ctx context.Context, in map[string]any, opts ...nodes.Nod
 	if existingCState != nil && len(existingCState.Index2InterruptInfo) > 0 {
 		logs.CtxInfof(ctx, "no interrupt thrown this round, but has historical interrupt events yet to be resumed, "+
 			"nodeKey: %v. indexes: %v", b.key, maps.Keys(existingCState.Index2InterruptInfo))
-		return nil, compose.InterruptAndRerun // interrupt again to wait for resuming of previously interrupted index runs
+		return nil, einobridge.InterruptAndRerun // interrupt again to wait for resuming of previously interrupted index runs
 	}
 
 	return output, nil

@@ -17,7 +17,7 @@
 package schema
 
 import (
-	"github.com/cloudwego/eino/compose"
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 
 	"github.com/superagent-ai/superagent-base/backend/domain/workflow/entity/vo"
 )
@@ -40,7 +40,7 @@ type SourceInfo struct {
 	// FromNodeKey is the node key that produces this field source. empty if the field is a static value or variable.
 	FromNodeKey vo.NodeKey
 	// FromPath is the path of this field source within the source node. empty if the field is a static value or variable.
-	FromPath compose.FieldPath
+	FromPath einobridge.FieldPath
 	TypeInfo *vo.TypeInfo
 	// SubSources are SourceInfo for keys within this intermediate Map(Object) field.
 	SubSources map[string]*SourceInfo

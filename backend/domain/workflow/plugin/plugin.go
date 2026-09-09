@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/cloudwego/eino/compose"
 	"github.com/getkin/kin-openapi/openapi3"
 	"golang.org/x/exp/maps"
 
@@ -359,7 +358,7 @@ func (p *pluginInvokeTool) PluginInvoke(ctx context.Context, argumentsInJSON str
 
 	r, err := crossplugin.DefaultSVC().ExecuteTool(ctx, req, execOpts...)
 	if err != nil {
-		if extra, ok := compose.IsInterruptRerunError(err); ok {
+		if extra, ok := einobridge.IsInterruptRerunError(err); ok {
 			pluginTIE, ok := extra.(*model.ToolInterruptEvent)
 			if !ok {
 				return "", vo.WrapError(errno.ErrPluginAPIErr, fmt.Errorf("expects ToolInterruptEvent, got %T", extra))
@@ -386,7 +385,7 @@ func (p *pluginInvokeTool) PluginInvoke(ctx context.Context, argumentsInJSON str
 			}
 
 			tie := &entity2.ToolInterruptEvent{
-				ToolCallID:     compose.GetToolCallID(ctx),
+				ToolCallID:     einobridge.GetToolCallID(ctx),
 				ToolName:       p.toolInfo.GetName(),
 				InterruptEvent: ie,
 			}

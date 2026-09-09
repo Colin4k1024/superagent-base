@@ -17,9 +17,9 @@
 package compose
 
 import (
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	"testing"
 
-	"github.com/cloudwego/eino/compose"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/superagent-ai/superagent-base/backend/domain/workflow/entity/vo"
@@ -28,95 +28,95 @@ import (
 func TestAddFieldMappingsWithDeduplication(t *testing.T) {
 	tests := []struct {
 		name              string
-		initialCarryOvers map[vo.NodeKey][]*compose.FieldMapping
+		initialCarryOvers map[vo.NodeKey][]*einobridge.FieldMapping
 		fromNodeKey       vo.NodeKey
-		fieldMappings     []*compose.FieldMapping
+		fieldMappings     []*einobridge.FieldMapping
 		expectedCount     int
 		description       string
 	}{
 		{
 			name:              "empty_carry_overs",
-			initialCarryOvers: make(map[vo.NodeKey][]*compose.FieldMapping),
+			initialCarryOvers: make(map[vo.NodeKey][]*einobridge.FieldMapping),
 			fromNodeKey:       "node1",
-			fieldMappings: []*compose.FieldMapping{
-				compose.MapFieldPaths(compose.FieldPath{"input1"}, compose.FieldPath{"output1"}),
-				compose.MapFieldPaths(compose.FieldPath{"input2"}, compose.FieldPath{"output2"}),
+			fieldMappings: []*einobridge.FieldMapping{
+				einobridge.MapFieldPaths(einobridge.FieldPath{"input1"}, einobridge.FieldPath{"output1"}),
+				einobridge.MapFieldPaths(einobridge.FieldPath{"input2"}, einobridge.FieldPath{"output2"}),
 			},
 			expectedCount: 2,
 			description:   "should add all mappings when carryOvers is empty",
 		},
 		{
 			name: "no_duplicates",
-			initialCarryOvers: map[vo.NodeKey][]*compose.FieldMapping{
+			initialCarryOvers: map[vo.NodeKey][]*einobridge.FieldMapping{
 				"node1": {
-					compose.MapFieldPaths(compose.FieldPath{"input1"}, compose.FieldPath{"output1"}),
+					einobridge.MapFieldPaths(einobridge.FieldPath{"input1"}, einobridge.FieldPath{"output1"}),
 				},
 			},
 			fromNodeKey: "node1",
-			fieldMappings: []*compose.FieldMapping{
-				compose.MapFieldPaths(compose.FieldPath{"input2"}, compose.FieldPath{"output2"}),
-				compose.MapFieldPaths(compose.FieldPath{"input3"}, compose.FieldPath{"output3"}),
+			fieldMappings: []*einobridge.FieldMapping{
+				einobridge.MapFieldPaths(einobridge.FieldPath{"input2"}, einobridge.FieldPath{"output2"}),
+				einobridge.MapFieldPaths(einobridge.FieldPath{"input3"}, einobridge.FieldPath{"output3"}),
 			},
 			expectedCount: 3,
 			description:   "should add new mappings when no duplicates exist",
 		},
 		{
 			name: "with_duplicates",
-			initialCarryOvers: map[vo.NodeKey][]*compose.FieldMapping{
+			initialCarryOvers: map[vo.NodeKey][]*einobridge.FieldMapping{
 				"node1": {
-					compose.MapFieldPaths(compose.FieldPath{"input1"}, compose.FieldPath{"output1"}),
-					compose.MapFieldPaths(compose.FieldPath{"input2"}, compose.FieldPath{"output2"}),
+					einobridge.MapFieldPaths(einobridge.FieldPath{"input1"}, einobridge.FieldPath{"output1"}),
+					einobridge.MapFieldPaths(einobridge.FieldPath{"input2"}, einobridge.FieldPath{"output2"}),
 				},
 			},
 			fromNodeKey: "node1",
-			fieldMappings: []*compose.FieldMapping{
-				compose.MapFieldPaths(compose.FieldPath{"input1"}, compose.FieldPath{"output1"}), // duplicate
-				compose.MapFieldPaths(compose.FieldPath{"input3"}, compose.FieldPath{"output3"}), // new
-				compose.MapFieldPaths(compose.FieldPath{"input2"}, compose.FieldPath{"output2"}), // duplicate
+			fieldMappings: []*einobridge.FieldMapping{
+				einobridge.MapFieldPaths(einobridge.FieldPath{"input1"}, einobridge.FieldPath{"output1"}), // duplicate
+				einobridge.MapFieldPaths(einobridge.FieldPath{"input3"}, einobridge.FieldPath{"output3"}), // new
+				einobridge.MapFieldPaths(einobridge.FieldPath{"input2"}, einobridge.FieldPath{"output2"}), // duplicate
 			},
 			expectedCount: 3,
 			description:   "should skip duplicates and only add new mappings",
 		},
 		{
 			name: "all_duplicates",
-			initialCarryOvers: map[vo.NodeKey][]*compose.FieldMapping{
+			initialCarryOvers: map[vo.NodeKey][]*einobridge.FieldMapping{
 				"node1": {
-					compose.MapFieldPaths(compose.FieldPath{"input1"}, compose.FieldPath{"output1"}),
-					compose.MapFieldPaths(compose.FieldPath{"input2"}, compose.FieldPath{"output2"}),
+					einobridge.MapFieldPaths(einobridge.FieldPath{"input1"}, einobridge.FieldPath{"output1"}),
+					einobridge.MapFieldPaths(einobridge.FieldPath{"input2"}, einobridge.FieldPath{"output2"}),
 				},
 			},
 			fromNodeKey: "node1",
-			fieldMappings: []*compose.FieldMapping{
-				compose.MapFieldPaths(compose.FieldPath{"input1"}, compose.FieldPath{"output1"}),
-				compose.MapFieldPaths(compose.FieldPath{"input2"}, compose.FieldPath{"output2"}),
+			fieldMappings: []*einobridge.FieldMapping{
+				einobridge.MapFieldPaths(einobridge.FieldPath{"input1"}, einobridge.FieldPath{"output1"}),
+				einobridge.MapFieldPaths(einobridge.FieldPath{"input2"}, einobridge.FieldPath{"output2"}),
 			},
 			expectedCount: 2,
 			description:   "should not add any mappings when all are duplicates",
 		},
 		{
 			name: "new_node_key",
-			initialCarryOvers: map[vo.NodeKey][]*compose.FieldMapping{
+			initialCarryOvers: map[vo.NodeKey][]*einobridge.FieldMapping{
 				"node1": {
-					compose.MapFieldPaths(compose.FieldPath{"input1"}, compose.FieldPath{"output1"}),
+					einobridge.MapFieldPaths(einobridge.FieldPath{"input1"}, einobridge.FieldPath{"output1"}),
 				},
 			},
 			fromNodeKey: "node2",
-			fieldMappings: []*compose.FieldMapping{
-				compose.MapFieldPaths(compose.FieldPath{"input1"}, compose.FieldPath{"output1"}),
-				compose.MapFieldPaths(compose.FieldPath{"input2"}, compose.FieldPath{"output2"}),
+			fieldMappings: []*einobridge.FieldMapping{
+				einobridge.MapFieldPaths(einobridge.FieldPath{"input1"}, einobridge.FieldPath{"output1"}),
+				einobridge.MapFieldPaths(einobridge.FieldPath{"input2"}, einobridge.FieldPath{"output2"}),
 			},
 			expectedCount: 2,
 			description:   "should add all mappings for new node key",
 		},
 		{
 			name: "empty_field_mappings",
-			initialCarryOvers: map[vo.NodeKey][]*compose.FieldMapping{
+			initialCarryOvers: map[vo.NodeKey][]*einobridge.FieldMapping{
 				"node1": {
-					compose.MapFieldPaths(compose.FieldPath{"input1"}, compose.FieldPath{"output1"}),
+					einobridge.MapFieldPaths(einobridge.FieldPath{"input1"}, einobridge.FieldPath{"output1"}),
 				},
 			},
 			fromNodeKey:   "node1",
-			fieldMappings: []*compose.FieldMapping{},
+			fieldMappings: []*einobridge.FieldMapping{},
 			expectedCount: 1,
 			description:   "should not change carryOvers when fieldMappings is empty",
 		},
@@ -125,9 +125,9 @@ func TestAddFieldMappingsWithDeduplication(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Make a copy of initial carryOvers to avoid modifying the test data
-			carryOvers := make(map[vo.NodeKey][]*compose.FieldMapping)
+			carryOvers := make(map[vo.NodeKey][]*einobridge.FieldMapping)
 			for k, v := range tt.initialCarryOvers {
-				carryOvers[k] = make([]*compose.FieldMapping, len(v))
+				carryOvers[k] = make([]*einobridge.FieldMapping, len(v))
 				copy(carryOvers[k], v)
 			}
 
@@ -152,7 +152,7 @@ func TestAddFieldMappingsWithDeduplication(t *testing.T) {
 
 func TestAddFieldMappingsWithDeduplication_NilSafety(t *testing.T) {
 	t.Run("nil_field_mappings", func(t *testing.T) {
-		carryOvers := make(map[vo.NodeKey][]*compose.FieldMapping)
+		carryOvers := make(map[vo.NodeKey][]*einobridge.FieldMapping)
 		fromNodeKey := vo.NodeKey("node1")
 
 		// Should not panic with nil fieldMappings
@@ -168,7 +168,7 @@ func TestAddFieldMappingsWithDeduplication_NilSafety(t *testing.T) {
 	t.Run("nil_carry_overs", func(t *testing.T) {
 		// Should panic with nil carryOvers - this is expected behavior
 		assert.Panics(t, func() {
-			addFieldMappingsWithDeduplication(nil, "node1", []*compose.FieldMapping{})
+			addFieldMappingsWithDeduplication(nil, "node1", []*einobridge.FieldMapping{})
 		})
 	})
 }

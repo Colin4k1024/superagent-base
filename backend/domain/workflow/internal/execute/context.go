@@ -17,6 +17,7 @@
 package execute
 
 import (
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	"context"
 	"errors"
 	"fmt"
@@ -26,7 +27,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/cloudwego/eino/compose"
 
 	workflowModel "github.com/superagent-ai/superagent-base/backend/crossdomain/workflow/model"
 	"github.com/superagent-ai/superagent-base/backend/domain/workflow"
@@ -91,7 +91,7 @@ type contextKey struct{}
 
 func restoreWorkflowCtx(ctx context.Context, h *WorkflowHandler) (context.Context, error) {
 	var storedCtx *Context
-	err := compose.ProcessState[ExeContextStore](ctx, func(ctx context.Context, state ExeContextStore) error {
+	err := einobridge.ProcessState[ExeContextStore](ctx, func(ctx context.Context, state ExeContextStore) error {
 		if state == nil {
 			return errors.New("state is nil")
 		}
@@ -132,7 +132,7 @@ func restoreWorkflowCtx(ctx context.Context, h *WorkflowHandler) (context.Contex
 func restoreNodeCtx(ctx context.Context, nodeKey vo.NodeKey, resumeEvent *entity.InterruptEvent,
 	exactlyResuming bool) (context.Context, error) {
 	var storedCtx *Context
-	err := compose.ProcessState[ExeContextStore](ctx, func(ctx context.Context, state ExeContextStore) error {
+	err := einobridge.ProcessState[ExeContextStore](ctx, func(ctx context.Context, state ExeContextStore) error {
 		if state == nil {
 			return errors.New("state is nil")
 		}
@@ -182,7 +182,7 @@ func restoreNodeCtx(ctx context.Context, nodeKey vo.NodeKey, resumeEvent *entity
 
 func tryRestoreNodeCtx(ctx context.Context, nodeKey vo.NodeKey) (context.Context, bool) {
 	var storedCtx *Context
-	err := compose.ProcessState[ExeContextStore](ctx, func(ctx context.Context, state ExeContextStore) error {
+	err := einobridge.ProcessState[ExeContextStore](ctx, func(ctx context.Context, state ExeContextStore) error {
 		if state == nil {
 			return errors.New("state is nil")
 		}
@@ -241,7 +241,7 @@ func PrepareRootExeCtx(ctx context.Context, h *WorkflowHandler) (context.Context
 
 	if h.requireCheckpoint {
 		rootExeCtx.CheckPointID = strconv.FormatInt(h.rootExecuteID, 10)
-		err := compose.ProcessState[ExeContextStore](ctx, func(ctx context.Context, state ExeContextStore) error {
+		err := einobridge.ProcessState[ExeContextStore](ctx, func(ctx context.Context, state ExeContextStore) error {
 			if state == nil {
 				return errors.New("state is nil")
 			}
@@ -295,7 +295,7 @@ func PrepareSubExeCtx(ctx context.Context, wb *entity.WorkflowBasic, requireChec
 	}
 
 	if requireCheckpoint {
-		err := compose.ProcessState[ExeContextStore](ctx, func(ctx context.Context, state ExeContextStore) error {
+		err := einobridge.ProcessState[ExeContextStore](ctx, func(ctx context.Context, state ExeContextStore) error {
 			if state == nil {
 				return errors.New("state is nil")
 			}

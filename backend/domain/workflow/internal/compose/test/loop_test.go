@@ -17,10 +17,10 @@
 package test
 
 import (
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	"context"
 	"testing"
 
-	"github.com/cloudwego/eino/compose"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/superagent-ai/superagent-base/backend/domain/workflow/entity"
@@ -42,17 +42,17 @@ func TestLoop(t *testing.T) {
 		innerNode := &schema.NodeSchema{
 			Key:  "innerNode",
 			Type: entity.NodeTypeLambda,
-			Lambda: compose.InvokableLambda(func(ctx context.Context, in map[string]any) (out map[string]any, err error) {
+			Lambda: einobridge.InvokableLambda(func(ctx context.Context, in map[string]any) (out map[string]any, err error) {
 				index := in["index"].(int64)
 				return map[string]any{"output": index}, nil
 			}),
 			InputSources: []*vo.FieldInfo{
 				{
-					Path: compose.FieldPath{"index"},
+					Path: einobridge.FieldPath{"index"},
 					Source: vo.FieldSource{
 						Ref: &vo.Reference{
 							FromNodeKey: "loop_node_key",
-							FromPath:    compose.FieldPath{"index"},
+							FromPath:    einobridge.FieldPath{"index"},
 						},
 					},
 				},
@@ -79,22 +79,22 @@ func TestLoop(t *testing.T) {
 			},
 			InputSources: []*vo.FieldInfo{
 				{
-					Path: compose.FieldPath{loop.Count},
+					Path: einobridge.FieldPath{loop.Count},
 					Source: vo.FieldSource{
 						Ref: &vo.Reference{
 							FromNodeKey: entryN.Key,
-							FromPath:    compose.FieldPath{"count"},
+							FromPath:    einobridge.FieldPath{"count"},
 						},
 					},
 				},
 			},
 			OutputSources: []*vo.FieldInfo{
 				{
-					Path: compose.FieldPath{"output"},
+					Path: einobridge.FieldPath{"output"},
 					Source: vo.FieldSource{
 						Ref: &vo.Reference{
 							FromNodeKey: "innerNode",
-							FromPath:    compose.FieldPath{"output"},
+							FromPath:    einobridge.FieldPath{"output"},
 						},
 					},
 				},
@@ -109,11 +109,11 @@ func TestLoop(t *testing.T) {
 			},
 			InputSources: []*vo.FieldInfo{
 				{
-					Path: compose.FieldPath{"output"},
+					Path: einobridge.FieldPath{"output"},
 					Source: vo.FieldSource{
 						Ref: &vo.Reference{
 							FromNodeKey: "loop_node_key",
-							FromPath:    compose.FieldPath{"output"},
+							FromPath:    einobridge.FieldPath{"output"},
 						},
 					},
 				},
@@ -175,17 +175,17 @@ func TestLoop(t *testing.T) {
 		innerNode := &schema.NodeSchema{
 			Key:  "innerNode",
 			Type: entity.NodeTypeLambda,
-			Lambda: compose.InvokableLambda(func(ctx context.Context, in map[string]any) (out map[string]any, err error) {
+			Lambda: einobridge.InvokableLambda(func(ctx context.Context, in map[string]any) (out map[string]any, err error) {
 				index := in["index"].(int64)
 				return map[string]any{"output": index}, nil
 			}),
 			InputSources: []*vo.FieldInfo{
 				{
-					Path: compose.FieldPath{"index"},
+					Path: einobridge.FieldPath{"index"},
 					Source: vo.FieldSource{
 						Ref: &vo.Reference{
 							FromNodeKey: "loop_node_key",
-							FromPath:    compose.FieldPath{"index"},
+							FromPath:    einobridge.FieldPath{"index"},
 						},
 					},
 				},
@@ -212,11 +212,11 @@ func TestLoop(t *testing.T) {
 			},
 			OutputSources: []*vo.FieldInfo{
 				{
-					Path: compose.FieldPath{"output"},
+					Path: einobridge.FieldPath{"output"},
 					Source: vo.FieldSource{
 						Ref: &vo.Reference{
 							FromNodeKey: "innerNode",
-							FromPath:    compose.FieldPath{"output"},
+							FromPath:    einobridge.FieldPath{"output"},
 						},
 					},
 				},
@@ -231,11 +231,11 @@ func TestLoop(t *testing.T) {
 			},
 			InputSources: []*vo.FieldInfo{
 				{
-					Path: compose.FieldPath{"output"},
+					Path: einobridge.FieldPath{"output"},
 					Source: vo.FieldSource{
 						Ref: &vo.Reference{
 							FromNodeKey: "loop_node_key",
-							FromPath:    compose.FieldPath{"output"},
+							FromPath:    einobridge.FieldPath{"output"},
 						},
 					},
 				},
@@ -296,7 +296,7 @@ func TestLoop(t *testing.T) {
 		innerNode := &schema.NodeSchema{
 			Key:  "innerNode",
 			Type: entity.NodeTypeLambda,
-			Lambda: compose.InvokableLambda(func(ctx context.Context, in map[string]any) (out map[string]any, err error) {
+			Lambda: einobridge.InvokableLambda(func(ctx context.Context, in map[string]any) (out map[string]any, err error) {
 				item1 := in["item1"].(string)
 				item2 := in["item2"].(string)
 				count := in["count"].(int)
@@ -304,28 +304,28 @@ func TestLoop(t *testing.T) {
 			}),
 			InputSources: []*vo.FieldInfo{
 				{
-					Path: compose.FieldPath{"item1"},
+					Path: einobridge.FieldPath{"item1"},
 					Source: vo.FieldSource{
 						Ref: &vo.Reference{
 							FromNodeKey: "loop_node_key",
-							FromPath:    compose.FieldPath{"items1"},
+							FromPath:    einobridge.FieldPath{"items1"},
 						},
 					},
 				},
 				{
-					Path: compose.FieldPath{"item2"},
+					Path: einobridge.FieldPath{"item2"},
 					Source: vo.FieldSource{
 						Ref: &vo.Reference{
 							FromNodeKey: "loop_node_key",
-							FromPath:    compose.FieldPath{"items2"},
+							FromPath:    einobridge.FieldPath{"items2"},
 						},
 					},
 				},
 				{
-					Path: compose.FieldPath{"count"},
+					Path: einobridge.FieldPath{"count"},
 					Source: vo.FieldSource{
 						Ref: &vo.Reference{
-							FromPath:     compose.FieldPath{"count"},
+							FromPath:     einobridge.FieldPath{"count"},
 							VariableType: ptr.Of(vo.ParentIntermediate),
 						},
 					},
@@ -340,20 +340,20 @@ func TestLoop(t *testing.T) {
 				Pairs: []*variableassigner.Pair{
 					{
 						Left: vo.Reference{
-							FromPath:     compose.FieldPath{"count"},
+							FromPath:     einobridge.FieldPath{"count"},
 							VariableType: ptr.Of(vo.ParentIntermediate),
 						},
-						Right: compose.FieldPath{"total"},
+						Right: einobridge.FieldPath{"total"},
 					},
 				},
 			},
 			InputSources: []*vo.FieldInfo{
 				{
-					Path: compose.FieldPath{"total"},
+					Path: einobridge.FieldPath{"total"},
 					Source: vo.FieldSource{
 						Ref: &vo.Reference{
 							FromNodeKey: "innerNode",
-							FromPath:    compose.FieldPath{"total"},
+							FromPath:    einobridge.FieldPath{"total"},
 						},
 					},
 				},
@@ -374,11 +374,11 @@ func TestLoop(t *testing.T) {
 			},
 			InputSources: []*vo.FieldInfo{
 				{
-					Path: compose.FieldPath{"output"},
+					Path: einobridge.FieldPath{"output"},
 					Source: vo.FieldSource{
 						Ref: &vo.Reference{
 							FromNodeKey: "loop_node_key",
-							FromPath:    compose.FieldPath{"output"},
+							FromPath:    einobridge.FieldPath{"output"},
 						},
 					},
 				},
@@ -409,25 +409,25 @@ func TestLoop(t *testing.T) {
 			},
 			InputSources: []*vo.FieldInfo{
 				{
-					Path: compose.FieldPath{"items1"},
+					Path: einobridge.FieldPath{"items1"},
 					Source: vo.FieldSource{
 						Ref: &vo.Reference{
 							FromNodeKey: entryN.Key,
-							FromPath:    compose.FieldPath{"items1"},
+							FromPath:    einobridge.FieldPath{"items1"},
 						},
 					},
 				},
 				{
-					Path: compose.FieldPath{"items2"},
+					Path: einobridge.FieldPath{"items2"},
 					Source: vo.FieldSource{
 						Ref: &vo.Reference{
 							FromNodeKey: entryN.Key,
-							FromPath:    compose.FieldPath{"items2"},
+							FromPath:    einobridge.FieldPath{"items2"},
 						},
 					},
 				},
 				{
-					Path: compose.FieldPath{"count"},
+					Path: einobridge.FieldPath{"count"},
 					Source: vo.FieldSource{
 						Val: 0,
 					},
@@ -435,10 +435,10 @@ func TestLoop(t *testing.T) {
 			},
 			OutputSources: []*vo.FieldInfo{
 				{
-					Path: compose.FieldPath{"output"},
+					Path: einobridge.FieldPath{"output"},
 					Source: vo.FieldSource{
 						Ref: &vo.Reference{
-							FromPath:     compose.FieldPath{"count"},
+							FromPath:     einobridge.FieldPath{"count"},
 							VariableType: ptr.Of(vo.ParentIntermediate),
 						},
 					},

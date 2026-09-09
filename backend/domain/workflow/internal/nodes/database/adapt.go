@@ -17,9 +17,9 @@
 package database
 
 import (
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	"fmt"
 
-	einoCompose "github.com/cloudwego/eino/compose"
 
 	database "github.com/superagent-ai/superagent-base/backend/crossdomain/database/model"
 	"github.com/superagent-ai/superagent-base/backend/domain/workflow/entity/vo"
@@ -93,7 +93,7 @@ func applyDBConditionToSchema(ns *schema.NodeSchema, condition *vo.DBCondition, 
 			return err
 		}
 		ns.SetInputType(name, tInfo)
-		sources, err := convert.CanvasBlockInputToFieldInfo(right.Input, einoCompose.FieldPath{name}, parentNode)
+		sources, err := convert.CanvasBlockInputToFieldInfo(right.Input, einobridge.FieldPath{name}, parentNode)
 		if err != nil {
 			return err
 		}
@@ -120,7 +120,7 @@ func applyInsetFieldInfoToSchema(ns *schema.NodeSchema, fieldInfo [][]*vo.Param,
 		}
 		name = "__setting_field_" + name
 		ns.SetInputType(name, tInfo)
-		sources, err := convert.CanvasBlockInputToFieldInfo(p1.Input, einoCompose.FieldPath{name}, parentNode)
+		sources, err := convert.CanvasBlockInputToFieldInfo(p1.Input, einobridge.FieldPath{name}, parentNode)
 		if err != nil {
 			return err
 		}

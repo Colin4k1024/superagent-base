@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/cloudwego/eino/compose"
 
 	"github.com/superagent-ai/superagent-base/backend/domain/workflow/entity"
 	"github.com/superagent-ai/superagent-base/backend/domain/workflow/entity/vo"
@@ -38,7 +37,7 @@ type Config struct {
 	WorkflowVersion string
 }
 
-func (c *Config) FieldStreamType(path compose.FieldPath, ns *schema2.NodeSchema,
+func (c *Config) FieldStreamType(path einobridge.FieldPath, ns *schema2.NodeSchema,
 	sc *schema2.WorkflowSchema) (schema2.FieldStreamType, error) {
 	if !sc.RequireStreaming() {
 		return schema2.FieldNotStream, nil
@@ -69,7 +68,7 @@ func (c *Config) FieldStreamType(path compose.FieldPath, ns *schema2.NodeSchema,
 }
 
 type SubWorkflow struct {
-	Runner compose.Runnable[map[string]any, map[string]any]
+	Runner einobridge.Runnable[map[string]any, map[string]any]
 }
 
 func (s *SubWorkflow) Invoke(ctx context.Context, in map[string]any, opts ...nodes.NodeOption) (map[string]any, error) {
@@ -80,7 +79,7 @@ func (s *SubWorkflow) Invoke(ctx context.Context, in map[string]any, opts ...nod
 
 	out, err := s.Runner.Invoke(ctx, in, nestedOpts...)
 	if err != nil {
-		interruptInfo, ok := compose.ExtractInterruptInfo(err)
+		interruptInfo, ok := einobridge.ExtractInterruptInfo(err)
 		if !ok {
 			return nil, err
 		}
@@ -91,7 +90,7 @@ func (s *SubWorkflow) Invoke(ctx context.Context, in map[string]any, opts ...nod
 			SubWorkflowInterruptInfo: interruptInfo,
 		}
 
-		return nil, compose.NewInterruptAndRerunErr(iEvent)
+		return nil, einobridge.NewInterruptAndRerunErr(iEvent)
 	}
 	return out, nil
 }
@@ -104,7 +103,7 @@ func (s *SubWorkflow) Stream(ctx context.Context, in map[string]any, opts ...nod
 
 	einoOut, err := s.Runner.Stream(ctx, in, nestedOpts...)
 	if err != nil {
-		interruptInfo, ok := compose.ExtractInterruptInfo(err)
+		interruptInfo, ok := einobridge.ExtractInterruptInfo(err)
 		if !ok {
 			return nil, err
 		}
@@ -115,13 +114,13 @@ func (s *SubWorkflow) Stream(ctx context.Context, in map[string]any, opts ...nod
 			SubWorkflowInterruptInfo: interruptInfo,
 		}
 
-		return nil, compose.NewInterruptAndRerunErr(iEvent)
+		return nil, einobridge.NewInterruptAndRerunErr(iEvent)
 	}
 
 	return einobridge.WrapStreamReader[map[string]any](einoOut), nil
 }
 
-func prepareOptions(ctx context.Context, opts ...nodes.NodeOption) ([]compose.Option, vo.NodeKey, error) {
+func prepareOptions(ctx context.Context, opts ...nodes.NodeOption) ([]einobridge.Option, vo.NodeKey, error) {
 	options := nodes.GetCommonOptions(&nodes.NodeOptions{}, opts...)
 
 	nestedOpts := options.GetOptsForNested()
@@ -138,7 +137,7 @@ func prepareOptions(ctx context.Context, opts ...nodes.NodeOption) ([]compose.Op
 			newCheckpointID += "_" + strconv.Itoa(int(exeCtx.SubWorkflowCtx.SubExecuteID))
 		}
 		newCheckpointID += "_" + strconv.Itoa(int(exeCtx.NodeCtx.NodeExecuteID))
-		nestedOpts = append(nestedOpts, compose.WithCheckPointID(newCheckpointID))
+		nestedOpts = append(nestedOpts, einobridge.WithCheckPointID(newCheckpointID))
 	}
 
 	if len(options.GetResumeIndexes()) > 0 {
@@ -150,7 +149,7 @@ func prepareOptions(ctx context.Context, opts ...nodes.NodeOption) ([]compose.Op
 		}
 		stateModifier, ok := options.GetResumeIndexes()[0]
 		if ok {
-			nestedOpts = append(nestedOpts, compose.WithStateModifier(stateModifier))
+			nestedOpts = append(nestedOpts, einobridge.WithStateModifier(stateModifier))
 		}
 	}
 

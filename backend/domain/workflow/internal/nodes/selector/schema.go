@@ -17,10 +17,10 @@
 package selector
 
 import (
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	"context"
 	"fmt"
 
-	einoCompose "github.com/cloudwego/eino/compose"
 
 	"github.com/superagent-ai/superagent-base/backend/domain/workflow/entity"
 	"github.com/superagent-ai/superagent-base/backend/domain/workflow/entity/vo"
@@ -84,7 +84,7 @@ func (c *Config) Adapt(_ context.Context, n *vo.Node, _ ...nodes.AdaptOption) (*
 				return nil, err
 			}
 
-			leftSources, err := convert.CanvasBlockInputToFieldInfo(left.Input, einoCompose.FieldPath{fmt.Sprintf("%d", i), LeftKey}, n.Parent())
+			leftSources, err := convert.CanvasBlockInputToFieldInfo(left.Input, einobridge.FieldPath{fmt.Sprintf("%d", i), LeftKey}, n.Parent())
 			if err != nil {
 				return nil, err
 			}
@@ -104,7 +104,7 @@ func (c *Config) Adapt(_ context.Context, n *vo.Node, _ ...nodes.AdaptOption) (*
 					return nil, err
 				}
 
-				rightSources, err := convert.CanvasBlockInputToFieldInfo(cond.Right.Input, einoCompose.FieldPath{fmt.Sprintf("%d", i), RightKey}, n.Parent())
+				rightSources, err := convert.CanvasBlockInputToFieldInfo(cond.Right.Input, einobridge.FieldPath{fmt.Sprintf("%d", i), RightKey}, n.Parent())
 				if err != nil {
 					return nil, err
 				}
@@ -142,7 +142,7 @@ func (c *Config) Adapt(_ context.Context, n *vo.Node, _ ...nodes.AdaptOption) (*
 				return nil, err
 			}
 
-			leftSources, err := convert.CanvasBlockInputToFieldInfo(left.Input, einoCompose.FieldPath{fmt.Sprintf("%d", i), fmt.Sprintf("%d", j), LeftKey}, n.Parent())
+			leftSources, err := convert.CanvasBlockInputToFieldInfo(left.Input, einobridge.FieldPath{fmt.Sprintf("%d", i), fmt.Sprintf("%d", j), LeftKey}, n.Parent())
 			if err != nil {
 				return nil, err
 			}
@@ -168,7 +168,7 @@ func (c *Config) Adapt(_ context.Context, n *vo.Node, _ ...nodes.AdaptOption) (*
 					return nil, err
 				}
 
-				rightSources, err := convert.CanvasBlockInputToFieldInfo(cond.Right.Input, einoCompose.FieldPath{fmt.Sprintf("%d", i), fmt.Sprintf("%d", j), RightKey}, n.Parent())
+				rightSources, err := convert.CanvasBlockInputToFieldInfo(cond.Right.Input, einobridge.FieldPath{fmt.Sprintf("%d", i), fmt.Sprintf("%d", j), RightKey}, n.Parent())
 				if err != nil {
 					return nil, err
 				}

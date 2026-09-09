@@ -21,8 +21,6 @@ import (
 	"context"
 	"regexp"
 
-	"github.com/cloudwego/eino/compose"
-	einoCompose "github.com/cloudwego/eino/compose"
 
 	"github.com/superagent-ai/superagent-base/backend/bizpkg/llm/modelbuilder"
 	"github.com/superagent-ai/superagent-base/backend/domain/workflow"
@@ -50,7 +48,7 @@ Analyze the user's question and the assistant's answer to suggest 3 unique, conc
 `
 
 type suggesterV3 struct {
-	r einoCompose.Runnable[*vo.SuggestInfo, []string]
+	r einobridge.Runnable[*vo.SuggestInfo, []string]
 }
 type state struct {
 	userMessage *einobridge.Message
@@ -60,11 +58,11 @@ type state struct {
 var suggestRegexp = regexp.MustCompile(`\[(.*?)\]`)
 
 func NewSuggester(chatModel modelbuilder.BaseChatModel) (workflow.Suggester, error) {
-	chain := einoCompose.NewChain[*vo.SuggestInfo, []string](einoCompose.WithGenLocalState(func(ctx context.Context) (s *state) {
+	chain := einobridge.NewChain[*vo.SuggestInfo, []string](einobridge.WithGenLocalState(func(ctx context.Context) (s *state) {
 		return &state{}
 	}))
-	r, err := chain.AppendLambda(einoCompose.InvokableLambda(func(ctx context.Context, input *vo.SuggestInfo) (output map[string]any, err error) {
-		_ = compose.ProcessState(ctx, func(ctx context.Context, s *state) error {
+	r, err := chain.AppendLambda(einobridge.InvokableLambda(func(ctx context.Context, input *vo.SuggestInfo) (output map[string]any, err error) {
+		_ = einobridge.ProcessState(ctx, func(ctx context.Context, s *state) error {
 			s.userMessage = input.UserInput
 			s.answer = input.AnswerInput
 			return nil
@@ -75,9 +73,9 @@ func NewSuggester(chatModel modelbuilder.BaseChatModel) (workflow.Suggester, err
 		}
 		return
 	})).AppendChatTemplate(einobridge.PromptFromMessages(einobridge.Jinja2, einobridge.SystemMessage(SUGGESTION_PROMPT))).AppendChatModel(chatModel,
-		compose.WithStatePreHandler(func(ctx context.Context, in []*einobridge.Message, state *state) ([]*einobridge.Message, error) {
+		einobridge.WithStatePreHandler(func(ctx context.Context, in []*einobridge.Message, state *state) ([]*einobridge.Message, error) {
 			return append(in, []*einobridge.Message{state.userMessage, state.answer}...), nil
-		})).AppendLambda(einoCompose.InvokableLambda(func(ctx context.Context, input *einobridge.Message) (output []string, err error) {
+		})).AppendLambda(einobridge.InvokableLambda(func(ctx context.Context, input *einobridge.Message) (output []string, err error) {
 		content := suggestRegexp.FindString(input.Content)
 		if len(content) == 0 {
 			return
