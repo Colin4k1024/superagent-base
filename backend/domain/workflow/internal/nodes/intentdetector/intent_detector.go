@@ -17,6 +17,7 @@
 package intentdetector
 
 import (
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	"context"
 	"errors"
 	"fmt"
@@ -26,7 +27,6 @@ import (
 
 	"github.com/cloudwego/eino/components/prompt"
 	"github.com/cloudwego/eino/compose"
-	"github.com/cloudwego/eino/schema"
 	"github.com/spf13/cast"
 
 	"github.com/superagent-ai/superagent-base/backend/bizpkg/llm/modelbuilder"
@@ -131,7 +131,7 @@ func (c *Config) Build(ctx context.Context, _ *schema2.NodeSchema, _ ...schema2.
 		return nil, err
 	}
 
-	chain := compose.NewChain[map[string]any, *schema.Message]()
+	chain := compose.NewChain[map[string]any, *einobridge.Message]()
 
 	spt := ternary.IFElse[string](c.IsFastMode, FastModeSystemIntentPrompt, SystemIntentPrompt)
 
@@ -146,9 +146,9 @@ func (c *Config) Build(ctx context.Context, _ *schema2.NodeSchema, _ ...schema2.
 	if err != nil {
 		return nil, err
 	}
-	prompts := prompt.FromMessages(schema.Jinja2,
-		&schema.Message{Content: sptTemplate, Role: schema.System},
-		&schema.Message{Content: "{{query}}", Role: schema.User})
+	prompts := prompt.FromMessages(einobridge.Jinja2,
+		&einobridge.Message{Content: sptTemplate, Role: einobridge.System},
+		&einobridge.Message{Content: "{{query}}", Role: einobridge.User})
 
 	r, err := chain.AppendChatTemplate(newHistoryChatTemplate(prompts, c.ChatHistorySetting)).AppendChatModel(m).Compile(ctx)
 	if err != nil {
@@ -268,7 +268,7 @@ const classificationID = "classificationId"
 type IntentDetector struct {
 	isFastMode         bool
 	systemPrompt       string
-	runner             compose.Runnable[map[string]any, *schema.Message]
+	runner             compose.Runnable[map[string]any, *einobridge.Message]
 	ChatHistorySetting *vo.ChatHistorySetting
 }
 
@@ -355,7 +355,7 @@ func (id *IntentDetector) ToCallbackInput(ctx context.Context, in map[string]any
 	}
 
 	var messages []*crossmessage.WfMessage
-	var scMessages []*schema.Message
+	var scMessages []*einobridge.Message
 	var sectionID *int64
 	execCtx := execute.GetExeCtx(ctx)
 	if execCtx != nil {
@@ -384,7 +384,7 @@ func (id *IntentDetector) ToCallbackInput(ctx context.Context, in map[string]any
 	count := 0
 	startIdx := 0
 	for i := len(messages) - 1; i >= 0; i-- {
-		if messages[i].Role == schema.User {
+		if messages[i].Role == einobridge.User {
 			count++
 		}
 		if count >= maxRounds {

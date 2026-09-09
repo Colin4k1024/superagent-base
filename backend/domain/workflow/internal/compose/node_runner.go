@@ -26,7 +26,6 @@ import (
 
 	"github.com/cloudwego/eino/callbacks"
 	"github.com/cloudwego/eino/compose"
-	"github.com/cloudwego/eino/schema"
 	"golang.org/x/exp/maps"
 
 	"github.com/superagent-ai/superagent-base/backend/domain/workflow/entity"
@@ -55,7 +54,7 @@ type nodeRunConfig[O any] struct {
 	preProcessors       []func(ctx context.Context, input map[string]any) (map[string]any, error)
 	postProcessors      []func(ctx context.Context, input map[string]any) (map[string]any, error)
 	streamPreProcessors []func(ctx context.Context,
-		input *schema.StreamReader[map[string]any]) *schema.StreamReader[map[string]any]
+		input *einobridge.StreamReader[map[string]any]) *einobridge.StreamReader[map[string]any]
 	callbackInputConverter  func(context.Context, map[string]any) (*nodes.StructuredCallbackInput, error)
 	callbackOutputConverter func(context.Context, map[string]any) (*nodes.StructuredCallbackOutput, error)
 	init                    []func(context.Context) (context.Context, error)
@@ -106,12 +105,12 @@ func newNodeRunConfig[O any](ns *schema2.NodeSchema,
 	}
 
 	streamPreProcessors := []func(ctx context.Context,
-		input *schema.StreamReader[map[string]any]) *schema.StreamReader[map[string]any]{
-		func(ctx context.Context, input *schema.StreamReader[map[string]any]) *schema.StreamReader[map[string]any] {
+		input *einobridge.StreamReader[map[string]any]) *einobridge.StreamReader[map[string]any]{
+		func(ctx context.Context, input *einobridge.StreamReader[map[string]any]) *einobridge.StreamReader[map[string]any] {
 			f := func(in map[string]any) (map[string]any, error) {
 				return preTypeConverter(ns.InputTypes)(ctx, in)
 			}
-			return schema.StreamReaderWithConvert(input, f)
+			return einobridge.StreamReaderWithConvert(input, f)
 		},
 	}
 	if meta.PreFillZero {
@@ -177,19 +176,19 @@ func newNodeRunConfigWOOpt(ns *schema2.NodeSchema,
 	}
 
 	if s != nil {
-		sWO = func(ctx context.Context, in map[string]any, _ ...any) (out *schema.StreamReader[map[string]any], err error) {
+		sWO = func(ctx context.Context, in map[string]any, _ ...any) (out *einobridge.StreamReader[map[string]any], err error) {
 			return s(ctx, in)
 		}
 	}
 
 	if c != nil {
-		cWO = func(ctx context.Context, in *schema.StreamReader[map[string]any], _ ...any) (out map[string]any, err error) {
+		cWO = func(ctx context.Context, in *einobridge.StreamReader[map[string]any], _ ...any) (out map[string]any, err error) {
 			return c(ctx, in)
 		}
 	}
 
 	if t != nil {
-		tWO = func(ctx context.Context, input *schema.StreamReader[map[string]any], opts ...any) (output *schema.StreamReader[map[string]any], err error) {
+		tWO = func(ctx context.Context, input *einobridge.StreamReader[map[string]any], opts ...any) (output *einobridge.StreamReader[map[string]any], err error) {
 			return t(ctx, input)
 		}
 	}
@@ -259,7 +258,7 @@ func toNode(ns *schema2.NodeSchema, r any) *Node {
 		}
 
 		if sWOpt != nil {
-			s = func(ctx context.Context, in map[string]any, opts ...nodes.NodeOption) (*schema.StreamReader[map[string]any], error) {
+			s = func(ctx context.Context, in map[string]any, opts ...nodes.NodeOption) (*einobridge.StreamReader[map[string]any], error) {
 				wfSR, err := sWOpt.Stream(ctx, in, opts...)
 				if err != nil {
 					return nil, err
@@ -269,14 +268,14 @@ func toNode(ns *schema2.NodeSchema, r any) *Node {
 		}
 
 		if cWOpt != nil {
-			c = func(ctx context.Context, in *schema.StreamReader[map[string]any], opts ...nodes.NodeOption) (map[string]any, error) {
+			c = func(ctx context.Context, in *einobridge.StreamReader[map[string]any], opts ...nodes.NodeOption) (map[string]any, error) {
 				wfIn := einobridge.WrapStreamReader[map[string]any](in)
 				return cWOpt.Collect(ctx, wfIn, opts...)
 			}
 		}
 
 		if tWOpt != nil {
-			t = func(ctx context.Context, in *schema.StreamReader[map[string]any], opts ...nodes.NodeOption) (*schema.StreamReader[map[string]any], error) {
+			t = func(ctx context.Context, in *einobridge.StreamReader[map[string]any], opts ...nodes.NodeOption) (*einobridge.StreamReader[map[string]any], error) {
 				wfIn := einobridge.WrapStreamReader[map[string]any](in)
 				wfOut, err := tWOpt.Transform(ctx, wfIn, opts...)
 				if err != nil {
@@ -301,7 +300,7 @@ func toNode(ns *schema2.NodeSchema, r any) *Node {
 	}
 
 	if sWOOpt != nil {
-		s = func(ctx context.Context, in map[string]any) (*schema.StreamReader[map[string]any], error) {
+		s = func(ctx context.Context, in map[string]any) (*einobridge.StreamReader[map[string]any], error) {
 			wfSR, err := sWOOpt.Stream(ctx, in)
 			if err != nil {
 				return nil, err
@@ -311,14 +310,14 @@ func toNode(ns *schema2.NodeSchema, r any) *Node {
 	}
 
 	if cWOOpt != nil {
-		c = func(ctx context.Context, in *schema.StreamReader[map[string]any]) (map[string]any, error) {
+		c = func(ctx context.Context, in *einobridge.StreamReader[map[string]any]) (map[string]any, error) {
 			wfIn := einobridge.WrapStreamReader[map[string]any](in)
 			return cWOOpt.Collect(ctx, wfIn)
 		}
 	}
 
 	if tWOOpt != nil {
-		t = func(ctx context.Context, in *schema.StreamReader[map[string]any]) (*schema.StreamReader[map[string]any], error) {
+		t = func(ctx context.Context, in *einobridge.StreamReader[map[string]any]) (*einobridge.StreamReader[map[string]any], error) {
 			wfIn := einobridge.WrapStreamReader[map[string]any](in)
 			wfOut, err := tWOOpt.Transform(ctx, wfIn)
 			if err != nil {
@@ -393,12 +392,12 @@ func (nc *nodeRunConfig[O]) invoke() func(ctx context.Context, input map[string]
 	}
 }
 
-func (nc *nodeRunConfig[O]) stream() func(ctx context.Context, input map[string]any, opts ...O) (output *schema.StreamReader[map[string]any], err error) {
+func (nc *nodeRunConfig[O]) stream() func(ctx context.Context, input map[string]any, opts ...O) (output *einobridge.StreamReader[map[string]any], err error) {
 	if nc.s == nil {
 		return nil
 	}
 
-	return func(ctx context.Context, input map[string]any, opts ...O) (output *schema.StreamReader[map[string]any], err error) {
+	return func(ctx context.Context, input map[string]any, opts ...O) (output *einobridge.StreamReader[map[string]any], err error) {
 		ctx, runner := newNodeRunner(ctx, nc)
 
 		defer func() {
@@ -413,7 +412,7 @@ func (nc *nodeRunConfig[O]) stream() func(ctx context.Context, input map[string]
 			if err != nil {
 				errOutput, hasErrOutput := runner.onError(ctx, err)
 				if hasErrOutput {
-					output = schema.StreamReaderFromArray([]map[string]any{errOutput})
+					output = einobridge.StreamReaderFromArray([]map[string]any{errOutput})
 					err = nil
 				}
 			}
@@ -448,12 +447,12 @@ func (nc *nodeRunConfig[O]) stream() func(ctx context.Context, input map[string]
 	}
 }
 
-func (nc *nodeRunConfig[O]) collect() func(ctx context.Context, input *schema.StreamReader[map[string]any], opts ...O) (output map[string]any, err error) {
+func (nc *nodeRunConfig[O]) collect() func(ctx context.Context, input *einobridge.StreamReader[map[string]any], opts ...O) (output map[string]any, err error) {
 	if nc.c == nil {
 		return nil
 	}
 
-	return func(ctx context.Context, input *schema.StreamReader[map[string]any], opts ...O) (output map[string]any, err error) {
+	return func(ctx context.Context, input *einobridge.StreamReader[map[string]any], opts ...O) (output map[string]any, err error) {
 		ctx, runner := newNodeRunner(ctx, nc)
 
 		defer func() {
@@ -502,12 +501,12 @@ func (nc *nodeRunConfig[O]) collect() func(ctx context.Context, input *schema.St
 	}
 }
 
-func (nc *nodeRunConfig[O]) transform() func(ctx context.Context, input *schema.StreamReader[map[string]any], opts ...O) (output *schema.StreamReader[map[string]any], err error) {
+func (nc *nodeRunConfig[O]) transform() func(ctx context.Context, input *einobridge.StreamReader[map[string]any], opts ...O) (output *einobridge.StreamReader[map[string]any], err error) {
 	if nc.t == nil {
 		return nil
 	}
 
-	return func(ctx context.Context, input *schema.StreamReader[map[string]any], opts ...O) (output *schema.StreamReader[map[string]any], err error) {
+	return func(ctx context.Context, input *einobridge.StreamReader[map[string]any], opts ...O) (output *einobridge.StreamReader[map[string]any], err error) {
 		ctx, runner := newNodeRunner(ctx, nc)
 
 		defer func() {
@@ -522,7 +521,7 @@ func (nc *nodeRunConfig[O]) transform() func(ctx context.Context, input *schema.
 			if err != nil {
 				errOutput, hasErrOutput := runner.onError(ctx, err)
 				if hasErrOutput {
-					output = schema.StreamReaderFromArray([]map[string]any{errOutput})
+					output = einobridge.StreamReaderFromArray([]map[string]any{errOutput})
 					err = nil
 				}
 			}
@@ -599,8 +598,8 @@ func (r *nodeRunner[O]) onStart(ctx context.Context, input map[string]any) (cont
 	return ctx, nil
 }
 
-func (r *nodeRunner[O]) onStartStream(ctx context.Context, input *schema.StreamReader[map[string]any]) (
-	context.Context, *schema.StreamReader[map[string]any], error) {
+func (r *nodeRunner[O]) onStartStream(ctx context.Context, input *einobridge.StreamReader[map[string]any]) (
+	context.Context, *einobridge.StreamReader[map[string]any], error) {
 	if r.callbackInputConverter != nil {
 		copied := input.Copy(2)
 		realConverter := func(ctx context.Context) func(map[string]any) (*nodes.StructuredCallbackInput, error) {
@@ -608,7 +607,7 @@ func (r *nodeRunner[O]) onStartStream(ctx context.Context, input *schema.StreamR
 				return r.callbackInputConverter(ctx, in)
 			}
 		}
-		callbackS := schema.StreamReaderWithConvert(copied[0], realConverter(ctx))
+		callbackS := einobridge.StreamReaderWithConvert(copied[0], realConverter(ctx))
 		newCtx, unused := callbacks.OnStartWithStreamInput(ctx, callbackS)
 		unused.Close()
 		return newCtx, copied[1], nil
@@ -682,9 +681,9 @@ func (r *nodeRunner[O]) invoke(ctx context.Context, input map[string]any, opts .
 	}
 }
 
-func (r *nodeRunner[O]) stream(ctx context.Context, input map[string]any, opts ...O) (output *schema.StreamReader[map[string]any], err error) {
+func (r *nodeRunner[O]) stream(ctx context.Context, input map[string]any, opts ...O) (output *einobridge.StreamReader[map[string]any], err error) {
 	var n int64
-	var streamOutput *schema.StreamReader[map[string]any]
+	var streamOutput *einobridge.StreamReader[map[string]any]
 
 	for {
 		err = exec.RunWithContextDone(ctx, func() error {
@@ -717,7 +716,7 @@ func (r *nodeRunner[O]) stream(ctx context.Context, input map[string]any, opts .
 	}
 }
 
-func (r *nodeRunner[O]) collect(ctx context.Context, input *schema.StreamReader[map[string]any], opts ...O) (output map[string]any, err error) {
+func (r *nodeRunner[O]) collect(ctx context.Context, input *einobridge.StreamReader[map[string]any], opts ...O) (output map[string]any, err error) {
 	if r.maxRetry == 0 {
 		return r.c(ctx, input, opts...)
 	}
@@ -762,7 +761,7 @@ func (r *nodeRunner[O]) collect(ctx context.Context, input *schema.StreamReader[
 	}
 }
 
-func (r *nodeRunner[O]) transform(ctx context.Context, input *schema.StreamReader[map[string]any], opts ...O) (output *schema.StreamReader[map[string]any], err error) {
+func (r *nodeRunner[O]) transform(ctx context.Context, input *einobridge.StreamReader[map[string]any], opts ...O) (output *einobridge.StreamReader[map[string]any], err error) {
 	if r.maxRetry == 0 {
 		return r.t(ctx, input, opts...)
 	}
@@ -776,7 +775,7 @@ func (r *nodeRunner[O]) transform(ctx context.Context, input *schema.StreamReade
 		}
 	}()
 
-	var transformOutput *schema.StreamReader[map[string]any]
+	var transformOutput *einobridge.StreamReader[map[string]any]
 	for {
 		err = exec.RunWithContextDone(ctx, func() error {
 			var transformErr error
@@ -825,11 +824,11 @@ func (r *nodeRunner[O]) onEnd(ctx context.Context, output map[string]any) error 
 	return nil
 }
 
-func (r *nodeRunner[O]) onEndStream(ctx context.Context, output *schema.StreamReader[map[string]any]) (
-	*schema.StreamReader[map[string]any], error) {
+func (r *nodeRunner[O]) onEndStream(ctx context.Context, output *einobridge.StreamReader[map[string]any]) (
+	*einobridge.StreamReader[map[string]any], error) {
 	if r.errProcessType == vo.ErrorProcessTypeExceptionBranch || r.errProcessType == vo.ErrorProcessTypeReturnDefaultData {
-		flag := schema.StreamReaderFromArray([]map[string]any{{"isSuccess": true}})
-		output = schema.MergeStreamReaders([]*schema.StreamReader[map[string]any]{flag, output})
+		flag := einobridge.StreamReaderFromArray([]map[string]any{{"isSuccess": true}})
+		output = einobridge.MergeStreamReaders([]*einobridge.StreamReader[map[string]any]{flag, output})
 	}
 
 	if r.callbackOutputConverter != nil {
@@ -839,7 +838,7 @@ func (r *nodeRunner[O]) onEndStream(ctx context.Context, output *schema.StreamRe
 				return r.callbackOutputConverter(ctx, in)
 			}
 		}
-		callbackS := schema.StreamReaderWithConvert(copied[0], realConverter(ctx))
+		callbackS := einobridge.StreamReaderWithConvert(copied[0], realConverter(ctx))
 		_, unused := callbacks.OnEndWithStreamOutput(ctx, callbackS)
 		unused.Close()
 

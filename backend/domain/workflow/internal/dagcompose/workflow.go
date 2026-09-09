@@ -38,11 +38,11 @@
 package dagcompose
 
 import (
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	"context"
 	"fmt"
 	"sync"
 
-	"github.com/cloudwego/eino/schema"
 
 	"github.com/superagent-ai/superagent-base/backend/domain/workflow/entity"
 	"github.com/superagent-ai/superagent-base/backend/domain/workflow/entity/vo"
@@ -156,7 +156,7 @@ func (w *Workflow) AsyncRun(ctx context.Context, input map[string]any, _ ...any)
 
 // StreamRun executes the workflow with streaming output via the given
 // StreamWriter. Each node's output is sent as a Message to the stream.
-func (w *Workflow) StreamRun(ctx context.Context, input map[string]any, sw *schema.StreamWriter[*entity.Message]) (map[string]any, error) {
+func (w *Workflow) StreamRun(ctx context.Context, input map[string]any, sw *einobridge.StreamWriter[*entity.Message]) (map[string]any, error) {
 	ex := dag.NewExecutor(w.graph,
 		dag.WithFailFast(),
 		dag.WithStreamHandler(func(key dag.NodeKey, data map[string]any) {

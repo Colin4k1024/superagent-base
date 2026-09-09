@@ -17,11 +17,11 @@
 package vo
 
 import (
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	"context"
 	"errors"
 	"fmt"
 
-	"github.com/cloudwego/eino/schema"
 
 	"github.com/cloudwego/eino/compose"
 	"github.com/superagent-ai/superagent-base/backend/bizpkg/debugutil"
@@ -305,15 +305,15 @@ func (t *TypeInfo) Zero() any {
 	}
 }
 
-func (n *NamedTypeInfo) ToParameterInfo() (*schema.ParameterInfo, error) {
-	param := &schema.ParameterInfo{
+func (n *NamedTypeInfo) ToParameterInfo() (*einobridge.ParameterInfo, error) {
+	param := &einobridge.ParameterInfo{
 		Type:     convertDataType(n.Type),
 		Desc:     n.Desc,
 		Required: n.Required,
 	}
 
 	if n.Type == DataTypeObject {
-		param.SubParams = make(map[string]*schema.ParameterInfo, len(n.Properties))
+		param.SubParams = make(map[string]*einobridge.ParameterInfo, len(n.Properties))
 		for _, subT := range n.Properties {
 			subParam, err := subT.ToParameterInfo()
 			if err != nil {
@@ -420,20 +420,20 @@ func convertVariableType(d DataType) (VariableType, error) {
 	}
 }
 
-func convertDataType(d DataType) schema.DataType {
+func convertDataType(d DataType) einobridge.DataType {
 	switch d {
 	case DataTypeString, DataTypeTime, DataTypeFile:
-		return schema.String
+		return einobridge.String
 	case DataTypeNumber:
-		return schema.Number
+		return einobridge.Number
 	case DataTypeInteger:
-		return schema.Integer
+		return einobridge.Integer
 	case DataTypeBoolean:
-		return schema.Boolean
+		return einobridge.Boolean
 	case DataTypeObject:
-		return schema.Object
+		return einobridge.Object
 	case DataTypeArray:
-		return schema.Array
+		return einobridge.Array
 	default:
 		panic("unknown data type")
 	}

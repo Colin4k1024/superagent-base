@@ -17,12 +17,12 @@
 package compose
 
 import (
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	"context"
 	"fmt"
 	"maps"
 	"slices"
 
-	"github.com/cloudwego/eino/schema"
 
 	"github.com/superagent-ai/superagent-base/backend/domain/workflow/entity/vo"
 	schema2 "github.com/superagent-ai/superagent-base/backend/domain/workflow/internal/schema"
@@ -80,7 +80,7 @@ func inputValueFiller(s *schema2.NodeSchema) func(ctx context.Context, input map
 }
 
 func streamInputValueFiller(s *schema2.NodeSchema) func(ctx context.Context,
-	input *schema.StreamReader[map[string]any]) *schema.StreamReader[map[string]any] {
+	input *einobridge.StreamReader[map[string]any]) *einobridge.StreamReader[map[string]any] {
 	fn := func(ctx context.Context, i map[string]any) (map[string]any, error) {
 		newI := make(map[string]any)
 		for k := range i {
@@ -96,8 +96,8 @@ func streamInputValueFiller(s *schema2.NodeSchema) func(ctx context.Context,
 		return newI, nil
 	}
 
-	return func(ctx context.Context, input *schema.StreamReader[map[string]any]) *schema.StreamReader[map[string]any] {
-		return schema.StreamReaderWithConvert(input, func(in map[string]any) (map[string]any, error) {
+	return func(ctx context.Context, input *einobridge.StreamReader[map[string]any]) *einobridge.StreamReader[map[string]any] {
+		return einobridge.StreamReaderWithConvert(input, func(in map[string]any) (map[string]any, error) {
 			return fn(ctx, in)
 		})
 	}

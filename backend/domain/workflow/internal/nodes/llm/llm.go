@@ -30,7 +30,6 @@ import (
 	"github.com/cloudwego/eino/components/tool"
 	"github.com/cloudwego/eino/compose"
 	"github.com/cloudwego/eino/flow/agent/react"
-	"github.com/cloudwego/eino/schema"
 	callbacks2 "github.com/cloudwego/eino/utils/callbacks"
 	"golang.org/x/exp/maps"
 
@@ -380,7 +379,7 @@ func simpleLLMParamsToLLMParams(params vo.SimpleLLMParam) (*vo.LLMParams, error)
 	return p, nil
 }
 
-func getReasoningContent(message *schema.Message) string {
+func getReasoningContent(message *einobridge.Message) string {
 	return message.ReasoningContent
 }
 
@@ -622,8 +621,8 @@ func (c *Config) Build(ctx context.Context, ns *schema2.NodeSchema, _ ...schema2
 		inputs[knowledgeUserPromptTemplateKey] = &vo.TypeInfo{
 			Type: vo.DataTypeString,
 		}
-		sp := newPromptTpl(schema.System, c.SystemPrompt, inputs)
-		up := newPromptTpl(schema.User, userPrompt, inputs, withReservedKeys([]string{knowledgeUserPromptTemplateKey}), withAssociateUserInputFields(c.AssociateStartNodeUserInputFields))
+		sp := newPromptTpl(einobridge.System, c.SystemPrompt, inputs)
+		up := newPromptTpl(einobridge.User, userPrompt, inputs, withReservedKeys([]string{knowledgeUserPromptTemplateKey}), withAssociateUserInputFields(c.AssociateStartNodeUserInputFields))
 		template := newPrompts(sp, up, modelWithInfo)
 		templateWithChatHistory := newPromptsWithChatHistory(template, c.ChatHistorySetting, modelWithInfo)
 
@@ -637,8 +636,8 @@ func (c *Config) Build(ctx context.Context, ns *schema2.NodeSchema, _ ...schema2
 		_ = g.AddEdge(knowledgeLambdaKey, templateNodeKey)
 
 	} else {
-		sp := newPromptTpl(schema.System, c.SystemPrompt, ns.InputTypes)
-		up := newPromptTpl(schema.User, userPrompt, ns.InputTypes, withAssociateUserInputFields(c.AssociateStartNodeUserInputFields))
+		sp := newPromptTpl(einobridge.System, c.SystemPrompt, ns.InputTypes)
+		up := newPromptTpl(einobridge.User, userPrompt, ns.InputTypes, withAssociateUserInputFields(c.AssociateStartNodeUserInputFields))
 		template := newPrompts(sp, up, modelWithInfo)
 		templateWithChatHistory := newPromptsWithChatHistory(template, c.ChatHistorySetting, modelWithInfo)
 
@@ -682,7 +681,7 @@ func (c *Config) Build(ctx context.Context, ns *schema2.NodeSchema, _ ...schema2
 
 	var outputKey string
 	if format == FormatJSON {
-		iConvert := func(ctx context.Context, msg *schema.Message) (map[string]any, error) {
+		iConvert := func(ctx context.Context, msg *einobridge.Message) (map[string]any, error) {
 			return jsonParse(ctx, msg.Content, ns.OutputTypes)
 		}
 
@@ -706,7 +705,7 @@ func (c *Config) Build(ctx context.Context, ns *schema2.NodeSchema, _ ...schema2
 			}
 		}
 
-		iConvert := func(_ context.Context, msg *schema.Message, _ ...struct{}) (map[string]any, error) {
+		iConvert := func(_ context.Context, msg *einobridge.Message, _ ...struct{}) (map[string]any, error) {
 			out := map[string]any{outputKey: msg.Content}
 			if hasReasoning {
 				out[ReasoningOutputKey] = getReasoningContent(msg)
@@ -714,8 +713,8 @@ func (c *Config) Build(ctx context.Context, ns *schema2.NodeSchema, _ ...schema2
 			return out, nil
 		}
 
-		tConvert := func(_ context.Context, s *schema.StreamReader[*schema.Message], _ ...struct{}) (*schema.StreamReader[map[string]any], error) {
-			sr, sw := schema.Pipe[map[string]any](0)
+		tConvert := func(_ context.Context, s *einobridge.StreamReader[*einobridge.Message], _ ...struct{}) (*einobridge.StreamReader[map[string]any], error) {
+			sr, sw := einobridge.Pipe[map[string]any](0)
 
 			safego.Go(ctx, func() {
 				reasoningDone := false
@@ -1180,8 +1179,8 @@ func injectKnowledgeTool(_ context.Context, g *compose.Graph[map[string]any, map
 		return err
 	}
 	_ = g.AddChatTemplateNode(knowledgeTemplateKey,
-		prompt.FromMessages(schema.Jinja2,
-			schema.SystemMessage(fmt.Sprintf(knowledgeIntentPrompt, selectedKwDetails, userPrompt)),
+		prompt.FromMessages(einobridge.Jinja2,
+			einobridge.SystemMessage(fmt.Sprintf(knowledgeIntentPrompt, selectedKwDetails, userPrompt)),
 		), compose.WithStatePreHandler(func(ctx context.Context, in map[string]any, state llmState) (map[string]any, error) {
 			for k, v := range in {
 				state[k] = v
@@ -1190,7 +1189,7 @@ func injectKnowledgeTool(_ context.Context, g *compose.Graph[map[string]any, map
 		}))
 	_ = g.AddChatModelNode(knowledgeChatModelKey, cfg.ChatModel)
 
-	_ = g.AddLambdaNode(knowledgeLambdaKey, compose.InvokableLambda(func(ctx context.Context, input *schema.Message) (output map[string]any, err error) {
+	_ = g.AddLambdaNode(knowledgeLambdaKey, compose.InvokableLambda(func(ctx context.Context, input *einobridge.Message) (output map[string]any, err error) {
 		modelPredictionIDs := strings.Split(input.Content, ",")
 		selectKwIDs := slices.ToMap(cfg.SelectedKnowledgeDetails, func(e *knowledge.KnowledgeDetail) (string, int64) {
 			return strconv.Itoa(int(e.ID)), e.ID
@@ -1249,7 +1248,7 @@ func (l *LLM) ToCallbackInput(ctx context.Context, input map[string]any) (
 	}
 
 	var messages []*crossmessage.WfMessage
-	var scMessages []*schema.Message
+	var scMessages []*einobridge.Message
 	var sectionID *int64
 	execCtx := execute.GetExeCtx(ctx)
 	if execCtx != nil {
@@ -1278,7 +1277,7 @@ func (l *LLM) ToCallbackInput(ctx context.Context, input map[string]any) (
 	count := 0
 	startIdx := 0
 	for i := len(messages) - 1; i >= 0; i-- {
-		if messages[i].Role == schema.User {
+		if messages[i].Role == einobridge.User {
 			count++
 		}
 		if count >= maxRounds {

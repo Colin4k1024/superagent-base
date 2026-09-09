@@ -16,10 +16,10 @@
 package llm
 
 import (
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	"context"
 
 	"github.com/cloudwego/eino/components/tool"
-	"github.com/cloudwego/eino/schema"
 
 	crossplugin "github.com/superagent-ai/superagent-base/backend/crossdomain/plugin"
 	"github.com/superagent-ai/superagent-base/backend/domain/workflow/internal/execute"
@@ -35,7 +35,7 @@ func newInvokableTool(pl crossplugin.InvokableTool) tool.InvokableTool {
 	}
 }
 
-func (p pluginInvokableTool) Info(ctx context.Context) (*schema.ToolInfo, error) {
+func (p pluginInvokableTool) Info(ctx context.Context) (*einobridge.ToolInfo, error) {
 	return p.pluginInvokableTool.Info(ctx)
 }
 

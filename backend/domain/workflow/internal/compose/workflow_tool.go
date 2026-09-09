@@ -17,6 +17,7 @@
 package compose
 
 import (
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	"context"
 	"fmt"
 	"strings"
@@ -24,7 +25,6 @@ import (
 	"github.com/cloudwego/eino/callbacks"
 	"github.com/cloudwego/eino/components/tool"
 	einoCompose "github.com/cloudwego/eino/compose"
-	"github.com/cloudwego/eino/schema"
 
 	workflowModel "github.com/superagent-ai/superagent-base/backend/crossdomain/workflow/model"
 	"github.com/superagent-ai/superagent-base/backend/pkg/lang/slices"
@@ -48,14 +48,14 @@ type invokableWorkflow struct {
 }
 
 type workflowTool struct {
-	info          *schema.ToolInfo
+	info          *einobridge.ToolInfo
 	wfEntity      *entity.Workflow
 	sc            *schema2.WorkflowSchema
 	repo          wf.Repository
 	terminatePlan vo.TerminatePlan
 }
 
-func NewInvokableWorkflow(info *schema.ToolInfo,
+func NewInvokableWorkflow(info *einobridge.ToolInfo,
 	invoke func(ctx context.Context, input map[string]any, opts ...einoCompose.Option) (map[string]any, error),
 	terminatePlan vo.TerminatePlan,
 	wfEntity *entity.Workflow,
@@ -74,7 +74,7 @@ func NewInvokableWorkflow(info *schema.ToolInfo,
 	}
 }
 
-func (i *invokableWorkflow) Info(_ context.Context) (*schema.ToolInfo, error) {
+func (i *invokableWorkflow) Info(_ context.Context) (*einobridge.ToolInfo, error) {
 	return i.info, nil
 }
 
@@ -104,7 +104,7 @@ func (wt *workflowTool) prepare(ctx context.Context, rInfo *entity.ResumeRequest
 		runOpts = append(runOpts, WithInput(argumentsInJSON))
 	}
 	if container := execute.GetParentStreamContainer(opts...); container != nil {
-		sr, sw := schema.Pipe[*entity.Message](10)
+		sr, sw := einobridge.Pipe[*entity.Message](10)
 		container.AddChild(sr)
 		runOpts = append(runOpts, WithStreamWriter(sw))
 	}
@@ -261,11 +261,11 @@ func (i *invokableWorkflow) IsCallbacksEnabled() bool {
 
 type streamableWorkflow struct {
 	workflowTool
-	stream func(ctx context.Context, input map[string]any, opts ...einoCompose.Option) (*schema.StreamReader[map[string]any], error)
+	stream func(ctx context.Context, input map[string]any, opts ...einoCompose.Option) (*einobridge.StreamReader[map[string]any], error)
 }
 
-func NewStreamableWorkflow(info *schema.ToolInfo,
-	stream func(ctx context.Context, input map[string]any, opts ...einoCompose.Option) (*schema.StreamReader[map[string]any], error),
+func NewStreamableWorkflow(info *einobridge.ToolInfo,
+	stream func(ctx context.Context, input map[string]any, opts ...einoCompose.Option) (*einobridge.StreamReader[map[string]any], error),
 	terminatePlan vo.TerminatePlan,
 	wfEntity *entity.Workflow,
 	sc *schema2.WorkflowSchema,
@@ -283,12 +283,12 @@ func NewStreamableWorkflow(info *schema.ToolInfo,
 	}
 }
 
-func (s *streamableWorkflow) Info(_ context.Context) (*schema.ToolInfo, error) {
+func (s *streamableWorkflow) Info(_ context.Context) (*einobridge.ToolInfo, error) {
 	return s.info, nil
 }
 
 func (s *streamableWorkflow) StreamableRun(ctx context.Context, argumentsInJSON string, opts ...tool.Option) (
-	out *schema.StreamReader[string], err error) {
+	out *einobridge.StreamReader[string], err error) {
 	rInfo, allIEs := execute.GetResumeRequest(opts...)
 	var (
 		previouslyInterrupted bool
@@ -357,7 +357,7 @@ func (s *streamableWorkflow) StreamableRun(ctx context.Context, argumentsInJSON 
 		close(toolFinishChan)
 	}()
 
-	_, callbackStream := callbacks.OnEndWithStreamOutput(ctx, schema.StreamReaderWithConvert(outStream,
+	_, callbackStream := callbacks.OnEndWithStreamOutput(ctx, einobridge.StreamReaderWithConvert(outStream,
 		func(in map[string]any) (*tool.CallbackOutput, error) {
 			content, ok := in["output"]
 			if !ok {
@@ -378,7 +378,7 @@ func (s *streamableWorkflow) StreamableRun(ctx context.Context, argumentsInJSON 
 			}, nil
 		}))
 
-	return schema.StreamReaderWithConvert(callbackStream, func(in *tool.CallbackOutput) (string, error) {
+	return einobridge.StreamReaderWithConvert(callbackStream, func(in *tool.CallbackOutput) (string, error) {
 		return in.Response, nil
 	}), nil
 }

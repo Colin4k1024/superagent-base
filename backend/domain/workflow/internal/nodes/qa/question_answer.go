@@ -17,6 +17,7 @@
 package qa
 
 import (
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	"context"
 	"errors"
 	"fmt"
@@ -26,7 +27,6 @@ import (
 	"unicode"
 
 	"github.com/cloudwego/eino/compose"
-	"github.com/cloudwego/eino/schema"
 
 	"github.com/superagent-ai/superagent-base/backend/bizpkg/llm/modelbuilder"
 	"github.com/superagent-ai/superagent-base/backend/domain/workflow"
@@ -548,19 +548,19 @@ func (q *QuestionAnswer) extractFromAnswer(ctx context.Context, in map[string]an
 	userPromptSuffix := fmt.Sprintf(extractUserPromptSuffix, requiredFields, formattedAdditionalPrompt)
 
 	var (
-		messages     = make([]*schema.Message, 0, len(questions)*2+1)
+		messages     = make([]*einobridge.Message, 0, len(questions)*2+1)
 		userResponse string
 	)
-	messages = append(messages, schema.SystemMessage(sysPrompt))
+	messages = append(messages, einobridge.SystemMessage(sysPrompt))
 	for i := range questions {
-		messages = append(messages, schema.AssistantMessage(questions[i][QuestionKey].(string), nil))
+		messages = append(messages, einobridge.AssistantMessage(questions[i][QuestionKey].(string), nil))
 
 		answer := answers[i]
 		if i == len(questions)-1 {
 			userResponse = answer
 			answer = answer + userPromptSuffix
 		}
-		messages = append(messages, schema.UserMessage(answer))
+		messages = append(messages, einobridge.UserMessage(answer))
 	}
 
 	out, err := q.model.Generate(ctx, messages)
@@ -686,9 +686,9 @@ func (q *QuestionAnswer) intentDetect(ctx context.Context, answer string, choice
 	}
 
 	sysPrompt := fmt.Sprintf(choiceIntentDetectPrompt, optionsStr)
-	messages := []*schema.Message{
-		schema.SystemMessage(sysPrompt),
-		schema.UserMessage(answer),
+	messages := []*einobridge.Message{
+		einobridge.SystemMessage(sysPrompt),
+		einobridge.UserMessage(answer),
 	}
 
 	out, err := q.model.Generate(ctx, messages)

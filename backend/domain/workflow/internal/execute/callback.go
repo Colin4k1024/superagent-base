@@ -17,6 +17,7 @@
 package execute
 
 import (
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	"context"
 	"errors"
 	"fmt"
@@ -31,7 +32,6 @@ import (
 	"github.com/cloudwego/eino/callbacks"
 	"github.com/cloudwego/eino/components/tool"
 	"github.com/cloudwego/eino/compose"
-	"github.com/cloudwego/eino/schema"
 	callbacks2 "github.com/cloudwego/eino/utils/callbacks"
 
 	workflowModel "github.com/superagent-ai/superagent-base/backend/crossdomain/workflow/model"
@@ -412,7 +412,7 @@ func (w *WorkflowHandler) OnError(ctx context.Context, info *callbacks.RunInfo, 
 }
 
 func (w *WorkflowHandler) OnStartWithStreamInput(ctx context.Context, info *callbacks.RunInfo,
-	input *schema.StreamReader[callbacks.CallbackInput],
+	input *einobridge.StreamReader[callbacks.CallbackInput],
 ) context.Context {
 	if info.Component != compose.ComponentOfWorkflow || (info.Name != strconv.FormatInt(w.getRootWorkflowID(), 10) &&
 		info.Name != strconv.FormatInt(w.getSubWorkflowID(), 10)) {
@@ -476,7 +476,7 @@ func (w *WorkflowHandler) OnStartWithStreamInput(ctx context.Context, info *call
 }
 
 func (w *WorkflowHandler) OnEndWithStreamOutput(ctx context.Context, info *callbacks.RunInfo,
-	output *schema.StreamReader[callbacks.CallbackOutput],
+	output *einobridge.StreamReader[callbacks.CallbackOutput],
 ) context.Context {
 	if info.Component != compose.ComponentOfWorkflow || (info.Name != strconv.FormatInt(w.getRootWorkflowID(), 10) &&
 		info.Name != strconv.FormatInt(w.getSubWorkflowID(), 10)) {
@@ -808,7 +808,7 @@ func (n *NodeHandler) OnError(ctx context.Context, info *callbacks.RunInfo, err 
 	return ctx
 }
 
-func (n *NodeHandler) OnStartWithStreamInput(ctx context.Context, info *callbacks.RunInfo, input *schema.StreamReader[callbacks.CallbackInput]) context.Context {
+func (n *NodeHandler) OnStartWithStreamInput(ctx context.Context, info *callbacks.RunInfo, input *einobridge.StreamReader[callbacks.CallbackInput]) context.Context {
 	if info.Component != compose.ComponentOfLambda || info.Name != string(n.nodeKey) {
 		input.Close()
 		return ctx
@@ -1066,7 +1066,7 @@ func buildStreamDeltaEvent(c *Context, chunk any, accumulated *nodes.StructuredC
 }
 
 func (n *NodeHandler) nonIncrementalEndProcessor(c *Context,
-	output *schema.StreamReader[callbacks.CallbackOutput]) error {
+	output *einobridge.StreamReader[callbacks.CallbackOutput]) error {
 	defer output.Close()
 
 	var (
@@ -1100,7 +1100,7 @@ func (n *NodeHandler) nonIncrementalEndProcessor(c *Context,
 }
 
 func (n *NodeHandler) incrementalEndProcessor(c *Context,
-	output *schema.StreamReader[callbacks.CallbackOutput]) error {
+	output *einobridge.StreamReader[callbacks.CallbackOutput]) error {
 	defer output.Close()
 	var (
 		firstEvent, previousEvent, secondPreviousEvent *Event
@@ -1171,7 +1171,7 @@ func (n *NodeHandler) incrementalEndProcessor(c *Context,
 	return nil
 }
 
-func (n *NodeHandler) OnEndWithStreamOutput(ctx context.Context, info *callbacks.RunInfo, output *schema.StreamReader[callbacks.CallbackOutput]) context.Context {
+func (n *NodeHandler) OnEndWithStreamOutput(ctx context.Context, info *callbacks.RunInfo, output *einobridge.StreamReader[callbacks.CallbackOutput]) context.Context {
 	if info.Component != compose.ComponentOfLambda || info.Name != string(n.nodeKey) {
 		output.Close()
 		return ctx
@@ -1302,7 +1302,7 @@ func (t *ToolHandler) OnEnd(ctx context.Context, info *callbacks.RunInfo,
 }
 
 func (t *ToolHandler) OnEndWithStreamOutput(ctx context.Context, info *callbacks.RunInfo,
-	output *schema.StreamReader[*tool.CallbackOutput],
+	output *einobridge.StreamReader[*tool.CallbackOutput],
 ) context.Context {
 	if info.Name != t.info.Name {
 		output.Close()

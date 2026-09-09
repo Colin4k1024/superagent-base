@@ -17,6 +17,7 @@
 package adaptor
 
 import (
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	"context"
 	"io"
 	"net"
@@ -31,7 +32,6 @@ import (
 	"github.com/superagent-ai/superagent-base/backend/domain/workflow/config"
 
 	"github.com/bytedance/mockey"
-	"github.com/cloudwego/eino/schema"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 
@@ -87,12 +87,12 @@ func TestIntentDetectorAndDatabase(t *testing.T) {
 		}).Build()
 
 		chatModel := &testutil.UTChatModel{
-			InvokeResultProvider: func(_ int, in []*schema.Message) (*schema.Message, error) {
-				return &schema.Message{
-					Role:    schema.Assistant,
+			InvokeResultProvider: func(_ int, in []*einobridge.Message) (*einobridge.Message, error) {
+				return &einobridge.Message{
+					Role:    einobridge.Assistant,
 					Content: `{"classificationId":1,"reason":"choice branch 1 "}`,
-					ResponseMeta: &schema.ResponseMeta{
-						Usage: &schema.TokenUsage{
+					ResponseMeta: &einobridge.ResponseMeta{
+						Usage: &einobridge.TokenUsage{
 							PromptTokens:     1,
 							CompletionTokens: 2,
 							TotalTokens:      3,

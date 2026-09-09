@@ -17,93 +17,93 @@
 package intentdetector
 
 import (
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	"testing"
 
-	"github.com/cloudwego/eino/schema"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestHandleHistoryMessages(t *testing.T) {
 	tests := []struct {
 		name             string
-		historyMessages  []*schema.Message
-		expectedMessages []*schema.Message
+		historyMessages  []*einobridge.Message
+		expectedMessages []*einobridge.Message
 	}{
 		{
 			name:             "Empty history",
-			historyMessages:  []*schema.Message{},
-			expectedMessages: []*schema.Message{},
+			historyMessages:  []*einobridge.Message{},
+			expectedMessages: []*einobridge.Message{},
 		},
 		{
 			name:             "Message with only content",
-			historyMessages:  []*schema.Message{{Content: "hello"}},
-			expectedMessages: []*schema.Message{{Content: "hello", MultiContent: nil}},
+			historyMessages:  []*einobridge.Message{{Content: "hello"}},
+			expectedMessages: []*einobridge.Message{{Content: "hello", MultiContent: nil}},
 		},
 		{
 			name: "Message with only single text multi-content",
-			historyMessages: []*schema.Message{
+			historyMessages: []*einobridge.Message{
 				{
-					MultiContent: []schema.ChatMessagePart{
-						{Type: schema.ChatMessagePartTypeText, Text: "world"},
+					MultiContent: []einobridge.ChatMessagePart{
+						{Type: einobridge.ChatMessagePartTypeText, Text: "world"},
 					},
 				},
 			},
-			expectedMessages: []*schema.Message{{Content: "world", MultiContent: nil}},
+			expectedMessages: []*einobridge.Message{{Content: "world", MultiContent: nil}},
 		},
 		{
 			name: "Message with content and multi-content",
-			historyMessages: []*schema.Message{
+			historyMessages: []*einobridge.Message{
 				{
 					Content: "hello",
-					MultiContent: []schema.ChatMessagePart{
-						{Type: schema.ChatMessagePartTypeText, Text: "world"},
+					MultiContent: []einobridge.ChatMessagePart{
+						{Type: einobridge.ChatMessagePartTypeText, Text: "world"},
 					},
 				},
 			},
-			expectedMessages: []*schema.Message{{Content: "hello\nworld", MultiContent: nil}},
+			expectedMessages: []*einobridge.Message{{Content: "hello\nworld", MultiContent: nil}},
 		},
 		{
 			name: "Message with multiple multi-content parts",
-			historyMessages: []*schema.Message{
+			historyMessages: []*einobridge.Message{
 				{
-					MultiContent: []schema.ChatMessagePart{
-						{Type: schema.ChatMessagePartTypeText, Text: "part1"},
-						{Type: schema.ChatMessagePartTypeText, Text: "part2"},
+					MultiContent: []einobridge.ChatMessagePart{
+						{Type: einobridge.ChatMessagePartTypeText, Text: "part1"},
+						{Type: einobridge.ChatMessagePartTypeText, Text: "part2"},
 					},
 				},
 			},
-			expectedMessages: []*schema.Message{{Content: "part1\npart2", MultiContent: nil}},
+			expectedMessages: []*einobridge.Message{{Content: "part1\npart2", MultiContent: nil}},
 		},
 		{
 			name: "Message with various multi-content part types",
-			historyMessages: []*schema.Message{
+			historyMessages: []*einobridge.Message{
 				{
-					MultiContent: []schema.ChatMessagePart{
-						{Type: schema.ChatMessagePartTypeText, Text: "text"},
-						{Type: schema.ChatMessagePartTypeImageURL, ImageURL: &schema.ChatMessageImageURL{URL: "image.png"}},
-						{Type: schema.ChatMessagePartTypeAudioURL, AudioURL: &schema.ChatMessageAudioURL{URL: "audio.mp3"}},
-						{Type: schema.ChatMessagePartTypeVideoURL, VideoURL: &schema.ChatMessageVideoURL{URL: "video.mp4"}},
-						{Type: schema.ChatMessagePartTypeFileURL, FileURL: &schema.ChatMessageFileURL{URL: "file.txt"}},
+					MultiContent: []einobridge.ChatMessagePart{
+						{Type: einobridge.ChatMessagePartTypeText, Text: "text"},
+						{Type: einobridge.ChatMessagePartTypeImageURL, ImageURL: &einobridge.ChatMessageImageURL{URL: "image.png"}},
+						{Type: einobridge.ChatMessagePartTypeAudioURL, AudioURL: &einobridge.ChatMessageAudioURL{URL: "audio.mp3"}},
+						{Type: einobridge.ChatMessagePartTypeVideoURL, VideoURL: &einobridge.ChatMessageVideoURL{URL: "video.mp4"}},
+						{Type: einobridge.ChatMessagePartTypeFileURL, FileURL: &einobridge.ChatMessageFileURL{URL: "file.txt"}},
 					},
 				},
 			},
-			expectedMessages: []*schema.Message{{Content: "text\nimage.png\naudio.mp3\nvideo.mp4\nfile.txt", MultiContent: nil}},
+			expectedMessages: []*einobridge.Message{{Content: "text\nimage.png\naudio.mp3\nvideo.mp4\nfile.txt", MultiContent: nil}},
 		},
 		{
 			name: "Multiple messages",
-			historyMessages: []*schema.Message{
+			historyMessages: []*einobridge.Message{
 				{Content: "msg1"},
-				{MultiContent: []schema.ChatMessagePart{{Type: schema.ChatMessagePartTypeText, Text: "msg2"}}},
+				{MultiContent: []einobridge.ChatMessagePart{{Type: einobridge.ChatMessagePartTypeText, Text: "msg2"}}},
 			},
-			expectedMessages: []*schema.Message{
+			expectedMessages: []*einobridge.Message{
 				{Content: "msg1", MultiContent: nil},
 				{Content: "msg2", MultiContent: nil},
 			},
 		},
 		{
 			name:             "Empty message",
-			historyMessages:  []*schema.Message{{}},
-			expectedMessages: []*schema.Message{{Content: "", MultiContent: nil}},
+			historyMessages:  []*einobridge.Message{{}},
+			expectedMessages: []*einobridge.Message{{Content: "", MultiContent: nil}},
 		},
 	}
 

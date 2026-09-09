@@ -16,12 +16,12 @@
 package plugin
 
 import (
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	"context"
 	"fmt"
 	"strconv"
 
 	"github.com/cloudwego/eino/compose"
-	"github.com/cloudwego/eino/schema"
 	"github.com/getkin/kin-openapi/openapi3"
 	"golang.org/x/exp/maps"
 
@@ -310,14 +310,14 @@ type pluginInvokeTool struct {
 	IsDraft       bool
 }
 
-func (p *pluginInvokeTool) Info(ctx context.Context) (_ *schema.ToolInfo, err error) {
+func (p *pluginInvokeTool) Info(ctx context.Context) (_ *einobridge.ToolInfo, err error) {
 	defer func() {
 		if err != nil {
 			err = vo.WrapIfNeeded(errno.ErrPluginAPIErr, err)
 		}
 	}()
 
-	var parameterInfo map[string]*schema.ParameterInfo
+	var parameterInfo map[string]*einobridge.ParameterInfo
 	if p.toolOperation != nil {
 		parameterInfo, err = model.NewOpenapi3Operation(p.toolOperation).ToEinoSchemaParameterInfo(ctx)
 	} else {
@@ -328,10 +328,10 @@ func (p *pluginInvokeTool) Info(ctx context.Context) (_ *schema.ToolInfo, err er
 		return nil, err
 	}
 
-	return &schema.ToolInfo{
+	return &einobridge.ToolInfo{
 		Name:        p.toolInfo.GetName(),
 		Desc:        p.toolInfo.GetDesc(),
-		ParamsOneOf: schema.NewParamsOneOfByParams(parameterInfo),
+		ParamsOneOf: einobridge.NewParamsOneOfByParams(parameterInfo),
 	}, nil
 }
 

@@ -33,10 +33,10 @@
 package dagcompose
 
 import (
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	"context"
 	"fmt"
 
-	"github.com/cloudwego/eino/schema"
 
 	workflowmodel "github.com/superagent-ai/superagent-base/backend/crossdomain/workflow/model"
 	"github.com/superagent-ai/superagent-base/backend/domain/workflow/entity"
@@ -51,7 +51,7 @@ type WorkflowRunner struct {
 	basic     *entity.WorkflowBasic
 	input     string
 	resumeReq *entity.ResumeRequest
-	sw        *schema.StreamWriter[*entity.Message]
+	sw        *einobridge.StreamWriter[*entity.Message]
 	schema    *wfschema.WorkflowSchema
 	config    workflowmodel.ExecuteConfig
 
@@ -66,7 +66,7 @@ type workflowRunnerOptions struct {
 	input     string
 	cpStore   dag.CheckpointStore
 	resumeReq *entity.ResumeRequest
-	sw        *schema.StreamWriter[*entity.Message]
+	sw        *einobridge.StreamWriter[*entity.Message]
 }
 
 // WithInput sets the serialized input string.
@@ -81,7 +81,7 @@ func WithResumeReq(req *entity.ResumeRequest) WorkflowRunnerOption {
 
 // WithStreamWriter sets the eino schema StreamWriter for streaming output.
 // This is used by NewMessagePipe to feed streaming results to the caller.
-func WithStreamWriter(sw *schema.StreamWriter[*entity.Message]) WorkflowRunnerOption {
+func WithStreamWriter(sw *einobridge.StreamWriter[*entity.Message]) WorkflowRunnerOption {
 	return func(o *workflowRunnerOptions) { o.sw = sw }
 }
 
@@ -145,7 +145,7 @@ func (r *WorkflowRunner) Prepare(ctx context.Context) (context.Context, int64, [
 }
 
 // StreamWriter returns the stream writer, if set.
-func (r *WorkflowRunner) StreamWriter() *schema.StreamWriter[*entity.Message] {
+func (r *WorkflowRunner) StreamWriter() *einobridge.StreamWriter[*entity.Message] {
 	return r.sw
 }
 

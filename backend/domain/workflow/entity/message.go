@@ -17,7 +17,7 @@
 package entity
 
 import (
-	"github.com/cloudwego/eino/schema"
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 
 	"github.com/superagent-ai/superagent-base/backend/api/model/workflow"
 	"github.com/superagent-ai/superagent-base/backend/domain/workflow/entity/vo"
@@ -42,7 +42,7 @@ type StateMessage struct {
 // DataMessage represents a full or chunked message during a run that should go into message history.
 type DataMessage struct {
 	ExecuteID    int64 // the root execute ID for current execution
-	Role         schema.RoleType
+	Role         einobridge.RoleType
 	Type         MessageType
 	Content      string
 	NodeID       string

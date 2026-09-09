@@ -24,7 +24,6 @@ import (
 
 	"github.com/superagent-ai/superagent-base/backend/types/consts"
 
-	"github.com/cloudwego/eino/schema"
 	"os"
 	"strings"
 
@@ -725,7 +724,7 @@ func (i *impl) streamExecuteDAG(ctx context.Context, config workflowModel.Execut
 	}
 
 	// Create message pipe.
-	einoSR, einoSW := schema.Pipe[*entity.Message](10)
+	einoSR, einoSW := einobridge.Pipe[*entity.Message](10)
 	sr := einobridge.WrapStreamReader[*entity.Message](einoSR)
 
 	// Run workflow in background with streaming.
@@ -1483,7 +1482,7 @@ func (i *impl) checkApplicationWorkflowReleaseVersion(ctx context.Context, appID
 	return nil
 }
 
-func (i *impl) prefetchChatHistory(ctx context.Context, config workflowModel.ExecuteConfig, historyRounds int64) ([]*crossmessage.WfMessage, []*schema.Message, error) {
+func (i *impl) prefetchChatHistory(ctx context.Context, config workflowModel.ExecuteConfig, historyRounds int64) ([]*crossmessage.WfMessage, []*einobridge.Message, error) {
 	convID := config.ConversationID
 	agentID := config.AgentID
 	appID := config.AppID
@@ -1523,7 +1522,7 @@ func (i *impl) prefetchChatHistory(ctx context.Context, config workflowModel.Exe
 		return nil, nil, err
 	}
 	if len(runIds) <= 1 {
-		return []*crossmessage.WfMessage{}, []*schema.Message{}, nil
+		return []*crossmessage.WfMessage{}, []*einobridge.Message{}, nil
 	}
 	runIds = runIds[1:]
 

@@ -17,6 +17,7 @@
 package test
 
 import (
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	"context"
 	"errors"
 	"fmt"
@@ -30,7 +31,6 @@ import (
 	"github.com/cloudwego/eino-ext/components/model/openai"
 	model2 "github.com/cloudwego/eino/components/model"
 	"github.com/cloudwego/eino/compose"
-	"github.com/cloudwego/eino/schema"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 	"gorm.io/driver/mysql"
@@ -98,9 +98,9 @@ func TestQuestionAnswer(t *testing.T) {
 		var oneChatModel = chatModel
 		if oneChatModel == nil {
 			oneChatModel = &testutil.UTChatModel{
-				InvokeResultProvider: func(_ int, in []*schema.Message) (*schema.Message, error) {
-					return &schema.Message{
-						Role:    schema.Assistant,
+				InvokeResultProvider: func(_ int, in []*einobridge.Message) (*einobridge.Message, error) {
+					return &einobridge.Message{
+						Role:    einobridge.Assistant,
 						Content: "-1",
 					}, nil
 				},
@@ -210,9 +210,9 @@ func TestQuestionAnswer(t *testing.T) {
 		t.Run("answer with fixed choices", func(t *testing.T) {
 			if chatModel == nil {
 				oneChatModel := &testutil.UTChatModel{
-					InvokeResultProvider: func(_ int, in []*schema.Message) (*schema.Message, error) {
-						return &schema.Message{
-							Role:    schema.Assistant,
+					InvokeResultProvider: func(_ int, in []*einobridge.Message) (*einobridge.Message, error) {
+						return &einobridge.Message{
+							Role:    einobridge.Assistant,
 							Content: "-1",
 						}, nil
 					},
@@ -525,15 +525,15 @@ func TestQuestionAnswer(t *testing.T) {
 					chatModel = nil
 				}()
 				chatModel = &testutil.UTChatModel{
-					InvokeResultProvider: func(_ int, in []*schema.Message) (*schema.Message, error) {
+					InvokeResultProvider: func(_ int, in []*einobridge.Message) (*einobridge.Message, error) {
 						if qaCount == 1 {
-							return &schema.Message{
-								Role:    schema.Assistant,
+							return &einobridge.Message{
+								Role:    einobridge.Assistant,
 								Content: `{"question": "what's your age?"}`,
 							}, nil
 						} else if qaCount == 2 {
-							return &schema.Message{
-								Role:    schema.Assistant,
+							return &einobridge.Message{
+								Role:    einobridge.Assistant,
 								Content: `{"fields": {"name": "eino", "age": 1}}`,
 							}, nil
 						}

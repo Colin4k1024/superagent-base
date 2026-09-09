@@ -39,7 +39,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/cloudwego/eino/schema"
 
 	workflowModel "github.com/superagent-ai/superagent-base/backend/crossdomain/workflow/model"
 	"github.com/superagent-ai/superagent-base/backend/domain/workflow/entity"
@@ -81,7 +80,7 @@ func NewWorkflowFromNodeNamed(ctx context.Context, sc *wfschema.WorkflowSchema, 
 // the write side into the workflow runner. It is the dagcompose parallel
 // to compose.NewMessagePipe.
 func NewMessagePipe() (*wfcompose.StreamReader[*entity.Message], WorkflowRunnerOption) {
-	sr, sw := schema.Pipe[*entity.Message](10)
+	sr, sw := einobridge.Pipe[*entity.Message](10)
 	return einobridge.WrapStreamReader[*entity.Message](sr), WithStreamWriter(sw)
 }
 
@@ -106,7 +105,7 @@ func WithToolResume(resumingEvent *entity.ToolInterruptEvent, resumeData string,
 // closer as framework-agnostic values. It is the dagcompose parallel to
 // compose.WithMessagePipe.
 func WithMessagePipe() (wfcompose.Option, *wfcompose.StreamReader[*entity.Message], func()) {
-	sr, sw := schema.Pipe[*entity.Message](10)
+	sr, sw := einobridge.Pipe[*entity.Message](10)
 	return wfcompose.NewOption(WithStreamWriter(sw)),
 		einobridge.WrapStreamReader[*entity.Message](sr),
 		func() {}

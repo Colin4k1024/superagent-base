@@ -17,13 +17,13 @@
 package repo
 
 import (
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	"context"
 	"regexp"
 
 	"github.com/cloudwego/eino/components/prompt"
 	"github.com/cloudwego/eino/compose"
 	einoCompose "github.com/cloudwego/eino/compose"
-	"github.com/cloudwego/eino/schema"
 
 	"github.com/superagent-ai/superagent-base/backend/bizpkg/llm/modelbuilder"
 	"github.com/superagent-ai/superagent-base/backend/domain/workflow"
@@ -54,8 +54,8 @@ type suggesterV3 struct {
 	r einoCompose.Runnable[*vo.SuggestInfo, []string]
 }
 type state struct {
-	userMessage *schema.Message
-	answer      *schema.Message
+	userMessage *einobridge.Message
+	answer      *einobridge.Message
 }
 
 var suggestRegexp = regexp.MustCompile(`\[(.*?)\]`)
@@ -75,10 +75,10 @@ func NewSuggester(chatModel modelbuilder.BaseChatModel) (workflow.Suggester, err
 			output["persona_input"] = *input.PersonaInput
 		}
 		return
-	})).AppendChatTemplate(prompt.FromMessages(schema.Jinja2, schema.SystemMessage(SUGGESTION_PROMPT))).AppendChatModel(chatModel,
-		compose.WithStatePreHandler(func(ctx context.Context, in []*schema.Message, state *state) ([]*schema.Message, error) {
-			return append(in, []*schema.Message{state.userMessage, state.answer}...), nil
-		})).AppendLambda(einoCompose.InvokableLambda(func(ctx context.Context, input *schema.Message) (output []string, err error) {
+	})).AppendChatTemplate(prompt.FromMessages(einobridge.Jinja2, einobridge.SystemMessage(SUGGESTION_PROMPT))).AppendChatModel(chatModel,
+		compose.WithStatePreHandler(func(ctx context.Context, in []*einobridge.Message, state *state) ([]*einobridge.Message, error) {
+			return append(in, []*einobridge.Message{state.userMessage, state.answer}...), nil
+		})).AppendLambda(einoCompose.InvokableLambda(func(ctx context.Context, input *einobridge.Message) (output []string, err error) {
 		content := suggestRegexp.FindString(input.Content)
 		if len(content) == 0 {
 			return

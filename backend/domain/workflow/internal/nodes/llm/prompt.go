@@ -17,11 +17,11 @@
 package llm
 
 import (
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	"context"
 	"fmt"
 
 	"github.com/cloudwego/eino/components/prompt"
-	"github.com/cloudwego/eino/schema"
 
 	"github.com/superagent-ai/superagent-base/backend/api/model/app/developer_api"
 	"github.com/superagent-ai/superagent-base/backend/api/model/workflow"
@@ -60,7 +60,7 @@ func withAssociateUserInputFields(fs map[string]struct{}) func(tpl *promptTpl) {
 }
 
 type promptTpl struct {
-	role                     schema.RoleType
+	role                     einobridge.RoleType
 	tpl                      string
 	parts                    []promptPart
 	hasMultiModal            bool
@@ -73,7 +73,7 @@ type promptPart struct {
 	fileType *vo.FileSubType
 }
 
-func newPromptTpl(role schema.RoleType,
+func newPromptTpl(role einobridge.RoleType,
 	tpl string,
 	inputTypes map[string]*vo.TypeInfo,
 	opts ...func(*promptTpl),
@@ -151,7 +151,7 @@ func (pl *promptTpl) render(ctx context.Context, vs map[string]any,
 	sources map[string]*schema2.SourceInfo,
 	supportedModals *developer_api.ModelAbility,
 	enableTransferBase64 bool,
-) (*schema.Message, error) {
+) (*einobridge.Message, error) {
 	isChatFlow := execute.GetExeCtx(ctx).ExeCfg.WorkflowMode == workflow.WorkflowMode_ChatFlow
 	userMessage := execute.GetExeCtx(ctx).ExeCfg.UserMessage
 
@@ -165,7 +165,7 @@ func (pl *promptTpl) render(ctx context.Context, vs map[string]any,
 			if err != nil {
 				return nil, err
 			}
-			return &schema.Message{
+			return &einobridge.Message{
 				Role:    pl.role,
 				Content: r,
 			}, nil
@@ -182,7 +182,7 @@ func (pl *promptTpl) render(ctx context.Context, vs map[string]any,
 			if err != nil {
 				return nil, err
 			}
-			return &schema.Message{
+			return &einobridge.Message{
 				Role:    pl.role,
 				Content: r,
 			}, nil
@@ -190,7 +190,7 @@ func (pl *promptTpl) render(ctx context.Context, vs map[string]any,
 
 	}
 
-	multiParts := make([]schema.ChatMessagePart, 0, len(pl.parts))
+	multiParts := make([]einobridge.ChatMessagePart, 0, len(pl.parts))
 	m, err := sonic.Marshal(vs)
 	if err != nil {
 		return nil, err
@@ -198,8 +198,8 @@ func (pl *promptTpl) render(ctx context.Context, vs map[string]any,
 
 	for _, part := range pl.parts {
 		if !part.part.IsVariable {
-			multiParts = append(multiParts, schema.ChatMessagePart{
-				Type: schema.ChatMessagePartTypeText,
+			multiParts = append(multiParts, einobridge.ChatMessagePart{
+				Type: einobridge.ChatMessagePartTypeText,
 				Text: part.part.Value,
 			})
 			continue
@@ -237,40 +237,40 @@ func (pl *promptTpl) render(ctx context.Context, vs map[string]any,
 		}
 
 		if part.fileType == nil {
-			multiParts = append(multiParts, schema.ChatMessagePart{
-				Type: schema.ChatMessagePartTypeText,
+			multiParts = append(multiParts, einobridge.ChatMessagePart{
+				Type: einobridge.ChatMessagePartTypeText,
 				Text: r,
 			})
 			continue
 		}
 
-		var originalPart schema.ChatMessagePart
+		var originalPart einobridge.ChatMessagePart
 		switch *part.fileType {
 		case vo.FileTypeImage, vo.FileTypeSVG:
-			originalPart = schema.ChatMessagePart{
-				Type: schema.ChatMessagePartTypeImageURL,
-				ImageURL: &schema.ChatMessageImageURL{
+			originalPart = einobridge.ChatMessagePart{
+				Type: einobridge.ChatMessagePartTypeImageURL,
+				ImageURL: &einobridge.ChatMessageImageURL{
 					URL: r,
 				},
 			}
 		case vo.FileTypeAudio, vo.FileTypeVoice:
-			originalPart = schema.ChatMessagePart{
-				Type: schema.ChatMessagePartTypeAudioURL,
-				AudioURL: &schema.ChatMessageAudioURL{
+			originalPart = einobridge.ChatMessagePart{
+				Type: einobridge.ChatMessagePartTypeAudioURL,
+				AudioURL: &einobridge.ChatMessageAudioURL{
 					URL: r,
 				},
 			}
 		case vo.FileTypeVideo:
-			originalPart = schema.ChatMessagePart{
-				Type: schema.ChatMessagePartTypeVideoURL,
-				VideoURL: &schema.ChatMessageVideoURL{
+			originalPart = einobridge.ChatMessagePart{
+				Type: einobridge.ChatMessagePartTypeVideoURL,
+				VideoURL: &einobridge.ChatMessageVideoURL{
 					URL: r,
 				},
 			}
 		default:
-			originalPart = schema.ChatMessagePart{
-				Type: schema.ChatMessagePartTypeFileURL,
-				FileURL: &schema.ChatMessageFileURL{
+			originalPart = einobridge.ChatMessagePart{
+				Type: einobridge.ChatMessagePartTypeFileURL,
+				FileURL: &einobridge.ChatMessageFileURL{
 					URL: r,
 				},
 			}
@@ -278,18 +278,18 @@ func (pl *promptTpl) render(ctx context.Context, vs map[string]any,
 		multiParts = append(multiParts, transformMessagePart(originalPart, supportedModals, enableTransferBase64))
 	}
 
-	return &schema.Message{
+	return &einobridge.Message{
 		Role:         pl.role,
 		MultiContent: multiParts,
 	}, nil
 }
 
-func transformMessagePart(part schema.ChatMessagePart, supportedModals *developer_api.ModelAbility, enableTransferBase64 bool) schema.ChatMessagePart {
+func transformMessagePart(part einobridge.ChatMessagePart, supportedModals *developer_api.ModelAbility, enableTransferBase64 bool) einobridge.ChatMessagePart {
 	switch part.Type {
-	case schema.ChatMessagePartTypeImageURL:
+	case einobridge.ChatMessagePartTypeImageURL:
 		if !supportedModals.GetImageUnderstanding() {
-			return schema.ChatMessagePart{
-				Type: schema.ChatMessagePartTypeText,
+			return einobridge.ChatMessagePart{
+				Type: einobridge.ChatMessagePartTypeText,
 				Text: part.ImageURL.URL,
 			}
 		}
@@ -302,10 +302,10 @@ func transformMessagePart(part schema.ChatMessagePart, supportedModals *develope
 				return part
 			}
 		}
-	case schema.ChatMessagePartTypeAudioURL:
+	case einobridge.ChatMessagePartTypeAudioURL:
 		if !supportedModals.GetAudioUnderstanding() {
-			return schema.ChatMessagePart{
-				Type: schema.ChatMessagePartTypeText,
+			return einobridge.ChatMessagePart{
+				Type: einobridge.ChatMessagePartTypeText,
 				Text: part.AudioURL.URL,
 			}
 		}
@@ -318,10 +318,10 @@ func transformMessagePart(part schema.ChatMessagePart, supportedModals *develope
 				return part
 			}
 		}
-	case schema.ChatMessagePartTypeVideoURL:
+	case einobridge.ChatMessagePartTypeVideoURL:
 		if !supportedModals.GetVideoUnderstanding() {
-			return schema.ChatMessagePart{
-				Type: schema.ChatMessagePartTypeText,
+			return einobridge.ChatMessagePart{
+				Type: einobridge.ChatMessagePartTypeText,
 				Text: part.VideoURL.URL,
 			}
 		}
@@ -334,9 +334,9 @@ func transformMessagePart(part schema.ChatMessagePart, supportedModals *develope
 				return part
 			}
 		}
-	case schema.ChatMessagePartTypeFileURL:
-		return schema.ChatMessagePart{
-			Type: schema.ChatMessagePartTypeText,
+	case einobridge.ChatMessagePartTypeFileURL:
+		return einobridge.ChatMessagePart{
+			Type: einobridge.ChatMessagePartTypeText,
 			Text: part.FileURL.URL,
 		}
 		// if enableTransferBase64 {
@@ -353,7 +353,7 @@ func transformMessagePart(part schema.ChatMessagePart, supportedModals *develope
 }
 
 func (p *prompts) Format(ctx context.Context, vs map[string]any, _ ...prompt.Option) (
-	_ []*schema.Message, err error,
+	_ []*einobridge.Message, err error,
 ) {
 	exeCtx := execute.GetExeCtx(ctx)
 	var nodeKey vo.NodeKey
@@ -369,7 +369,7 @@ func (p *prompts) Format(ctx context.Context, vs map[string]any, _ ...prompt.Opt
 
 	supportedModal, enableTransferBase64 := getModelProcessingInfo(ctx, p.mwi)
 
-	var systemMsg, userMsg *schema.Message
+	var systemMsg, userMsg *einobridge.Message
 	if p.sp != nil {
 		systemMsg, err = p.sp.render(ctx, vs, sources, supportedModal, enableTransferBase64)
 		if err != nil {
@@ -387,18 +387,18 @@ func (p *prompts) Format(ctx context.Context, vs map[string]any, _ ...prompt.Opt
 	if userMsg == nil {
 		// give it a default empty message.
 		// Some model may fail on empty message such as this one.
-		userMsg = schema.UserMessage("")
+		userMsg = einobridge.UserMessage("")
 	}
 
 	if systemMsg == nil {
-		return []*schema.Message{userMsg}, nil
+		return []*einobridge.Message{userMsg}, nil
 	}
 
-	return []*schema.Message{systemMsg, userMsg}, nil
+	return []*einobridge.Message{systemMsg, userMsg}, nil
 }
 
 func (p *promptsWithChatHistory) Format(ctx context.Context, vs map[string]any, _ ...prompt.Option) (
-	[]*schema.Message, error) {
+	[]*einobridge.Message, error) {
 	baseMessages, err := p.prompts.Format(ctx, vs)
 	if err != nil {
 		return nil, err
@@ -417,7 +417,7 @@ func (p *promptsWithChatHistory) Format(ctx context.Context, vs map[string]any, 
 		return baseMessages, nil
 	}
 
-	historyMessages, ok := ctxcache.Get[[]*schema.Message](ctx, chatHistoryKey)
+	historyMessages, ok := ctxcache.Get[[]*einobridge.Message](ctx, chatHistoryKey)
 
 	if !ok || len(historyMessages) == 0 {
 		logs.CtxWarnf(ctx, "conversation history is empty")
@@ -436,8 +436,8 @@ func (p *promptsWithChatHistory) Format(ctx context.Context, vs map[string]any, 
 		}
 	}
 
-	finalMessages := make([]*schema.Message, 0, len(baseMessages)+len(historyMessages))
-	if len(baseMessages) > 0 && baseMessages[0].Role == schema.System {
+	finalMessages := make([]*einobridge.Message, 0, len(baseMessages)+len(historyMessages))
+	if len(baseMessages) > 0 && baseMessages[0].Role == einobridge.System {
 		finalMessages = append(finalMessages, baseMessages[0])
 		baseMessages = baseMessages[1:]
 	}
