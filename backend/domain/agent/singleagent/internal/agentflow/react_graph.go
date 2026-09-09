@@ -40,12 +40,12 @@
 package agentflow
 
 import (
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	"context"
 	"io"
 
 	"github.com/cloudwego/eino/components/model"
 	"github.com/cloudwego/eino/components/tool"
-	"github.com/cloudwego/eino/compose"
 	"github.com/cloudwego/eino/schema"
 )
 
@@ -63,8 +63,8 @@ func init() {
 // reactGraphResult holds the compiled graph and node options, matching
 // the return type of react.Agent.ExportGraph().
 type reactGraphResult struct {
-	graph    compose.AnyGraph
-	nodeOpts []compose.GraphAddNodeOpt
+	graph    einobridge.AnyGraph
+	nodeOpts []einobridge.GraphAddNodeOpt
 }
 
 // buildReActGraph constructs a ReAct agent graph using eino compose primitives
@@ -101,7 +101,7 @@ func buildReActGraph(ctx context.Context, chatModel model.ToolCallingChatModel,
 	}
 
 	// Create the tools node.
-	toolsNode, err := compose.NewToolNode(ctx, &compose.ToolsNodeConfig{
+	toolsNode, err := einobridge.NewToolNode(ctx, &einobridge.ToolsNodeConfig{
 		Tools: agentTools,
 	})
 	if err != nil {
@@ -114,8 +114,8 @@ func buildReActGraph(ctx context.Context, chatModel model.ToolCallingChatModel,
 		nodeKeyDirectReturn = "direct_return"
 	)
 
-	graph := compose.NewGraph[[]*schema.Message, *schema.Message](
-		compose.WithGenLocalState(func(ctx context.Context) *reactState {
+	graph := einobridge.NewGraph[[]*schema.Message, *schema.Message](
+		einobridge.WithGenLocalState(func(ctx context.Context) *reactState {
 			return &reactState{Messages: make([]*schema.Message, 0)}
 		}))
 
@@ -126,12 +126,12 @@ func buildReActGraph(ctx context.Context, chatModel model.ToolCallingChatModel,
 	}
 
 	if err = graph.AddChatModelNode(nodeKeyModel, chatModelNode,
-		compose.WithStatePreHandler(modelPreHandle),
-		compose.WithNodeName(modelNodeName)); err != nil {
+		einobridge.WithStatePreHandler(modelPreHandle),
+		einobridge.WithNodeName(modelNodeName)); err != nil {
 		return nil, err
 	}
 
-	if err = graph.AddEdge(compose.START, nodeKeyModel); err != nil {
+	if err = graph.AddEdge(einobridge.START, nodeKeyModel); err != nil {
 		return nil, err
 	}
 
@@ -147,8 +147,8 @@ func buildReActGraph(ctx context.Context, chatModel model.ToolCallingChatModel,
 	}
 
 	if err = graph.AddToolsNode(nodeKeyTools, toolsNode,
-		compose.WithStatePreHandler(toolsPreHandle),
-		compose.WithNodeName(toolsNodeName)); err != nil {
+		einobridge.WithStatePreHandler(toolsPreHandle),
+		einobridge.WithNodeName(toolsNodeName)); err != nil {
 		return nil, err
 	}
 
@@ -161,12 +161,12 @@ func buildReActGraph(ctx context.Context, chatModel model.ToolCallingChatModel,
 		if isToolCall {
 			return nodeKeyTools, nil
 		}
-		return compose.END, nil
+		return einobridge.END, nil
 	}
 
 	if err = graph.AddBranch(nodeKeyModel,
-		compose.NewStreamGraphBranch(modelBranchCondition,
-			map[string]bool{nodeKeyTools: true, compose.END: true})); err != nil {
+		einobridge.NewStreamGraphBranch(modelBranchCondition,
+			map[string]bool{nodeKeyTools: true, einobridge.END: true})); err != nil {
 		return nil, err
 	}
 
@@ -175,7 +175,7 @@ func buildReActGraph(ctx context.Context, chatModel model.ToolCallingChatModel,
 	directReturn := func(ctx context.Context, msgs *schema.StreamReader[[]*schema.Message]) (*schema.StreamReader[*schema.Message], error) {
 		return schema.StreamReaderWithConvert(msgs, func(msgs []*schema.Message) (*schema.Message, error) {
 			var msg *schema.Message
-			err = compose.ProcessState[*reactState](ctx, func(_ context.Context, state *reactState) error {
+			err = einobridge.ProcessState[*reactState](ctx, func(_ context.Context, state *reactState) error {
 				for i := range msgs {
 					if msgs[i] != nil && msgs[i].ToolCallID == state.ReturnDirectlyToolCallID {
 						msg = msgs[i]
@@ -195,16 +195,16 @@ func buildReActGraph(ctx context.Context, chatModel model.ToolCallingChatModel,
 	}
 
 	if err = graph.AddLambdaNode(nodeKeyDirectReturn,
-		compose.TransformableLambda(directReturn)); err != nil {
+		einobridge.TransformableLambda(directReturn)); err != nil {
 		return nil, err
 	}
 
 	// Branch after tools: if return-directly → directReturn, else → model (loop).
 	if err = graph.AddBranch(nodeKeyTools,
-		compose.NewStreamGraphBranch(func(ctx context.Context, msgsStream *schema.StreamReader[[]*schema.Message]) (string, error) {
+		einobridge.NewStreamGraphBranch(func(ctx context.Context, msgsStream *schema.StreamReader[[]*schema.Message]) (string, error) {
 			msgsStream.Close()
 			var endNode string
-			err = compose.ProcessState[*reactState](ctx, func(_ context.Context, state *reactState) error {
+			err = einobridge.ProcessState[*reactState](ctx, func(_ context.Context, state *reactState) error {
 				if len(state.ReturnDirectlyToolCallID) > 0 {
 					endNode = nodeKeyDirectReturn
 				} else {
@@ -220,19 +220,19 @@ func buildReActGraph(ctx context.Context, chatModel model.ToolCallingChatModel,
 		return nil, err
 	}
 
-	if err = graph.AddEdge(nodeKeyDirectReturn, compose.END); err != nil {
+	if err = graph.AddEdge(nodeKeyDirectReturn, einobridge.END); err != nil {
 		return nil, err
 	}
 
-	compileOpts := []compose.GraphCompileOption{
-		compose.WithMaxRunSteps(0), // 0 = use default max steps
-		compose.WithNodeTriggerMode(compose.AnyPredecessor),
-		compose.WithGraphName("SelfReActAgent"),
+	compileOpts := []einobridge.GraphCompileOption{
+		einobridge.WithMaxRunSteps(0), // 0 = use default max steps
+		einobridge.WithNodeTriggerMode(einobridge.AnyPredecessor),
+		einobridge.WithGraphName("SelfReActAgent"),
 	}
 
 	return &reactGraphResult{
 		graph:    graph,
-		nodeOpts: []compose.GraphAddNodeOpt{compose.WithGraphCompileOptions(compileOpts...)},
+		nodeOpts: []einobridge.GraphAddNodeOpt{einobridge.WithGraphCompileOptions(compileOpts...)},
 	}, nil
 }
 

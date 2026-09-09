@@ -17,6 +17,7 @@
 package agentflow
 
 import (
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose"
 	"context"
 	"fmt"
@@ -24,7 +25,6 @@ import (
 	"strings"
 
 	"github.com/cloudwego/eino/components/tool"
-	"github.com/cloudwego/eino/compose"
 
 	"github.com/superagent-ai/superagent-base/backend/bizpkg/llm/modelbuilder"
 	"github.com/superagent-ai/superagent-base/backend/domain/agent/singleagent/entity"
@@ -36,7 +36,7 @@ type Config struct {
 	Agent    *entity.SingleAgent
 	UserID   string
 	Identity *entity.AgentIdentity
-	CPStore  compose.CheckPointStore
+	CPStore  einobridge.CheckPointStore
 
 	CustomVariables map[string]string
 
@@ -165,8 +165,8 @@ func BuildAgent(ctx context.Context, conf *Config) (r *AgentRunner, err error) {
 		}
 	}
 
-	var agentGraph compose.AnyGraph
-	var agentNodeOpts []compose.GraphAddNodeOpt
+	var agentGraph einobridge.AnyGraph
+	var agentNodeOpts []einobridge.GraphAddNodeOpt
 	var agentNodeName string
 	if isReActAgent {
 		result, err := buildReActGraph(ctx, chatModel, agentTools, returnDirectlyTools,
@@ -184,38 +184,38 @@ func BuildAgent(ctx context.Context, conf *Config) (r *AgentRunner, err error) {
 
 	suggestGraph, nsg := newSuggestGraph(ctx, conf, chatModel)
 
-	g := compose.NewGraph[*AgentRequest, *wfcompose.Message](
-		compose.WithGenLocalState(func(ctx context.Context) (state *AgentState) {
+	g := einobridge.NewGraph[*AgentRequest, *wfcompose.Message](
+		einobridge.WithGenLocalState(func(ctx context.Context) (state *AgentState) {
 			return &AgentState{}
 		}))
 
 	_ = g.AddLambdaNode(keyOfPersonRender,
-		compose.InvokableLambda[*AgentRequest, string](personaVars.RenderPersona),
-		compose.WithStatePreHandler(func(ctx context.Context, ar *AgentRequest, state *AgentState) (*AgentRequest, error) {
+		einobridge.InvokableLambda[*AgentRequest, string](personaVars.RenderPersona),
+		einobridge.WithStatePreHandler(func(ctx context.Context, ar *AgentRequest, state *AgentState) (*AgentRequest, error) {
 			state.UserInput = ar.Input
 			return ar, nil
 		}),
-		compose.WithOutputKey(placeholderOfPersona))
+		einobridge.WithOutputKey(placeholderOfPersona))
 
 	_ = g.AddLambdaNode(keyOfPromptVariables,
-		compose.InvokableLambda[*AgentRequest, map[string]any](promptVars.AssemblePromptVariables))
+		einobridge.InvokableLambda[*AgentRequest, map[string]any](promptVars.AssemblePromptVariables))
 
 	_ = g.AddLambdaNode(keyOfKnowledgeRetriever,
-		compose.InvokableLambda[*AgentRequest, []*wfcompose.Document](kr.Retrieve),
-		compose.WithNodeName(keyOfKnowledgeRetriever))
+		einobridge.InvokableLambda[*AgentRequest, []*wfcompose.Document](kr.Retrieve),
+		einobridge.WithNodeName(keyOfKnowledgeRetriever))
 
 	_ = g.AddLambdaNode(keyOfToolsPreRetriever,
-		compose.InvokableLambda[*AgentRequest, []*wfcompose.Message](tr.toolPreRetrieve),
-		compose.WithOutputKey(keyOfToolsPreRetriever),
-		compose.WithNodeName(keyOfToolsPreRetriever),
+		einobridge.InvokableLambda[*AgentRequest, []*wfcompose.Message](tr.toolPreRetrieve),
+		einobridge.WithOutputKey(keyOfToolsPreRetriever),
+		einobridge.WithNodeName(keyOfToolsPreRetriever),
 	)
 	_ = g.AddLambdaNode(keyOfKnowledgeRetrieverPack,
-		compose.InvokableLambda[[]*wfcompose.Document, string](kr.PackRetrieveResultInfo),
-		compose.WithOutputKey(placeholderOfKnowledge),
+		einobridge.InvokableLambda[[]*wfcompose.Document, string](kr.PackRetrieveResultInfo),
+		einobridge.WithOutputKey(placeholderOfKnowledge),
 	)
 	_ = g.AddChatTemplateNode(keyOfPromptTemplate, chatPrompt)
 
-	agentNodeOpts = append(agentNodeOpts, compose.WithNodeName(agentNodeName))
+	agentNodeOpts = append(agentNodeOpts, einobridge.WithNodeName(agentNodeName))
 
 	if isReActAgent {
 		_ = g.AddGraphNode(agentNodeName, agentGraph, agentNodeOpts...)
@@ -224,8 +224,8 @@ func BuildAgent(ctx context.Context, conf *Config) (r *AgentRunner, err error) {
 	}
 
 	if nsg {
-		_ = g.AddLambdaNode(keyOfSuggestPreInputParse, compose.ToList[*wfcompose.Message](),
-			compose.WithStatePostHandler(func(ctx context.Context, out []*wfcompose.Message, state *AgentState) ([]*wfcompose.Message, error) {
+		_ = g.AddLambdaNode(keyOfSuggestPreInputParse, einobridge.ToList[*wfcompose.Message](),
+			einobridge.WithStatePostHandler(func(ctx context.Context, out []*wfcompose.Message, state *AgentState) ([]*wfcompose.Message, error) {
 				out = append(out, state.UserInput)
 				return out, nil
 			}),
@@ -233,10 +233,10 @@ func BuildAgent(ctx context.Context, conf *Config) (r *AgentRunner, err error) {
 		_ = g.AddGraphNode(keyOfSuggestGraph, suggestGraph)
 	}
 
-	_ = g.AddEdge(compose.START, keyOfPersonRender)
-	_ = g.AddEdge(compose.START, keyOfPromptVariables)
-	_ = g.AddEdge(compose.START, keyOfKnowledgeRetriever)
-	_ = g.AddEdge(compose.START, keyOfToolsPreRetriever)
+	_ = g.AddEdge(einobridge.START, keyOfPersonRender)
+	_ = g.AddEdge(einobridge.START, keyOfPromptVariables)
+	_ = g.AddEdge(einobridge.START, keyOfKnowledgeRetriever)
+	_ = g.AddEdge(einobridge.START, keyOfToolsPreRetriever)
 
 	_ = g.AddEdge(keyOfPersonRender, keyOfPromptTemplate)
 	_ = g.AddEdge(keyOfPromptVariables, keyOfPromptTemplate)
@@ -249,17 +249,17 @@ func BuildAgent(ctx context.Context, conf *Config) (r *AgentRunner, err error) {
 	if nsg {
 		_ = g.AddEdge(agentNodeName, keyOfSuggestPreInputParse)
 		_ = g.AddEdge(keyOfSuggestPreInputParse, keyOfSuggestGraph)
-		_ = g.AddEdge(keyOfSuggestGraph, compose.END)
+		_ = g.AddEdge(keyOfSuggestGraph, einobridge.END)
 	} else {
-		_ = g.AddEdge(agentNodeName, compose.END)
+		_ = g.AddEdge(agentNodeName, einobridge.END)
 	}
 
-	var opts []compose.GraphCompileOption
+	var opts []einobridge.GraphCompileOption
 	if requireCheckpoint {
-		opts = append(opts, compose.WithCheckPointStore(conf.CPStore))
+		opts = append(opts, einobridge.WithCheckPointStore(conf.CPStore))
 	}
-	opts = append(opts, compose.WithNodeTriggerMode(compose.AllPredecessor))
-	runner, err := g.Compile(ctx, opts...)
+	opts = append(opts, einobridge.WithNodeTriggerMode(einobridge.AllPredecessor))
+	runner, err := einobridge.Compile(g, ctx, opts...)
 	if err != nil {
 		return nil, err
 	}
