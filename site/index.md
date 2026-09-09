@@ -3,7 +3,7 @@ layout: home
 hero:
   name: Superagent Base
   text: AI Agent 开发基座
-  tagline: 基于 Eino 框架，YAML 声明式构建任意 AI Agent — 5 分钟上手
+  tagline: 基于 Google ADK 框架，YAML 声明式构建任意 AI Agent — 5 分钟上手
   actions:
     - theme: brand
       text: 5 分钟快速上手
@@ -73,7 +73,7 @@ features:
     linkText: 了解协议
   - icon: "\U0001F9EC"
     title: 经验自进化
-    details: 本地 MySQL 存储执行经验，Eino Callback 自动收集信号 → 基因提炼 → 策略推荐注入 system prompt，零外部依赖
+    details: 本地 MySQL 存储执行经验，ADK Callback 自动收集信号 → 基因提炼 → 策略推荐注入 system prompt，零外部依赖
     link: /advanced/evolution
     linkText: 了解进化
   - icon: "\U000023F8"
@@ -83,7 +83,7 @@ features:
     linkText: 查看详情
   - icon: "\U0001F4CA"
     title: 全栈可观测性
-    details: OpenTelemetry 分布式追踪 + Prometheus 指标 + Grafana 看板 + 实时 SSE 日志流，Eino Callback 自动上报
+    details: OpenTelemetry 分布式追踪 + Prometheus 指标 + Grafana 看板 + 实时 SSE 日志流，ADK Callback 自动上报
     link: /guide/architecture
     linkText: 查看架构
   - icon: "\U0001F4E1"
@@ -136,7 +136,7 @@ features:
 
 | 类型 | 说明 |
 |------|------|
-| `chat_model_agent` | 标准对话 Agent，可挂载工具，Eino ReAct 自动调用 |
+| `chat_model_agent` | 标准对话 Agent，可挂载工具，Google ADK ReAct 自动调用 |
 | `deep_agent` | 深度推理模式，支持多步规划 |
 | `agentloop` | 自主循环，多轮迭代直到 `[DONE]` 或达到 max_turns |
 | `supervisor` | 多 Agent 协调者，通过 LLM 决策分发给 sub_agents |
@@ -144,11 +144,11 @@ features:
 | `parallel` | 并发执行所有 sub_agents，合并输出 |
 | `plan_execute` | 先规划后执行的多 Agent 模式 |
 | `workflow` | DAG 图执行，拓扑排序 + 变量映射 |
-| `eino_graph` | 原生 Eino Graph，VS Code 插件可视化编排后注册 |
+| `adk_graph` | 原生 Google ADK Graph，VS Code 插件可视化编排后注册 |
 
 ## 内置 Agent 案例一览（14 个）
 
-开箱即用的典型 AI Agent 模板，参考 [cloudwego/eino-examples](https://github.com/cloudwego/eino-examples) 官方案例设计，覆盖所有主流 Agent 架构模式。
+开箱即用的典型 AI Agent 模板，参考 [google/adk-go](https://github.com/google/adk-go) 官方案例设计，覆盖所有主流 Agent 架构模式。
 
 ### 基础能力 — 单 Agent 场景
 
@@ -417,7 +417,7 @@ curl -N -X POST http://localhost:8888/api/v1/chat/stream \
 | 层 | 选型 |
 |------|------|
 | HTTP 框架 | Hertz (CloudWeGo) |
-| LLM SDK | Eino (CloudWeGo) |
+| LLM SDK | Google ADK |
 | 模型提供商 | OpenAI / Claude / Gemini / DeepSeek / Ark / Ollama / Qwen |
 | ORM | GORM + MySQL 8.x |
 | 缓存 | Redis 7 |

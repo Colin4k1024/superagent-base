@@ -6,6 +6,16 @@ All notable changes to this project will be documented in this file.
 > published together on the same date (2026-05-11). Future releases will carry
 > distinct dates reflecting actual public release timelines.
 
+## [Unreleased]
+
+### Documentation
+- Replace all Eino framework references with Google ADK across documentation,
+  site, wiki, configs, and JSON schemas.
+- Rename `configs/agents/eino-graph-example.yaml` → `adk-graph-example.yaml`.
+- Update agent type `eino_graph` → `adk_graph` in schema and docs.
+- Architecture diagrams, SSE examples, evolution docs, skill docs, langfuse
+  docs, and roadmap updated to reflect Google ADK as the primary runtime.
+
 ## [0.4.0] - 2026-05-11
 
 ### Phase 4：Interrupt/Resume + A2UI + Workflow + 文档完善
@@ -109,7 +119,7 @@ All notable changes to this project will be documented in this file.
   - `pkg/mcp/transport_sse.go`：SSE 传输（HTTP 流）
   - `pkg/mcp/server.go` / `server_http.go`：暴露平台能力作为 MCP 端点
   - `pkg/mcp/registry.go`：注册和管理 MCP 服务器
-  - `pkg/mcp/eino_adapter.go`：将 MCP 工具适配为 Eino InvokableTool
+  - `pkg/mcp/eino_adapter.go`：将 MCP 工具适配为 Google ADK InvokableTool
   - `AgentBuilder` 新增 `WithMCPRegistry` 选项
   - `spec.tools` 支持 `mcp://<server>/<tool>` URI
 
@@ -129,7 +139,7 @@ All notable changes to this project will be documented in this file.
 - **项目初始化**
   - 基于 Coze Studio 分叉（Apache 2.0）
   - Go module 路径：`github.com/superagent-ai/superagent-base/backend`
-  - Go 1.24 + Eino 框架
+  - Go 1.24 + Google ADK 框架
 
 - **声明式 Agent 定义系统**
   - `pkg/agentdef/schema.go`：AgentDefinition / Metadata / AgentSpec / ModelSpec / ToolRef / MemorySpec / MiddlewareSpec / ObsSpec
@@ -142,7 +152,7 @@ All notable changes to this project will be documented in this file.
 
 - **LLM 集成**
   - Eino ChatModel（OpenAI-compatible）
-  - Eino ReAct Agent（工具调用循环，最多 10 步）
+  - Google ADK ReAct Agent（工具调用循环，最多 10 步）
   - 支持 7 种 Provider：OpenAI / Claude / Gemini / DeepSeek / Ark / Ollama / Qwen
 
 - **内置工具**

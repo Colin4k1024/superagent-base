@@ -61,7 +61,7 @@
 │  │   Engine             Evolution 门面（Init/Shutdown/Discover）     │  │
 │  │   SignalCollector     异步信号收集（信号量限流 + 背压丢弃）       │  │
 │  │   EvolutionAdvisor   Gene 推荐查询 → system prompt 注入          │  │
-│  │   callback.go         Eino 全局 Callback 自动捕获 Tool/Model     │  │
+│  │   callback.go         ADK 全局 Callback 自动捕获 Tool/Model     │  │
 │  └─────────────────────────────────────────────────────────────────┘  │
 │  ┌─────────────────────────────────────────────────────────────────┐  │
 │  │ pkg/skill/                                                       │  │
@@ -88,9 +88,9 @@
 │  │ pkg/a2ui/              Event 协议 + SSE 编码（EncodeSSE）         │  │
 │  └─────────────────────────────────────────────────────────────────┘  │
 └────────────────────────────────────┬──────────────────────────────────┘
-                                     │ Eino SDK
+                                     │ Google ADK
 ┌────────────────────────────────────▼──────────────────────────────────┐
-│                       LLM 推理层（cloudwego/eino）                       │
+│                       LLM 推理层（google/adk-go）                       │
 │  ChatModel（OpenAI-compatible）                                         │
 │  ReAct Agent（工具调用循环，最多 10 步）                                  │
 │  Stream Reader（token 流）                                               │
@@ -130,8 +130,8 @@
   │  AgentRuntime.GetAgent("research-agent")
   │
   ▼ agent.Chat(ctx, sessionID, message)
-  │  ├── einoChatAgent.Stream()  —— 无工具，直接调用 ChatModel
-  │  └── einoReactAgent.Stream() —— 有工具，ReAct 循环（最多 10 步）
+  │  ├── adkChatAgent.Stream()  —— 无工具，直接调用 ChatModel
+  │  └── adkReactAgent.Stream() —— 有工具，ReAct 循环（最多 10 步）
   │
   ▼ <-chan string（token 流）
   │
@@ -233,7 +233,7 @@ main.go
 API 层 → Application 层 → Domain 层 → Infra 层
 API 层 → agentdef.AgentRuntime（直接调用 Agent.Chat）
 agentdef.AgentBuilder → pkg/tool + pkg/skill + pkg/mcp + pkg/memory + pkg/modelrouter
-agentdef.AgentBuilder → Eino SDK → LLM Provider
+agentdef.AgentBuilder → Google ADK → LLM Provider
 ```
 
 ---
@@ -245,7 +245,7 @@ agentdef.AgentBuilder → Eino SDK → LLM Provider
 | `pkg/agentdef` | Agent YAML 运行时：Schema / Parser / Builder / Runtime / Interrupt / Workflow / Orchestration |
 | `pkg/a2ui` | A2UI 协议：事件类型定义（event.go）+ SSE 编码（encoder.go） |
 | `pkg/modelrouter` | 模型路由：capability-based / cost-optimized / latency 策略 + fallback |
-| `pkg/mcp` | MCP 协议：Client（stdio/SSE）/ Server / Registry / EinoAdapter |
+| `pkg/mcp` | MCP 协议：Client（stdio/SSE）/ Server / Registry / ADKAdapter |
 | `pkg/memory` | 记忆后端：builtin / Mem0 / Zep / Letta 统一接口 |
 | `pkg/skill` | 技能运行时：LocalInvoker / HTTPInvoker / CompositeInvoker / Manager / Cache |
 | `pkg/skill/builtin` | 内置技能：datetime / calculator / uuid |
@@ -265,7 +265,7 @@ agentdef.AgentBuilder → Eino SDK → LLM Provider
 | 组件 | 选型 | 原因 |
 |------|------|------|
 | HTTP 框架 | [Hertz](https://github.com/cloudwego/hertz) | CloudWeGo 高性能框架，原 Coze Studio 使用 |
-| LLM SDK | [Eino](https://github.com/cloudwego/eino) | CloudWeGo AI 框架，原生支持 ReAct/Stream/工具调用 |
+| LLM SDK | [Google ADK](https://github.com/google/adk-go) | Google AI Agent 框架，原生支持 ReAct/Stream/工具调用 |
 | gRPC | google.golang.org/grpc | 标准 gRPC Go 实现 |
 | ORM | GORM + MySQL 8.x | 成熟稳定，支持迁移 |
 | 缓存 | Redis 7 | 会话缓存、分布式锁、中断状态持久化 |
@@ -304,7 +304,7 @@ AgentBuilder.Build(def)
         ├── 解析工具引用（builtin / mcp / skill）
         ├── 初始化记忆后端
         ├── 无 ModelConfig → 返回 stub chatAgent（测试用）
-        ├── 有 ModelConfig，无工具 → einoChatAgent（直接 Stream）
-        └── 有 ModelConfig，有工具 → einoReactAgent（ReAct 循环）
+        ├── 有 ModelConfig，无工具 → adkChatAgent（直接 Stream）
+        └── 有 ModelConfig，有工具 → adkReactAgent（ReAct 循环）
               └── maybeWrapInterruptable（当 interrupt.enabled=true）
 ```

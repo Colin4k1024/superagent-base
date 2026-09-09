@@ -24,14 +24,14 @@ Content-Type: application/json
 {
   "agent_id": "research-agent",
   "session_id": "session-123",
-  "message": "介绍一下 Eino 框架"
+  "message": "介绍一下 Google ADK 框架"
 }
 ```
 
 ### 响应（Legacy 模式）
 
 ```
-data: Eino
+data: Google ADK
 data:  是一个
 data:  基于
 data:  Go
@@ -45,7 +45,7 @@ data: [DONE]
 
 ```
 event: text
-data: {"type":"text","timestamp":1234567890,"data":{"delta":"Eino "}}
+data: {"type":"text","timestamp":1234567890,"data":{"delta":"Google ADK "}}
 
 event: tool_call
 data: {"type":"tool_call","timestamp":1234567891,"data":{"id":"tc1","name":"web_search","status":"calling"}}

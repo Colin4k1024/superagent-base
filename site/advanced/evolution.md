@@ -18,13 +18,13 @@ Superagent Base 内置**经验自进化**能力。系统自动收集 Agent 执�
 ### 信号收集
 
 ```
-Agent 执行 → Eino Callback → SignalCollector.Collect()
+Agent 执行 → ADK Callback → SignalCollector.Collect()
     → [bounded goroutine pool, max=64]
     → context.WithTimeout(Background, 5s)
     → LocalGeneStore.SaveGene() → MySQL (evolution_genes 表)
 ```
 
-每次 Agent 执行工具调用或模型推理，Eino 全局 callback 自动捕获事件，异步写入本地 MySQL。收集器使用信号量限制并发，并与 HTTP 请求上下文解耦以避免提前取消。
+每次 Agent 执行工具调用或模型推理，ADK 全局 callback 自动捕获事件，异步写入本地 MySQL。收集器使用信号量限制并发，并与 HTTP 请求上下文解耦以避免提前取消。
 
 ### 基因推荐
 
@@ -185,7 +185,7 @@ backend/pkg/evolution/
 ├── evolution.go       Engine 门面（Init / Shutdown）
 ├── collector.go       SignalCollector — 异步信号收集（semaphore bounded）
 ├── advisor.go         EvolutionAdvisor — Gene 推荐查询
-├── callback.go        Eino 全局 Callback — Tool/Model 事件自动捕获
+├── callback.go        ADK 全局 Callback — Tool/Model 事件自动捕获
 └── evolution_test.go  单元测试（11 cases: store / nil safety / payload / config）
 ```
 

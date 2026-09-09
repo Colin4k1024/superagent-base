@@ -1,6 +1,6 @@
-# Example: native Eino graph agent with middleware
+# Example: native Google ADK graph agent with middleware
 #
-# 1. Generate your graph with the Eino Dev VS Code plugin.
+# 1. Generate your graph with the ADK Dev VS Code plugin.
 # 2. Drop the Go file into backend/pkg/graphs/ and add:
 #
 #      func init() {
@@ -13,13 +13,13 @@
 apiVersion: superagent/v1
 kind: Agent
 metadata:
-  name: eino-graph-example
+  name: adk-graph-example
   version: "1.0.0"
-  tags: [eino, graph, example]
+  tags: [adk, graph, example]
 spec:
-  type: eino_graph
+  type: adk_graph
   graph: hello-world              # must match graphs.Register("hello-world", ...)
-  system_prompt: "You are a helpful assistant powered by a native Eino graph."
+  system_prompt: "You are a helpful assistant powered by a native Google ADK graph."
   middleware:
     # [audit_log] 审计日志：记录 graph 执行全程
     - name: audit_log

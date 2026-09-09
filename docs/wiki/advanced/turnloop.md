@@ -7,7 +7,7 @@ TurnLoop 为每个会话的 turn（轮次）生命周期提供精确控制，实
 | **Preempt（抢占）** | 用户在 Agent 仍在生成时发送新消息，当前 turn 被立即取消，Agent 开始回答新问题 |
 | **Abort（中止）** | 用户主动点击停止，Agent 立即停止当前 turn |
 
-这与 Eino 框架的 `adk.TurnLoop` 设计理念一致，针对项目自有 Agent 接口（`Chat(ctx, sessionID, message)`）实现了等价语义。
+这与 Google ADK 框架的 `adk.TurnLoop` 设计理念一致，针对项目自有 Agent 接口（`Chat(ctx, sessionID, message)`）实现了等价语义。
 
 ---
 

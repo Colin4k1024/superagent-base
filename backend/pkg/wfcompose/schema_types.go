@@ -62,7 +62,7 @@ type ParameterInfo struct {
 }
 
 // ParamsOneOf holds either named parameters or a JSON schema for a tool.
-// It mirrors eino's schema.ParamsOneOf so that tool definitions remain
+// It mirrors Google ADK's schema.ParamsOneOf so that tool definitions remain
 // structurally compatible.
 type ParamsOneOf struct {
 	params map[string]*ParameterInfo
@@ -206,7 +206,7 @@ func ConcatMessages(msgs []*Message) (*Message, error) {
 }
 
 // RegisterName is a no-op stub for type registration compatibility.
-// It mirrors eino's schema.RegisterName but does nothing in the wfcompose
+// It mirrors Google ADK's schema.RegisterName but does nothing in the wfcompose
 // context since there is no serialization registry.
 func RegisterName[T any](name string) {
 	// no-op

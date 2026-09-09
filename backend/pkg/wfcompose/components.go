@@ -173,8 +173,8 @@ type BaseTool interface {
 }
 
 // Embedder converts a batch of strings into dense vector representations.
-// It mirrors eino's embedding.Embedder interface so providers can implement
-// it without importing eino.
+// It mirrors Google ADK's embedding.Embedder interface so providers can implement
+// it without importing eino directly.
 type Embedder interface {
 	EmbedStrings(ctx context.Context, texts []string, opts ...EmbeddingOption) ([][]float64, error)
 }

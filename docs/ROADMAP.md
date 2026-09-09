@@ -158,7 +158,7 @@
 
 以下为本次开发周期（2026-05-14）已完成的全部事项：
 
-- [x] Eino DevOps IDE 集成 + eino_graph agent 类型
+- [x] ADK DevOps IDE 集成 + adk_graph agent 类型
 - [x] 开发环境稳定性（MySQL 8.4 兼容、MinIO noop fallback、Docker auto-start）
 - [x] gRPC 全服务实现（Tool/Model/Conversation/Agent）
 - [x] 工具系统实现（web_search DuckDuckGo/Serper、code_execute CodeRunner）

@@ -16,7 +16,7 @@
 
 | 组件 | 路径 | 框架 | 端口 | 完成度 |
 |---|---|---|---|---|
-| Go 后端 | `backend/` | Hertz + Eino ReAct | 8888 | 完整 |
+| Go 后端 | `backend/` | Hertz + Google ADK ReAct | 8888 | 完整 |
 | Python 后端 | `python/` | FastAPI + AgentScope 2.0 | 8889 | 基本完整（43 endpoints） |
 | Java 后端 | `java/` | Spring Boot 3 + AgentScope | 8890 | 完整，部分 TODO |
 | Python SDK | `sdks/python/` | httpx async | — | 完整，用于测试 |
@@ -35,7 +35,7 @@
 │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐          │
 │  │ go-backend  │  │python-backend│  │java-backend │          │
 │  │  :8888      │  │  :8889      │  │  :8890      │          │
-│  │ Hertz/Eino  │  │ FastAPI/AS  │  │ SpringBoot  │          │
+│  │ Hertz/Google ADK  │  │ FastAPI/AS  │  │ SpringBoot  │          │
 │  └──────┬──────┘  └──────┬──────┘  └──────┬──────┘          │
 │         └────────────────┴────────────────┘                  │
 │                           │                                   │

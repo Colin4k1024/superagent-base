@@ -81,7 +81,7 @@ backend/
     memory/          ← Memory backends (builtin, mem0, zep, letta)
     skill/           ← SkillsHub (Local/HTTP/Composite Invoker, built-in skills)
     tool/            ← Tool Manager + middleware chain (retry/timeout/ratelimit/cache)
-    observe/         ← OpenTelemetry + Prometheus + Eino callback
+    observe/         ← OpenTelemetry + Prometheus + ADK callback
   cmd/sactl/         ← CLI: skill search/install/uninstall, agent apply
   conf/              ← YAML configs (model templates, plugin defs, prompts)
 ```
@@ -99,7 +99,7 @@ backend/
 - **A2UI event protocol**: Structured SSE streaming with typed events (text, thinking, tool_call, tool_result, code_block, interrupt, error, done, progress, agent_switch). See `docs/a2ui-protocol.md`.
 - **Agent types**: `chat_model_agent`, `deep_agent`, `supervisor`, `sequential`, `parallel`, `plan_execute`, `workflow` — each has distinct execution semantics.
 - **Interrupt/resume**: Agents with `spec.interrupt.enabled=true` save checkpoint state; resume via `POST /api/v1/chat/resume`.
-- **Eino ReAct agent**: When tools are present, builder wraps ChatModel in `react.NewAgent` with `MaxStep: 10`.
+- **Google ADK ReAct agent**: When tools are present, builder wraps ChatModel in `react.NewAgent` with `MaxStep: 10`.
 - **Middleware pipeline**: ContextCache → RequestInspector → SetHost → SetLogID → CORS → AccessLog → OpenapiAuth → SessionAuth → I18n — applied in strict order.
 
 ## Configuration

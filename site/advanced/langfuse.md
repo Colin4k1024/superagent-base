@@ -114,14 +114,14 @@ OTEL_ENDPOINT=otel-collector:4317
 
 ## 架构集成点
 
-### Eino 回调链
+### ADK 回调链
 
-Langfuse trace 数据通过 Eino 组件生命周期回调自动采集，无需在业务代码中手动埋点：
+Langfuse trace 数据通过 ADK 组件生命周期回调自动采集，无需在业务代码中手动埋点：
 
 ```
 Agent 请求
   └─ StartAgentSpan (agent.chat)
-       └─ EinoObserveCallback.OnStart
+       └─ ADKObserveCallback.OnStart
             ├─ Model 调用 → gen_ai.chat span (含 input/output/tokens)
             ├─ Tool 调用 → tool.invoke span (含 input/output)
             └─ 子 Agent 调用 → 递归追踪
