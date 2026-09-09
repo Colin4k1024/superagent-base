@@ -169,10 +169,11 @@ type BaseTool interface {
 	Info(ctx context.Context) (*ToolInfo, error)
 }
 
-// Embedder is the interface for an embedding model.
+// Embedder converts a batch of strings into dense vector representations.
+// It mirrors eino's embedding.Embedder interface so providers can implement
+// it without importing eino.
 type Embedder interface {
 	EmbedStrings(ctx context.Context, texts []string, opts ...EmbeddingOption) ([][]float64, error)
-	EmbedQueries(ctx context.Context, queries []string, opts ...EmbeddingOption) ([][]float64, error)
 }
 
 // EmbeddingOption is a call-time option for an Embedder.
@@ -180,16 +181,36 @@ type EmbeddingOption struct {
 	apply func(*EmbeddingOptions)
 }
 
+// EmbeddingOptions holds the options for an embedding call.
 type EmbeddingOptions struct {
-	Model string
+	Model *string
 }
 
+// NewEmbeddingOption creates an EmbeddingOption from an apply function.
 func NewEmbeddingOption(apply func(*EmbeddingOptions)) EmbeddingOption {
 	return EmbeddingOption{apply: apply}
 }
 
+// Apply applies the option to the given EmbeddingOptions.
 func (o EmbeddingOption) Apply(opts *EmbeddingOptions) {
 	if o.apply != nil {
 		o.apply(opts)
 	}
+}
+
+// WithEmbeddingModel sets the model name for the embedding call.
+func WithEmbeddingModel(model string) EmbeddingOption {
+	return EmbeddingOption{apply: func(opts *EmbeddingOptions) { opts.Model = &model }}
+}
+
+// GetEmbeddingOptions extracts EmbeddingOptions from an option list,
+// optionally providing a base with default values.
+func GetEmbeddingOptions(base *EmbeddingOptions, opts ...EmbeddingOption) *EmbeddingOptions {
+	if base == nil {
+		base = &EmbeddingOptions{}
+	}
+	for _, opt := range opts {
+		opt.Apply(base)
+	}
+	return base
 }

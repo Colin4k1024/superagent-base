@@ -32,7 +32,7 @@
 
 // ext_embedding_facade defines native config types and constructor functions
 // for all embedding providers.  Each constructor creates a native provider
-// (which implements eino's embedding.Embedder with zero eino-ext imports) and
+// (which implements eino's wfcompose.Embedder with zero eino-ext imports) and
 // returns it directly.
 //
 // This file has ZERO cloudwego/eino-ext imports.
@@ -41,7 +41,7 @@ package einobridge
 import (
 	"context"
 
-	"github.com/cloudwego/eino/components/embedding"
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose"
 
 	arkprovider "github.com/superagent-ai/superagent-base/backend/pkg/embedding/providers/ark"
 	geminiprovider "github.com/superagent-ai/superagent-base/backend/pkg/embedding/providers/gemini"
@@ -61,7 +61,7 @@ const (
 	ArkAPITypeMultiModal ArkAPIType = arkprovider.APITypeMultiModal
 )
 
-func ArkNewEmbedder(ctx context.Context, config *ArkEmbeddingConfig) (embedding.Embedder, error) {
+func ArkNewEmbedder(ctx context.Context, config *ArkEmbeddingConfig) (wfcompose.Embedder, error) {
 	return arkprovider.NewEmbedder(ctx, config)
 }
 
@@ -71,7 +71,7 @@ func ArkNewEmbedder(ctx context.Context, config *ArkEmbeddingConfig) (embedding.
 
 type GeminiEmbeddingConfig = geminiprovider.EmbeddingConfig
 
-func GeminiNewEmbedder(ctx context.Context, config *GeminiEmbeddingConfig) (embedding.Embedder, error) {
+func GeminiNewEmbedder(ctx context.Context, config *GeminiEmbeddingConfig) (wfcompose.Embedder, error) {
 	return geminiprovider.NewEmbedder(ctx, config)
 }
 
@@ -81,7 +81,7 @@ func GeminiNewEmbedder(ctx context.Context, config *GeminiEmbeddingConfig) (embe
 
 type OllamaEmbeddingConfig = ollamaprovider.EmbeddingConfig
 
-func OllamaNewEmbedder(ctx context.Context, config *OllamaEmbeddingConfig) (embedding.Embedder, error) {
+func OllamaNewEmbedder(ctx context.Context, config *OllamaEmbeddingConfig) (wfcompose.Embedder, error) {
 	return ollamaprovider.NewEmbedder(ctx, config)
 }
 
@@ -91,6 +91,6 @@ func OllamaNewEmbedder(ctx context.Context, config *OllamaEmbeddingConfig) (embe
 
 type OpenAIEmbeddingConfig = openaiprovider.EmbeddingConfig
 
-func OpenAINewEmbedder(ctx context.Context, config *OpenAIEmbeddingConfig) (embedding.Embedder, error) {
+func OpenAINewEmbedder(ctx context.Context, config *OpenAIEmbeddingConfig) (wfcompose.Embedder, error) {
 	return openaiprovider.NewEmbedder(ctx, config)
 }

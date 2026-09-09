@@ -31,7 +31,7 @@
  */
 
 // Package ollama provides a native embedding provider for Ollama,
-// implementing the eino embedding.Embedder interface without any eino-ext imports.
+// implementing the wfcompose.Embedder interface without any eino-ext imports.
 package ollama
 
 import (
@@ -41,7 +41,7 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/cloudwego/eino/components/embedding"
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose"
 	"github.com/ollama/ollama/api"
 )
 
@@ -57,7 +57,7 @@ type EmbeddingConfig struct {
 	Options    map[string]any   `json:"options,omitempty"`
 }
 
-var _ embedding.Embedder = (*Embedder)(nil)
+var _ wfcompose.Embedder = (*Embedder)(nil)
 
 type Embedder struct {
 	cli  *api.Client
@@ -87,7 +87,7 @@ func NewEmbedder(ctx context.Context, config *EmbeddingConfig) (*Embedder, error
 	return &Embedder{cli: cli, conf: config}, nil
 }
 
-func (e *Embedder) EmbedStrings(ctx context.Context, texts []string, opts ...embedding.Option) ([][]float64, error) {
+func (e *Embedder) EmbedStrings(ctx context.Context, texts []string, opts ...wfcompose.EmbeddingOption) ([][]float64, error) {
 	req := &api.EmbedRequest{
 		Model:    e.conf.Model,
 		Input:    texts,

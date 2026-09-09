@@ -31,7 +31,7 @@
  */
 
 // Package openai provides a native embedding provider for OpenAI-compatible
-// APIs, implementing the eino embedding.Embedder interface without any eino-ext imports.
+// APIs, implementing the wfcompose.Embedder interface without any eino-ext imports.
 package openai
 
 import (
@@ -39,7 +39,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/cloudwego/eino/components/embedding"
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose"
 	goopenai "github.com/meguminnnnnnnnn/go-openai"
 )
 
@@ -63,7 +63,7 @@ type EmbeddingConfig struct {
 	User            *string                 `json:"user,omitempty"`
 }
 
-var _ embedding.Embedder = (*Embedder)(nil)
+var _ wfcompose.Embedder = (*Embedder)(nil)
 
 type Embedder struct {
 	cli    *goopenai.Client
@@ -100,8 +100,8 @@ func NewEmbedder(ctx context.Context, config *EmbeddingConfig) (*Embedder, error
 	}, nil
 }
 
-func (e *Embedder) EmbedStrings(ctx context.Context, texts []string, opts ...embedding.Option) ([][]float64, error) {
-	options := embedding.GetCommonOptions(&embedding.Options{
+func (e *Embedder) EmbedStrings(ctx context.Context, texts []string, opts ...wfcompose.EmbeddingOption) ([][]float64, error) {
+	options := wfcompose.GetEmbeddingOptions(&wfcompose.EmbeddingOptions{
 		Model: &e.config.Model,
 	}, opts...)
 
