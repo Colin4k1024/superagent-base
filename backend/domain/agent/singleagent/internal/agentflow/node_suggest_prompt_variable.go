@@ -17,22 +17,22 @@
 package agentflow
 
 import (
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose"
 	"context"
 
-	"github.com/cloudwego/eino/schema"
 )
 
 type suggestPromptVariables struct {
 }
 
-func (p *suggestPromptVariables) AssembleSuggestPromptVariables(ctx context.Context, vb []*schema.Message) (variables map[string]any, err error) {
+func (p *suggestPromptVariables) AssembleSuggestPromptVariables(ctx context.Context, vb []*wfcompose.Message) (variables map[string]any, err error) {
 	variables = make(map[string]any)
 
 	for _, item := range vb {
-		if item.Role == schema.Assistant {
+		if item.Role == wfcompose.RoleAssistant {
 			variables[placeholderOfChaAnswer] = item.Content
 		}
-		if item.Role == schema.User {
+		if item.Role == wfcompose.RoleUser {
 			variables[placeholderOfChaInput] = item.Content
 		}
 	}

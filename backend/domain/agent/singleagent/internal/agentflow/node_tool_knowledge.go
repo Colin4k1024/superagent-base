@@ -17,6 +17,7 @@
 package agentflow
 
 import (
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose"
 	"context"
 	"fmt"
 	"reflect"
@@ -24,7 +25,6 @@ import (
 
 	"github.com/cloudwego/eino/components/tool"
 	"github.com/cloudwego/eino/components/tool/utils"
-	"github.com/cloudwego/eino/schema"
 	"github.com/eino-contrib/jsonschema"
 
 	"github.com/superagent-ai/superagent-base/backend/api/model/app/bot_common"
@@ -40,8 +40,8 @@ const (
 type knowledgeConfig struct {
 	knowledgeInfos  []*knowledgeEntity.Knowledge
 	knowledgeConfig *bot_common.Knowledge
-	Input           *schema.Message
-	GetHistory      func() []*schema.Message
+	Input           *wfcompose.Message
+	GetHistory      func() []*wfcompose.Message
 }
 
 func newKnowledgeTool(ctx context.Context, conf *knowledgeConfig) (tool.InvokableTool, error) {
@@ -86,11 +86,11 @@ type RetrieveRequest struct {
 
 type knowledgeTool struct {
 	knowledgeConfig *bot_common.Knowledge
-	Input           *schema.Message
-	GetHistory      func() []*schema.Message
+	Input           *wfcompose.Message
+	GetHistory      func() []*wfcompose.Message
 }
 
-func (k *knowledgeTool) Retrieve(ctx context.Context, req *RetrieveRequest) ([]*schema.Document, error) {
+func (k *knowledgeTool) Retrieve(ctx context.Context, req *RetrieveRequest) ([]*wfcompose.Document, error) {
 	rr, err := genKnowledgeRequest(ctx, req.KnowledgeIDs, k.knowledgeConfig, k.Input.Content, k.GetHistory())
 	if err != nil {
 		return nil, err

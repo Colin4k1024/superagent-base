@@ -17,12 +17,13 @@
 package agentflow
 
 import (
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose"
 	"context"
 	"fmt"
 	"strconv"
 	"strings"
 
-	"github.com/cloudwego/eino/schema"
 
 	"github.com/superagent-ai/superagent-base/backend/api/model/app/bot_common"
 	crossknowledge "github.com/superagent-ai/superagent-base/backend/crossdomain/knowledge"
@@ -47,7 +48,7 @@ type knowledgeRetriever struct {
 	knowledgeConfig *bot_common.Knowledge
 }
 
-func (r *knowledgeRetriever) Retrieve(ctx context.Context, req *AgentRequest) ([]*schema.Document, error) {
+func (r *knowledgeRetriever) Retrieve(ctx context.Context, req *AgentRequest) ([]*wfcompose.Document, error) {
 	if r.knowledgeConfig == nil || len(r.knowledgeConfig.KnowledgeInfo) == 0 {
 		return nil, nil
 	}
@@ -80,7 +81,7 @@ func (r *knowledgeRetriever) Retrieve(ctx context.Context, req *AgentRequest) ([
 	return docs, nil
 }
 
-func (r *knowledgeRetriever) PackRetrieveResultInfo(ctx context.Context, docs []*schema.Document) (string, error) {
+func (r *knowledgeRetriever) PackRetrieveResultInfo(ctx context.Context, docs []*wfcompose.Document) (string, error) {
 	packedRes := strings.Builder{}
 	for idx, doc := range docs {
 		if doc == nil {
@@ -92,11 +93,11 @@ func (r *knowledgeRetriever) PackRetrieveResultInfo(ctx context.Context, docs []
 }
 
 func genKnowledgeRequest(_ context.Context, ids []int64, conf *bot_common.Knowledge,
-	query string, history []*schema.Message,
+	query string, history []*wfcompose.Message,
 ) (*service.RetrieveRequest, error) {
 	rr := &service.RetrieveRequest{
 		Query:        query,
-		ChatHistory:  history,
+		ChatHistory:  einobridge.UnwrapMessageSlice(history),
 		KnowledgeIDs: ids,
 		Strategy: &knowledgeEntity.RetrievalStrategy{
 			TopK:     conf.TopK,
@@ -134,9 +135,9 @@ func genKnowledgeRequest(_ context.Context, ids []int64, conf *bot_common.Knowle
 	return rr, nil
 }
 
-func convertDocument(_ context.Context, docSlice []*knowledgeModel.RetrieveSlice) ([]*schema.Document, error) {
-	return slices.Transform(docSlice, func(a *knowledgeModel.RetrieveSlice) *schema.Document {
-		doc := &schema.Document{
+func convertDocument(_ context.Context, docSlice []*knowledgeModel.RetrieveSlice) ([]*wfcompose.Document, error) {
+	return slices.Transform(docSlice, func(a *knowledgeModel.RetrieveSlice) *wfcompose.Document {
+		doc := &wfcompose.Document{
 			ID:      strconv.FormatInt(a.Slice.ID, 10),
 			Content: a.Slice.GetSliceContent(),
 			MetaData: map[string]any{

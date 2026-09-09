@@ -127,8 +127,8 @@ func (s *singleAgentImpl) StreamExecute(ctx context.Context, req *entity.Execute
 
 	exeReq := &agentflow.AgentRequest{
 		UserID:   req.UserID,
-		Input:    einobridge.UnwrapMessage(req.Input),
-		History:  einobridge.UnwrapMessageSlice(req.History),
+		Input:    req.Input,
+		History:  req.History,
 		Identity: req.Identity,
 
 		ResumeInfo:   req.ResumeInfo,
@@ -138,7 +138,7 @@ func (s *singleAgentImpl) StreamExecute(ctx context.Context, req *entity.Execute
 	if err != nil {
 		return nil, err
 	}
-	return einobridge.WrapStreamReader[*entity.AgentEvent](einoSR), nil
+	return einoSR, nil
 }
 
 func (s *singleAgentImpl) GetSingleAgent(ctx context.Context, agentID int64, version string) (botInfo *entity.SingleAgent, err error) {

@@ -33,9 +33,9 @@
 package agentflow
 
 import (
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose"
 	"context"
 
-	"github.com/cloudwego/eino/schema"
 
 	"github.com/superagent-ai/superagent-base/backend/domain/agent/singleagent/entity"
 	"github.com/superagent-ai/superagent-base/backend/pkg/dag"
@@ -62,7 +62,7 @@ type DAGAgentRunner struct {
 // it delegates to the eino runner's StreamExecute so that streaming,
 // callbacks, and interrupt/resume behaviour remain unchanged.
 func (r *DAGAgentRunner) StreamExecute(ctx context.Context, req *AgentRequest) (
-	*schema.StreamReader[*entity.AgentEvent], error,
+	*wfcompose.StreamReader[*entity.AgentEvent], error,
 ) {
 	logs.CtxInfof(ctx, "[DAGAgentRunner] StreamExecute delegating to eino runner (incremental)")
 	return r.einoRunner.StreamExecute(ctx, req)
@@ -77,6 +77,6 @@ func (r *DAGAgentRunner) PreHandlerReq(ctx context.Context, req *AgentRequest) *
 // DAGAgentRunner. The single agent service uses it to switch between
 // the eino and DAG-engine implementations behind a feature flag.
 type Runner interface {
-	StreamExecute(ctx context.Context, req *AgentRequest) (*schema.StreamReader[*entity.AgentEvent], error)
+	StreamExecute(ctx context.Context, req *AgentRequest) (*wfcompose.StreamReader[*entity.AgentEvent], error)
 	PreHandlerReq(ctx context.Context, req *AgentRequest) *AgentRequest
 }

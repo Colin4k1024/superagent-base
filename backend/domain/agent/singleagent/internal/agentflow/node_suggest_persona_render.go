@@ -17,6 +17,7 @@
 package agentflow
 
 import (
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose"
 	"context"
 	"fmt"
 
@@ -28,7 +29,7 @@ type suggestPersonaRender struct {
 	persona string
 }
 
-func (p *suggestPersonaRender) RenderPersona(ctx context.Context, _ []*schema.Message) (persona string, err error) {
+func (p *suggestPersonaRender) RenderPersona(ctx context.Context, _ []*wfcompose.Message) (persona string, err error) {
 
 	if p.persona == "" {
 		return "", nil
