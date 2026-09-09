@@ -17,7 +17,6 @@ require (
 	github.com/bytedance/gopkg v0.1.3
 	github.com/bytedance/mockey v1.4.6
 	github.com/bytedance/sonic v1.15.0
-	github.com/cloudwego/eino v0.9.0-beta.1
 	github.com/cloudwego/hertz v0.10.2
 	github.com/dimchansky/utfbom v1.1.1
 	github.com/elastic/go-elasticsearch/v7 v7.17.10
@@ -34,7 +33,6 @@ require (
 	github.com/mattn/go-shellwords v1.0.12
 	github.com/minio/minio-go/v7 v7.0.90
 	github.com/mohae/deepcopy v0.0.0-20170929034955-c48cc78d4826
-	github.com/nikolalohinski/gonja v1.5.3 // indirect
 	github.com/nsqio/go-nsq v1.1.0
 	github.com/ollama/ollama v0.9.6
 	github.com/onsi/gomega v1.35.1
@@ -125,7 +123,6 @@ require (
 	github.com/google/pprof v0.0.0-20250302191652-9094ed2288e7 // indirect
 	github.com/google/s2a-go v0.1.9 // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.3.20 // indirect
-	github.com/goph/emperror v0.17.2 // indirect
 	github.com/gopherjs/gopherjs v1.17.2 // indirect
 	github.com/gorilla/websocket v1.5.3 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.29.0 // indirect
@@ -150,7 +147,6 @@ require (
 	github.com/kr/pretty v0.3.1 // indirect
 	github.com/kr/text v0.2.0 // indirect
 	github.com/mailru/easyjson v0.9.0 // indirect
-	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-sqlite3 v1.14.22 // indirect
 	github.com/meguminnnnnnnnn/go-openai v0.0.0-20250821095446-07791bea23a0
 	github.com/minio/crc64nvme v1.0.1 // indirect
@@ -159,7 +155,6 @@ require (
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/nyaruka/phonenumbers v1.0.55 // indirect
 	github.com/patrickmn/go-cache v2.1.0+incompatible // indirect
-	github.com/pelletier/go-toml/v2 v2.2.3 // indirect
 	github.com/perimeterx/marshmallow v1.1.5 // indirect
 	github.com/peterbourgon/diskv/v3 v3.0.1 // indirect
 	github.com/pierrec/lz4/v4 v4.1.22 // indirect
@@ -179,7 +174,6 @@ require (
 	github.com/rs/xid v1.6.0 // indirect
 	github.com/shabbyrobe/xmlwriter v0.0.0-20200208144257-9fca06d00ffa // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
-	github.com/slongfield/pyfmt v0.0.0-20220222012616-ea85ff4c361f // indirect
 	github.com/smarty/assertions v1.16.0 // indirect
 	github.com/spaolacci/murmur3 v1.1.0 // indirect
 	github.com/tidwall/gjson v1.19.0 // indirect
@@ -189,7 +183,6 @@ require (
 	github.com/x448/float16 v0.8.4 // indirect
 	github.com/xuri/efp v0.0.0-20240408161823-9ad904a10d6d // indirect
 	github.com/xuri/nfp v0.0.0-20240318013403-ab9948c2c4a7 // indirect
-	github.com/yargevad/filepathx v1.0.0 // indirect
 	github.com/yuin/gopher-lua v1.1.1 // indirect
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect

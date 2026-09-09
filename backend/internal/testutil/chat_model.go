@@ -73,7 +73,7 @@ func (q *UTChatModel) Generate(ctx context.Context, in []*einobridge.Message, _ 
 	if msg.ResponseMeta != nil {
 		callbackOut.TokenUsage = &einobridge.ModelTokenUsage{
 			PromptTokens: msg.ResponseMeta.Usage.PromptTokens,
-			PromptTokenDetails: einobridge.PromptTokenDetails{
+			PromptTokenDetails: &einobridge.PromptTokenDetails{
 				CachedTokens: msg.ResponseMeta.Usage.PromptTokenDetails.CachedTokens,
 			},
 			CompletionTokens: msg.ResponseMeta.Usage.CompletionTokens,
@@ -120,7 +120,7 @@ func (q *UTChatModel) Stream(ctx context.Context, in []*einobridge.Message, _ ..
 		if t.ResponseMeta != nil {
 			callbackOut.TokenUsage = &einobridge.ModelTokenUsage{
 				PromptTokens: t.ResponseMeta.Usage.PromptTokens,
-				PromptTokenDetails: einobridge.PromptTokenDetails{
+				PromptTokenDetails: &einobridge.PromptTokenDetails{
 					CachedTokens: t.ResponseMeta.Usage.PromptTokenDetails.CachedTokens,
 				},
 				CompletionTokens: t.ResponseMeta.Usage.CompletionTokens,

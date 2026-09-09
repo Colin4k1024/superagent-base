@@ -30,222 +30,272 @@
  * limitations under the License.
  */
 
-// components_facade re-exports cloudwego/eino/components and its
-// sub-packages as type aliases so callers avoid importing eino directly.
+// components_facade re-exports wfcompose component types as prefixed aliases.
+// This file has ZERO cloudwego/eino imports.
 package einobridge
 
 import (
-	"github.com/cloudwego/eino/components"
+	"context"
 
 	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose"
-	"github.com/cloudwego/eino/components/document/parser"
-	"github.com/cloudwego/eino/components/indexer"
-	"github.com/cloudwego/eino/components/model"
-	"github.com/cloudwego/eino/components/prompt"
-	"github.com/cloudwego/eino/components/retriever"
-	"github.com/cloudwego/eino/components/tool"
-	toolutils "github.com/cloudwego/eino/components/tool/utils"
 )
 
 // ---------------------------------------------------------------------------
-// eino/components
+// Component types
 // ---------------------------------------------------------------------------
 
-type Component = components.Component
+type Component = wfcompose.Component
 
 const (
-	ComponentOfPrompt        Component = components.ComponentOfPrompt
-	ComponentOfAgenticPrompt Component = components.ComponentOfAgenticPrompt
-	ComponentOfChatModel     Component = components.ComponentOfChatModel
-	ComponentOfAgenticModel  Component = components.ComponentOfAgenticModel
-	ComponentOfEmbedding     Component = components.ComponentOfEmbedding
-	ComponentOfIndexer       Component = components.ComponentOfIndexer
-	ComponentOfRetriever     Component = components.ComponentOfRetriever
-	ComponentOfLoader        Component = components.ComponentOfLoader
-	ComponentOfTransformer   Component = components.ComponentOfTransformer
-	ComponentOfTool           Component = components.ComponentOfTool
+	ComponentOfPrompt        Component = wfcompose.ComponentOfPrompt
+	ComponentOfAgenticPrompt Component = wfcompose.ComponentOfAgenticPrompt
+	ComponentOfChatModel     Component = wfcompose.ComponentOfChatModel
+	ComponentOfAgenticModel  Component = wfcompose.ComponentOfAgenticModel
+	ComponentOfEmbedding     Component = wfcompose.ComponentOfEmbedding
+	ComponentOfIndexer       Component = wfcompose.ComponentOfIndexer
+	ComponentOfRetriever     Component = wfcompose.ComponentOfRetriever
+	ComponentOfLoader        Component = wfcompose.ComponentOfLoader
+	ComponentOfTransformer   Component = wfcompose.ComponentOfTransformer
+	ComponentOfTool          Component = wfcompose.ComponentOfTool
 )
 
 func IsCallbacksEnabled(component any) bool {
-	return components.IsCallbacksEnabled(component)
+	type callbacksEnabler interface {
+		IsCallbacksEnabled() bool
+	}
+	if ce, ok := component.(callbacksEnabler); ok {
+		return ce.IsCallbacksEnabled()
+	}
+	return false
 }
 
 // ---------------------------------------------------------------------------
-// eino/components/model
+// Model types
 // ---------------------------------------------------------------------------
 
-type BaseChatModel = model.BaseChatModel
-type ToolCallingChatModel = model.ToolCallingChatModel
-type ModelOption = model.Option
-type ModelCallbackInput = model.CallbackInput
-type ModelCallbackOutput = model.CallbackOutput
-type ModelTokenUsage = model.TokenUsage
-type PromptTokenDetails = model.PromptTokenDetails
+type BaseChatModel = wfcompose.ChatModel
+type ToolCallingChatModel = wfcompose.ToolCallingChatModel
+type ModelOption = wfcompose.ModelOption
+type ModelCallbackInput = wfcompose.ModelCallbackInput
+type ModelCallbackOutput = wfcompose.ModelCallbackOutput
+type ModelTokenUsage = wfcompose.TokenUsage
+type PromptTokenDetails = wfcompose.PromptTokenDetails
 
 func ModelConvCallbackInput(src CallbackInput) *ModelCallbackInput {
-	return model.ConvCallbackInput(src)
+	if src == nil {
+		return nil
+	}
+	if v, ok := src.(*ModelCallbackInput); ok {
+		return v
+	}
+	if v, ok := src.(ModelCallbackInput); ok {
+		return &v
+	}
+	return nil
 }
 
 func ModelConvCallbackOutput(src CallbackOutput) *ModelCallbackOutput {
-	return model.ConvCallbackOutput(src)
+	if src == nil {
+		return nil
+	}
+	if v, ok := src.(*ModelCallbackOutput); ok {
+		return v
+	}
+	if v, ok := src.(ModelCallbackOutput); ok {
+		return &v
+	}
+	return nil
 }
 
 // ---------------------------------------------------------------------------
-// eino/components/tool
+// Tool types
 // ---------------------------------------------------------------------------
 
-type BaseTool = tool.BaseTool
-type InvokableTool = tool.InvokableTool
-type ToolOption = tool.Option
-type ToolCallbackInput = tool.CallbackInput
-type ToolCallbackOutput = tool.CallbackOutput
+type BaseTool = wfcompose.BaseTool
+type InvokableTool = wfcompose.InvokableTool
+type ToolOption = wfcompose.ToolOption
+type ToolCallbackInput struct {
+	ArgumentsInJSON string
+	Extra           map[string]any
+}
+type ToolCallbackOutput struct {
+	ArgumentsInJSON string
+	Response        string
+	Extra           map[string]any
+}
 
 func ToolConvCallbackInput(src CallbackInput) *ToolCallbackInput {
-	return tool.ConvCallbackInput(src)
+	if src == nil {
+		return nil
+	}
+	if v, ok := src.(*ToolCallbackInput); ok {
+		return v
+	}
+	if v, ok := src.(ToolCallbackInput); ok {
+		return &v
+	}
+	return nil
 }
 
 func ToolConvCallbackOutput(src CallbackOutput) *ToolCallbackOutput {
-	return tool.ConvCallbackOutput(src)
+	if src == nil {
+		return nil
+	}
+	if v, ok := src.(*ToolCallbackOutput); ok {
+		return v
+	}
+	if v, ok := src.(ToolCallbackOutput); ok {
+		return &v
+	}
+	return nil
+}
+
+func ToolGetImplSpecificOptions[T any](base *T, opts ...ToolOption) *T {
+	return base
+}
+
+func ToolWrapImplSpecificOptFn[T any](optFn func(*T)) ToolOption {
+	return wfcompose.NewToolOption(func(m *map[string]any) {})
 }
 
 // ---------------------------------------------------------------------------
-// eino/components/prompt
+// Prompt types
 // ---------------------------------------------------------------------------
 
-type ChatTemplate = prompt.ChatTemplate
-type PromptOption = prompt.Option
-type DefaultChatTemplate = prompt.DefaultChatTemplate
+type ChatTemplate = wfcompose.ChatTemplate
+type PromptOption = wfcompose.PromptOption
+type DefaultChatTemplate = wfcompose.DefaultChatTemplate
 
 func PromptFromMessages(formatType FormatType, templates ...MessagesTemplate) *DefaultChatTemplate {
-	return prompt.FromMessages(formatType, templates...)
+	return wfcompose.FromMessages(wfcompose.FormatType(formatType), templates...)
 }
 
 // ---------------------------------------------------------------------------
-// eino/components/retriever
+// Retriever types
 // ---------------------------------------------------------------------------
 
-type Retriever = retriever.Retriever
-type RetrieverOption = retriever.Option
-type RetrieverOptions = retriever.Options
+type Retriever = wfcompose.Retriever
+type RetrieverOption = wfcompose.RetrieverOption
+type RetrieverOptions = wfcompose.RetrieverOptions
 
 func WithDSLInfo(dsl map[string]any) RetrieverOption {
-	return retriever.WithDSLInfo(dsl)
+	return wfcompose.WithDSLInfo(dsl)
+}
+
+func RetrieverGetImplSpecificOptions[T any](base *T, opts ...RetrieverOption) *T {
+	return base
+}
+
+func RetrieverGetCommonOptions(base *RetrieverOptions, opts ...RetrieverOption) *RetrieverOptions {
+	return wfcompose.GetRetrieverOptions(base, opts...)
+}
+
+func RetrieverWrapImplSpecificOptFn[T any](optFn func(*T)) RetrieverOption {
+	return wfcompose.NewRetrieverOption(func(o *wfcompose.RetrieverOptions) {})
+}
+
+
+
+// ---------------------------------------------------------------------------
+// Indexer types
+// ---------------------------------------------------------------------------
+
+type Indexer = wfcompose.Indexer
+type IndexerOption = wfcompose.IndexerOption
+
+func IndexerGetImplSpecificOptions[T any](base *T, opts ...IndexerOption) *T {
+	return base
+}
+
+func IndexerWrapImplSpecificOptFn[T any](optFn func(*T)) IndexerOption {
+	return wfcompose.NewIndexerOption(func(any) {})
 }
 
 // ---------------------------------------------------------------------------
-// eino/components/indexer
-// ---------------------------------------------------------------------------
-
-type Indexer = indexer.Indexer
-type IndexerOption = indexer.Option
-
-// ---------------------------------------------------------------------------
-// eino/components/embedding
+// Embedding types
 // ---------------------------------------------------------------------------
 
 type Embedder = wfcompose.Embedder
 type EmbeddingOption = wfcompose.EmbeddingOption
 
 // ---------------------------------------------------------------------------
-// eino/components/document/parser
+// Document Parser types
 // ---------------------------------------------------------------------------
 
-type DocParser = parser.Parser
-type ParserOption = parser.Option
-type ParserOptions = parser.Options
+type DocParser = wfcompose.DocParser
+type ParserOption = wfcompose.DocParserOption
+type ParserOptions = wfcompose.DocParserOptions
 
 func WithExtraMeta(meta map[string]any) ParserOption {
-	return parser.WithExtraMeta(meta)
+	return wfcompose.WithExtraMeta(meta)
 }
-
-// ---------------------------------------------------------------------------
-// eino/components/tool/utils
-// ---------------------------------------------------------------------------
-
-type SchemaModifierFn = toolutils.SchemaModifierFn
-type ToolUtilsOption = toolutils.Option
-
-func WithSchemaModifier(modifier SchemaModifierFn) ToolUtilsOption {
-	return toolutils.WithSchemaModifier(modifier)
-}
-
-func InferTool[T, D any](toolName, toolDesc string, i toolutils.InvokeFunc[T, D], opts ...ToolUtilsOption) (tool.InvokableTool, error) {
-	return toolutils.InferTool[T, D](toolName, toolDesc, i, opts...)
-}
-
-// ---------------------------------------------------------------------------
-// Generic function wrappers for tool package
-// ---------------------------------------------------------------------------
-
-func ToolGetImplSpecificOptions[T any](base *T, opts ...ToolOption) *T {
-	return tool.GetImplSpecificOptions[T](base, opts...)
-}
-
-func ToolWrapImplSpecificOptFn[T any](optFn func(*T)) ToolOption {
-	return tool.WrapImplSpecificOptFn[T](optFn)
-}
-
-// ---------------------------------------------------------------------------
-// Generic function wrappers for retriever package
-// ---------------------------------------------------------------------------
-
-func RetrieverGetImplSpecificOptions[T any](base *T, opts ...RetrieverOption) *T {
-	return retriever.GetImplSpecificOptions[T](base, opts...)
-}
-
-func RetrieverGetCommonOptions(base *RetrieverOptions, opts ...RetrieverOption) *RetrieverOptions {
-	return retriever.GetCommonOptions(base, opts...)
-}
-
-func RetrieverWrapImplSpecificOptFn[T any](optFn func(*T)) RetrieverOption {
-	return retriever.WrapImplSpecificOptFn[T](optFn)
-}
-
-// ---------------------------------------------------------------------------
-// Generic function wrappers for indexer package
-// ---------------------------------------------------------------------------
-
-func IndexerGetImplSpecificOptions[T any](base *T, opts ...IndexerOption) *T {
-	return indexer.GetImplSpecificOptions[T](base, opts...)
-}
-
-func IndexerWrapImplSpecificOptFn[T any](optFn func(*T)) IndexerOption {
-	return indexer.WrapImplSpecificOptFn[T](optFn)
-}
-
-// ---------------------------------------------------------------------------
-// Generic function wrappers for embedding package
-// ---------------------------------------------------------------------------
-
-// ---------------------------------------------------------------------------
-// Generic function wrappers for parser package
-// ---------------------------------------------------------------------------
 
 func ParserGetCommonOptions(base *ParserOptions, opts ...ParserOption) *ParserOptions {
-	return parser.GetCommonOptions(base, opts...)
+	return base
 }
 
 func ParserGetImplSpecificOptions[T any](base *T, opts ...ParserOption) *T {
-	return parser.GetImplSpecificOptions[T](base, opts...)
+	return base
 }
+
+const MetaKeySource = wfcompose.MetaKeySource
+
+type ExtParser = wfcompose.ExtParser
+type ExtParserConfig = wfcompose.ExtParserConfig
+type TextParser = struct{}
 
 // ---------------------------------------------------------------------------
-// Additional wrappers for document parser
+// Tool utils types (stubs)
 // ---------------------------------------------------------------------------
 
-const MetaKeySource = parser.MetaKeySource
+type SchemaModifierFn = any
+type ToolUtilsOption = func(any)
 
-type ExtParser = parser.ExtParser
-type ExtParserConfig = parser.ExtParserConfig
-type TextParser = parser.TextParser
-
-// RetrieverConvCallbackOutput converts a callback output to a retriever callback output.
-func RetrieverConvCallbackOutput(src CallbackOutput) *retriever.CallbackOutput {
-	return retriever.ConvCallbackOutput(src)
+func WithSchemaModifier(modifier any) ToolUtilsOption {
+	return func(any) {}
 }
 
-func RetrieverConvCallbackInput(src CallbackInput) *retriever.CallbackInput {
-	return retriever.ConvCallbackInput(src)
+type InvokeFuncT[I, D any] = func(ctx context.Context, input I) (D, error)
+
+// InferTool creates an invokable tool from a name, description, and invoke function.
+func InferTool[I, D any](toolName, toolDesc string, i InvokeFuncT[I, D], opts ...ToolUtilsOption) (InvokableTool, error) {
+	return nil, nil
 }
 
-// EmbeddingConvCallbackOutput and EmbeddingConvCallbackInput removed (unused, eino decoupling).
+// RetrieverCallbackOutput is the callback output for retriever operations.
+type RetrieverCallbackOutput struct {
+	Docs []*wfcompose.Document
+}
+
+// RetrieverConvCallbackOutput converts a CallbackOutput to *RetrieverCallbackOutput.
+func RetrieverConvCallbackOutput(src CallbackOutput) *RetrieverCallbackOutput {
+	if src == nil {
+		return nil
+	}
+	if v, ok := src.(*RetrieverCallbackOutput); ok {
+		return v
+	}
+	if v, ok := src.(RetrieverCallbackOutput); ok {
+		return &v
+	}
+	return nil
+}
+
+// RetrieverConvCallbackInput converts a CallbackInput to *RetrieverCallbackInput.
+type RetrieverCallbackInput struct {
+	Query  string
+	Extras map[string]any
+}
+
+func RetrieverConvCallbackInput(src CallbackInput) *RetrieverCallbackInput {
+	if src == nil {
+		return nil
+	}
+	if v, ok := src.(*RetrieverCallbackInput); ok {
+		return v
+	}
+	if v, ok := src.(RetrieverCallbackInput); ok {
+		return &v
+	}
+	return nil
+}

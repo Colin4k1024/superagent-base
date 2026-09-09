@@ -128,33 +128,28 @@ func (a *ReverseToolAdapter) Run(ctx context.Context, argsJSON string, _ ...llm.
 var _ llm.Tool = (*ReverseToolAdapter)(nil)
 
 // einoParamsToACL converts eino ParamsOneOf to ACL ParameterInfo map.
-// Uses the ParamsOneOf.ToJSONSchema method to extract params when available.
+// Uses ParamsOneOf.Params() to extract params directly.
 func einoParamsToACL(p *einobridge.ParamsOneOf) map[string]*llm.ParameterInfo {
 	if p == nil {
 		return nil
 	}
-	js, err := p.ToJSONSchema()
-	if err != nil || js == nil || js.Properties == nil {
+	params := p.Params()
+	if params == nil {
 		return nil
 	}
-	requiredSet := make(map[string]bool, len(js.Required))
-	for _, r := range js.Required {
-		requiredSet[r] = true
-	}
 	out := make(map[string]*llm.ParameterInfo)
-	for pair := js.Properties.Oldest(); pair != nil; pair = pair.Next() {
-		v := pair.Value
+	for name, v := range params {
 		if v == nil {
 			continue
 		}
 		pi := &llm.ParameterInfo{
-			Desc:     v.Description,
-			Required: requiredSet[pair.Key],
+			Desc:     v.Desc,
+			Required: v.Required,
 		}
-		if len(v.Type) > 0 {
+		if v.Type != "" {
 			pi.Type = llm.DataType(v.Type)
 		}
-		out[pair.Key] = pi
+		out[name] = pi
 	}
 	if len(out) == 0 {
 		return nil

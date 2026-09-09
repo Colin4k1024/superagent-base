@@ -30,52 +30,64 @@
  * limitations under the License.
  */
 
-// schema_facade re-exports cloudwego/eino/schema types and functions as
-// type aliases and thin wrappers so agentflow can avoid importing
-// cloudwego/eino/schema directly (S3 acceptance criterion).
+// schema_facade re-exports wfcompose schema types as prefixed aliases
+// so callers avoid importing cloudwego/eino/schema directly.
+// This file has ZERO cloudwego/eino imports.
 package einobridge
 
 import (
-	"github.com/cloudwego/eino/schema"
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose"
 )
 
 // ---------------------------------------------------------------------------
-// Type aliases
+// Type aliases (all map to wfcompose native types)
 // ---------------------------------------------------------------------------
 
-type Message = schema.Message
-type StreamReader[T any] = schema.StreamReader[T]
-type StreamWriter[T any] = schema.StreamWriter[T]
-type ToolInfo = schema.ToolInfo
-type ParamsOneOf = schema.ParamsOneOf
-type ParameterInfo = schema.ParameterInfo
-type ToolCall = schema.ToolCall
-type MessagesTemplate = schema.MessagesTemplate
-type FormatType = schema.FormatType
-type ConvertOption = schema.ConvertOption
+type Message = wfcompose.Message
+type StreamReader[T any] = wfcompose.StreamReader[T]
+type StreamWriter[T any] = wfcompose.StreamWriter[T]
+type ToolInfo = wfcompose.ToolInfo
+type ParamsOneOf = wfcompose.ParamsOneOf
+type ParameterInfo = wfcompose.ParameterInfo
+type ToolCall = wfcompose.ToolCall
+type MessagesTemplate = wfcompose.MessagesTemplate
+type FormatType = wfcompose.FormatType
+type ConvertOption = wfcompose.ConvertOption
 
 // ---------------------------------------------------------------------------
 // Constants & variables
 // ---------------------------------------------------------------------------
 
-const Jinja2 FormatType = schema.Jinja2
+const Jinja2 FormatType = wfcompose.Jinja2
 
-var ErrNoValue = schema.ErrNoValue
+var ErrNoValue = wfcompose.ErrNoValue
 
 // ---------------------------------------------------------------------------
 // Message constructors
 // ---------------------------------------------------------------------------
 
 func SystemMessage(content string) *Message {
-	return schema.SystemMessage(content)
+	return wfcompose.SystemMessage(content)
 }
 
 func UserMessage(content string) *Message {
-	return schema.UserMessage(content)
+	return wfcompose.UserMessage(content)
 }
 
 func MessagesPlaceholder(key string, optional bool) MessagesTemplate {
-	return schema.MessagesPlaceholder(key, optional)
+	return wfcompose.MessagesPlaceholder(key, optional)
+}
+
+func AssistantMessage(content string, toolCalls []ToolCall) *Message {
+	return wfcompose.AssistantMessage(content, toolCalls)
+}
+
+func ToolMessage(content string, toolCallID string) *Message {
+	return wfcompose.ToolMessage(content, toolCallID)
+}
+
+func ConcatMessages(msgs []*Message) (*Message, error) {
+	return wfcompose.ConcatMessages(msgs)
 }
 
 // ---------------------------------------------------------------------------
@@ -83,15 +95,19 @@ func MessagesPlaceholder(key string, optional bool) MessagesTemplate {
 // ---------------------------------------------------------------------------
 
 func Pipe[T any](cap int) (*StreamReader[T], *StreamWriter[T]) {
-	return schema.Pipe[T](cap)
+	return wfcompose.Pipe[T](cap)
 }
 
 func StreamReaderWithConvert[T, D any](sr *StreamReader[T], convert func(T) (D, error), opts ...ConvertOption) *StreamReader[D] {
-	return schema.StreamReaderWithConvert[T, D](sr, convert, opts...)
+	return wfcompose.StreamReaderWithConvert[T, D](sr, convert, opts...)
 }
 
-func ConcatMessages(msgs []*Message) (*Message, error) {
-	return schema.ConcatMessages(msgs)
+func StreamReaderFromArray[T any](arr []T) *StreamReader[T] {
+	return wfcompose.StreamReaderFromArray(arr)
+}
+
+func MergeStreamReaders[T any](readers []*StreamReader[T]) *StreamReader[T] {
+	return wfcompose.MergeStreamReaders(readers)
 }
 
 // ---------------------------------------------------------------------------
@@ -99,7 +115,7 @@ func ConcatMessages(msgs []*Message) (*Message, error) {
 // ---------------------------------------------------------------------------
 
 func RegisterName[T any](name string) {
-	schema.RegisterName[T](name)
+	wfcompose.RegisterName[T](name)
 }
 
 // ---------------------------------------------------------------------------
@@ -107,72 +123,51 @@ func RegisterName[T any](name string) {
 // ---------------------------------------------------------------------------
 
 func NewParamsOneOfByParams(params map[string]*ParameterInfo) *ParamsOneOf {
-	return schema.NewParamsOneOfByParams(params)
-}
-
-func AssistantMessage(content string, toolCalls []ToolCall) *Message {
-	return schema.AssistantMessage(content, toolCalls)
+	return wfcompose.NewParamsOneOfByParams(params)
 }
 
 // ---------------------------------------------------------------------------
 // Additional type aliases for domain/workflow/ migration
 // ---------------------------------------------------------------------------
 
-type ChatMessagePart = schema.ChatMessagePart
-type ChatMessagePartType = schema.ChatMessagePartType
-type ChatMessageImageURL = schema.ChatMessageImageURL
-type ChatMessageAudioURL = schema.ChatMessageAudioURL
-type ChatMessageVideoURL = schema.ChatMessageVideoURL
-type ChatMessageFileURL = schema.ChatMessageFileURL
-type RoleType = schema.RoleType
-type ResponseMeta = schema.ResponseMeta
-type TokenUsage = schema.TokenUsage
-type Document = schema.Document
+type ChatMessagePart = wfcompose.ChatMessagePart
+type ChatMessagePartType = wfcompose.ChatMessagePartType
+type ChatMessageImageURL = wfcompose.ChatMessageImageURL
+type ChatMessageAudioURL = wfcompose.ChatMessageAudioURL
+type ChatMessageVideoURL = wfcompose.ChatMessageVideoURL
+type ChatMessageFileURL = wfcompose.ChatMessageFileURL
+type RoleType = wfcompose.RoleType
+type ResponseMeta = wfcompose.ResponseMeta
+type TokenUsage = wfcompose.TokenUsage
+type Document = wfcompose.Document
+type FunctionCall = wfcompose.FunctionCall
 
 // Role constants
 const (
-	Assistant RoleType = schema.Assistant
-	User      RoleType = schema.User
-	System    RoleType = schema.System
-	Tool      RoleType = schema.Tool
+	Assistant RoleType = wfcompose.Assistant
+	User      RoleType = wfcompose.User
+	System    RoleType = wfcompose.System
+	Tool      RoleType = wfcompose.Tool
 )
 
 // ChatMessagePartType constants
 const (
-	ChatMessagePartTypeText      ChatMessagePartType = schema.ChatMessagePartTypeText
-	ChatMessagePartTypeImageURL  ChatMessagePartType = schema.ChatMessagePartTypeImageURL
-	ChatMessagePartTypeAudioURL  ChatMessagePartType = schema.ChatMessagePartTypeAudioURL
-	ChatMessagePartTypeVideoURL  ChatMessagePartType = schema.ChatMessagePartTypeVideoURL
-	ChatMessagePartTypeFileURL   ChatMessagePartType = schema.ChatMessagePartTypeFileURL
+	ChatMessagePartTypeText      ChatMessagePartType = wfcompose.ChatMessagePartTypeText
+	ChatMessagePartTypeImageURL  ChatMessagePartType = wfcompose.ChatMessagePartTypeImageURL
+	ChatMessagePartTypeAudioURL  ChatMessagePartType = wfcompose.ChatMessagePartTypeAudioURL
+	ChatMessagePartTypeVideoURL  ChatMessagePartType = wfcompose.ChatMessagePartTypeVideoURL
+	ChatMessagePartTypeFileURL   ChatMessagePartType = wfcompose.ChatMessagePartTypeFileURL
 )
-
-// Additional stream helpers
-func StreamReaderFromArray[T any](arr []T) *StreamReader[T] {
-	return schema.StreamReaderFromArray(arr)
-}
-
-func MergeStreamReaders[T any](readers []*StreamReader[T]) *StreamReader[T] {
-	return schema.MergeStreamReaders(readers)
-}
 
 // DataType and JSON schema constants
-type DataType = schema.DataType
+type DataType = wfcompose.DataType
 
 const (
-	Object  DataType = schema.Object
-	Number  DataType = schema.Number
-	Integer DataType = schema.Integer
-	String  DataType = schema.String
-	Array   DataType = schema.Array
-	Null    DataType = schema.Null
-	Boolean DataType = schema.Boolean
+	Object  DataType = wfcompose.Object
+	Number  DataType = wfcompose.Number
+	Integer DataType = wfcompose.Integer
+	String  DataType = wfcompose.String
+	Array   DataType = wfcompose.Array
+	Null    DataType = wfcompose.Null
+	Boolean DataType = wfcompose.Boolean
 )
-
-// Additional type aliases for S4 migration
-type FunctionCall = schema.FunctionCall
-
-// ToolMessage constructs a tool-result message.
-func ToolMessage(content string, toolCallID string) *Message {
-	return schema.ToolMessage(content, toolCallID)
-}
-

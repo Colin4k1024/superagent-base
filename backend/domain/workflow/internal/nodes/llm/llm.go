@@ -1022,7 +1022,7 @@ func (l *LLM) prepare(ctx context.Context, _ map[string]any, opts ...nodes.NodeO
 			},
 		}).Handler()
 
-		composeOpts = append(composeOpts, einobridge.WithCallbacks(chatModelHandler))
+		composeOpts = append(composeOpts, einobridge.WrapOption(einobridge.WithCallbacks(chatModelHandler)))
 	}
 
 	if c != nil {

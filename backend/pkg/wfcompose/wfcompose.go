@@ -51,6 +51,12 @@ type Option struct {
 // NewOption wraps an engine-specific option value.
 func NewOption(inner any) Option { return Option{inner: inner} }
 
+// DesignateNode is a no-op in native compose that returns the option unchanged.
+// It exists for API compatibility with eino's compose.Option.
+func (o Option) DesignateNode(nodeKey string) Option {
+	return o
+}
+
 // Unwrap returns the underlying engine-specific option.
 // It is intended for use by engine adapters only.
 func (o Option) Unwrap() (any, bool) {
@@ -207,4 +213,36 @@ type FieldPath []string
 // (Invoke, Collect, Transform) can be added when needed.
 type Runnable[I, O any] interface {
 	Stream(ctx context.Context, input I, opts ...Option) (*StreamReader[O], error)
+}
+
+// Copy creates n independent copies of the StreamReader.
+// The native implementation drains the source and buffers items for replay.
+func (sr *StreamReader[T]) Copy(n int) []*StreamReader[T] {
+	if sr == nil {
+		return nil
+	}
+	var items []T
+	for {
+		v, err := sr.Recv()
+		if err != nil {
+			break
+		}
+		items = append(items, v)
+	}
+	readers := make([]*StreamReader[T], n)
+	for i := 0; i < n; i++ {
+		idx := 0
+		readers[i] = &StreamReader[T]{
+			recv: func() (T, error) {
+				if idx >= len(items) {
+					var zero T
+					return zero, errStreamClosed
+				}
+				v := items[idx]
+				idx++
+				return v, nil
+			},
+		}
+	}
+	return readers
 }

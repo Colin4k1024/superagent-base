@@ -32,7 +32,10 @@
 
 package wfcompose
 
-import "context"
+import (
+	"context"
+	"io"
+)
 
 // Component is the type identifier for a pipeline component.
 type Component string
@@ -213,4 +216,191 @@ func GetEmbeddingOptions(base *EmbeddingOptions, opts ...EmbeddingOption) *Embed
 		opt.Apply(base)
 	}
 	return base
+}
+
+// ---------------------------------------------------------------------------
+// Prompt / ChatTemplate types
+// ---------------------------------------------------------------------------
+
+// PromptOption is a call-time option for a ChatTemplate.
+type PromptOption struct {
+	apply func(any)
+}
+
+// ChatTemplate formats variables into a list of messages.
+type ChatTemplate interface {
+	Format(ctx context.Context, vs map[string]any, opts ...PromptOption) ([]*Message, error)
+}
+
+// DefaultChatTemplate stores templates and a format type for rendering.
+type DefaultChatTemplate struct {
+	templates  []MessagesTemplate
+	formatType FormatType
+}
+
+// FromMessages creates a DefaultChatTemplate from the given templates and format type.
+func FromMessages(formatType FormatType, templates ...MessagesTemplate) *DefaultChatTemplate {
+	return &DefaultChatTemplate{
+		templates:  templates,
+		formatType: formatType,
+	}
+}
+
+// Format renders the templates into messages.
+func (t *DefaultChatTemplate) Format(ctx context.Context, vs map[string]any, opts ...PromptOption) ([]*Message, error) {
+	var result []*Message
+	for _, tpl := range t.templates {
+		if tpl == nil {
+			continue
+		}
+		msgs, err := tpl.Format(ctx, vs, t.formatType)
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, msgs...)
+	}
+	return result, nil
+}
+
+// ---------------------------------------------------------------------------
+// Retriever types
+// ---------------------------------------------------------------------------
+
+// Retriever retrieves documents matching a query.
+type Retriever interface {
+	Retrieve(ctx context.Context, query string, opts ...RetrieverOption) ([]*Document, error)
+}
+
+// RetrieverOption is a call-time option for a Retriever.
+type RetrieverOption struct {
+	apply func(*RetrieverOptions)
+}
+
+// RetrieverOptions holds options for a retrieval call.
+type RetrieverOptions struct {
+	TopK      *int
+	Score     *float64
+	ScoreThreshold *float64
+	DSLInfo   map[string]any
+}
+
+// WithDSLInfo sets DSL filter info for retrieval.
+func WithDSLInfo(dsl map[string]any) RetrieverOption {
+	return RetrieverOption{apply: func(o *RetrieverOptions) { o.DSLInfo = dsl }}
+}
+
+// Indexer indexes documents for later retrieval.
+type Indexer interface {
+	Store(ctx context.Context, docs []*Document, opts ...IndexerOption) ([]string, error)
+}
+
+// IndexerOption is a call-time option for an Indexer.
+type IndexerOption struct {
+	apply func(any)
+}
+
+// ---------------------------------------------------------------------------
+// Document Parser types
+// ---------------------------------------------------------------------------
+
+// DocParser parses documents into text.
+type DocParser interface {
+	Parse(ctx context.Context, reader io.Reader, opts ...DocParserOption) ([]*Document, error)
+}
+
+// DocParserOption is a call-time option for a DocParser.
+type DocParserOption struct {
+	apply func(*DocParserOptions)
+}
+
+// DocParserOptions holds options for document parsing.
+type DocParserOptions struct {
+	ExtraMeta map[string]any
+}
+
+// WithExtraMeta sets extra metadata for document parsing.
+func WithExtraMeta(meta map[string]any) DocParserOption {
+	return DocParserOption{apply: func(o *DocParserOptions) { o.ExtraMeta = meta }}
+}
+
+const MetaKeySource = "source"
+
+// ExtParser is an extension point for custom parsers.
+type ExtParser interface {
+	ExtParse(ctx context.Context, reader io.Reader, opts ...DocParserOption) ([]*Document, error)
+}
+
+// ExtParserConfig holds configuration for extension parsers.
+type ExtParserConfig struct {
+	URI string
+}
+
+// NewToolOption creates a ToolOption from an apply function.
+func NewToolOption(apply func(*map[string]any)) ToolOption {
+	return ToolOption{apply: apply}
+}
+
+// NewRetrieverOption creates a RetrieverOption from an apply function.
+func NewRetrieverOption(apply func(*RetrieverOptions)) RetrieverOption {
+	return RetrieverOption{apply: apply}
+}
+
+// GetRetrieverOptions applies RetrieverOptions to a base and returns the merged result.
+func GetRetrieverOptions(base *RetrieverOptions, opts ...RetrieverOption) *RetrieverOptions {
+	if base == nil {
+		base = &RetrieverOptions{}
+	}
+	for _, opt := range opts {
+		if opt.apply != nil {
+			opt.apply(base)
+		}
+	}
+	return base
+}
+
+// NewIndexerOption creates an IndexerOption.
+func NewIndexerOption(apply func(any)) IndexerOption {
+	return IndexerOption{apply: apply}
+}
+
+// NewDocParserOption creates a DocParserOption.
+func NewDocParserOption(apply func(*DocParserOptions)) DocParserOption {
+	return DocParserOption{apply: apply}
+}
+
+// PromptTokenDetails holds token usage breakdown details.
+type PromptTokenDetails struct {
+	AudioTokens          int
+	CachedTokens         int
+	CompletionTokens     int
+	AcceptedPredictionTokens int
+	RejectedPredictionTokens int
+}
+
+// ModelCallbackInput is the callback input for model operations.
+type ModelCallbackInput struct {
+	Messages []*Message
+	Config   *ModelCallbackConfig
+	Tools    []*ToolInfo
+	Extra    map[string]any
+}
+
+// ModelCallbackConfig holds model call configuration.
+type ModelCallbackConfig struct {
+	Model          string
+	Temperature    *float32
+	MaxTokens      *int
+	TopP           *float32
+	Stop           []string
+	Tools          []*ToolInfo
+	ToolChoice     *string
+}
+
+// ModelCallbackOutput is the callback output for model operations.
+type ModelCallbackOutput struct {
+	Message      *Message
+	Config       *ModelCallbackConfig
+	TokenUsage   *TokenUsage
+	Tools        []*ToolInfo
+	Extra        map[string]any
 }
