@@ -24,7 +24,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/cloudwego/eino/flow/agent/react"
 	"golang.org/x/exp/maps"
 
 	workflow3 "github.com/superagent-ai/superagent-base/backend/api/model/workflow"
@@ -645,7 +644,7 @@ func (c *Config) Build(ctx context.Context, ns *schema2.NodeSchema, _ ...schema2
 		if !ok {
 			return nil, errors.New("requires a ToolCallingChatModel to use with tools")
 		}
-		reactConfig := react.AgentConfig{
+		reactConfig := einobridge.AgentConfig{
 			ToolCallingModel: m,
 			ToolsConfig:      einobridge.ToolsNodeConfig{Tools: tools},
 			ModelNodeName:    agentModelName,
@@ -659,7 +658,7 @@ func (c *Config) Build(ctx context.Context, ns *schema2.NodeSchema, _ ...schema2
 			}
 		}
 
-		reactAgent, err := react.NewAgent(ctx, &reactConfig)
+		reactAgent, err := einobridge.NewAgent(ctx, &reactConfig)
 		if err != nil {
 			return nil, err
 		}
