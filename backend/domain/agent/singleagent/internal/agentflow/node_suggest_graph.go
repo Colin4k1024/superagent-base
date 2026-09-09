@@ -20,7 +20,6 @@ import (
 	"context"
 
 	"github.com/cloudwego/eino/components/prompt"
-	"github.com/cloudwego/eino/schema"
 
 	"github.com/superagent-ai/superagent-base/backend/api/model/app/bot_common"
 	"github.com/superagent-ai/superagent-base/backend/bizpkg/llm/modelbuilder"
@@ -38,7 +37,7 @@ const (
 	keyOfSuggestTemplate        = "suggest_template"
 )
 
-func newSuggestGraph(_ context.Context, conf *Config, chatModel modelbuilder.ToolCallingChatModel) (*einobridge.Graph[[]*schema.Message, *schema.Message], bool) {
+func newSuggestGraph(_ context.Context, conf *Config, chatModel modelbuilder.ToolCallingChatModel) (*einobridge.Graph[[]*einobridge.Message, *einobridge.Message], bool) {
 
 	isNeedGenerateSuggest := false
 	agentSuggestionSetting := conf.Agent.SuggestReply
@@ -54,20 +53,20 @@ func newSuggestGraph(_ context.Context, conf *Config, chatModel modelbuilder.Too
 	if !isNeedGenerateSuggest {
 		return nil, isNeedGenerateSuggest
 	}
-	suggestPrompt := prompt.FromMessages(schema.Jinja2,
-		schema.SystemMessage(SUGGESTION_PROMPT_JINJA2),
-		schema.UserMessage("Based on the contextual information, provide three recommended questions"),
+	suggestPrompt := prompt.FromMessages(einobridge.Jinja2,
+		einobridge.SystemMessage(SUGGESTION_PROMPT_JINJA2),
+		einobridge.UserMessage("Based on the contextual information, provide three recommended questions"),
 	)
 
-	suggestGraph := einobridge.NewGraph[[]*schema.Message, *schema.Message]()
+	suggestGraph := einobridge.NewGraph[[]*einobridge.Message, *einobridge.Message]()
 	suggestPromptVars := &suggestPromptVariables{}
 	_ = suggestGraph.AddLambdaNode(keyOfSuggestPromptVariables,
-		einobridge.InvokableLambda[[]*schema.Message, map[string]any](func(ctx context.Context, vb []*schema.Message) (map[string]any, error) {
+		einobridge.InvokableLambda[[]*einobridge.Message, map[string]any](func(ctx context.Context, vb []*einobridge.Message) (map[string]any, error) {
 		return suggestPromptVars.AssembleSuggestPromptVariables(ctx, einobridge.WrapMessageSlice(vb))
 	}))
 
 	_ = suggestGraph.AddLambdaNode(keyOfSuggestPersonParse,
-		einobridge.InvokableLambda[[]*schema.Message, string](func(ctx context.Context, vb []*schema.Message) (string, error) {
+		einobridge.InvokableLambda[[]*einobridge.Message, string](func(ctx context.Context, vb []*einobridge.Message) (string, error) {
 		return sp.RenderPersona(ctx, einobridge.WrapMessageSlice(vb))
 	}),
 		einobridge.WithOutputKey(keyOfSuggestPersonParse),
@@ -75,7 +74,7 @@ func newSuggestGraph(_ context.Context, conf *Config, chatModel modelbuilder.Too
 
 	_ = suggestGraph.AddChatTemplateNode(keyOfSuggestTemplate, suggestPrompt)
 	_ = suggestGraph.AddChatModelNode(keyOfSuggestChatModel, chatModel, einobridge.WithNodeName(keyOfSuggestChatModel))
-	_ = suggestGraph.AddLambdaNode(keyOfSuggestParser, einobridge.InvokableLambda[*schema.Message, *schema.Message](func(ctx context.Context, msg *schema.Message) (*schema.Message, error) {
+	_ = suggestGraph.AddLambdaNode(keyOfSuggestParser, einobridge.InvokableLambda[*einobridge.Message, *einobridge.Message](func(ctx context.Context, msg *einobridge.Message) (*einobridge.Message, error) {
 		wfMsg, err := suggestParser(ctx, einobridge.WrapMessage(msg))
 		if err != nil {
 			return nil, err

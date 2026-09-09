@@ -17,12 +17,12 @@
 package agentflow
 
 import (
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose"
 	"context"
 	"fmt"
 
 	"github.com/cloudwego/eino/components/prompt"
-	"github.com/cloudwego/eino/schema"
 )
 
 type suggestPersonaRender struct {
@@ -35,7 +35,7 @@ func (p *suggestPersonaRender) RenderPersona(ctx context.Context, _ []*wfcompose
 		return "", nil
 	}
 
-	msgs, err := prompt.FromMessages(schema.Jinja2, schema.UserMessage(p.persona)).Format(ctx, nil)
+	msgs, err := prompt.FromMessages(einobridge.Jinja2, einobridge.UserMessage(p.persona)).Format(ctx, nil)
 	if err != nil {
 		return "", fmt.Errorf("render persona failed, err=%w", err)
 	}
