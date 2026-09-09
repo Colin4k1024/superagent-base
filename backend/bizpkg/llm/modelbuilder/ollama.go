@@ -20,7 +20,6 @@ import (
 	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	"context"
 
-	"github.com/eino-contrib/ollama/api"
 
 	"github.com/superagent-ai/superagent-base/backend/api/model/admin/config"
 	"github.com/superagent-ai/superagent-base/backend/pkg/lang/ptr"
@@ -38,7 +37,7 @@ func newOllamaModelBuilder(cfg *config.Model) Service {
 
 func (o *ollamaModelBuilder) getDefaultOllamaConfig() *einobridge.OllamaChatModelConfig {
 	return &einobridge.OllamaChatModelConfig{
-		Options: &api.Options{},
+		Options: &einobridge.OllamaOptions{},
 		BaseURL: "http://127.0.0.1:11434",
 	}
 }
@@ -68,11 +67,11 @@ func (o *ollamaModelBuilder) applyParamsToOllamaConfig(conf *einobridge.OllamaCh
 		conf.Options.PresencePenalty = params.PresencePenalty
 	}
 
-	if params.EnableThinking != nil {
-		conf.Thinking = &api.ThinkValue{
-			Value: ptr.From(params.EnableThinking),
-		}
+if params.EnableThinking != nil {
+	conf.Thinking = &einobridge.OllamaThinkValue{
+		Value: params.EnableThinking,
 	}
+}
 }
 
 func (o *ollamaModelBuilder) Build(ctx context.Context, params *LLMParams) (ToolCallingChatModel, error) {
@@ -85,12 +84,12 @@ func (o *ollamaModelBuilder) Build(ctx context.Context, params *LLMParams) (Tool
 	conf.Model = base.Model
 
 	switch base.ThinkingType {
-	case config.ThinkingType_Enable:
-		conf.Thinking = &api.ThinkValue{
+case config.ThinkingType_Enable:
+	conf.Thinking = &einobridge.OllamaThinkValue{
 			Value: ptr.Of(true),
 		}
-	case config.ThinkingType_Disable:
-		conf.Thinking = &api.ThinkValue{
+case config.ThinkingType_Disable:
+	conf.Thinking = &einobridge.OllamaThinkValue{
 			Value: ptr.Of(false),
 		}
 	}

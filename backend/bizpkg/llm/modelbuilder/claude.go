@@ -43,8 +43,13 @@ func (c *claudeModelBuilder) applyParamsToChatModelConfig(conf *einobridge.Claud
 		return
 	}
 
-	conf.TopP = params.TopP
-	conf.TopK = params.TopK
+	if params.TopP != nil {
+		conf.TopP = *params.TopP
+	}
+
+	if params.TopK != nil {
+		conf.TopK = int(*params.TopK)
+	}
 
 	if params.Temperature != nil {
 		conf.Temperature = ptr.Of(*params.Temperature)

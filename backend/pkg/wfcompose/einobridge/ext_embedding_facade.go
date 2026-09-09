@@ -30,65 +30,67 @@
  * limitations under the License.
  */
 
-// ext_embedding_facade re-exports cloudwego/eino-ext embedding provider
-// types as prefixed aliases so callers avoid importing eino-ext directly (S4).
+// ext_embedding_facade defines native config types and constructor functions
+// for all embedding providers.  Each constructor creates a native provider
+// (which implements eino's embedding.Embedder with zero eino-ext imports) and
+// returns it directly.
+//
+// This file has ZERO cloudwego/eino-ext imports.
 package einobridge
 
 import (
 	"context"
 
-	arkembed "github.com/cloudwego/eino-ext/components/embedding/ark"
-	"github.com/cloudwego/eino-ext/components/embedding/gemini"
-	"github.com/cloudwego/eino-ext/components/embedding/ollama"
-	"github.com/cloudwego/eino-ext/components/embedding/openai"
+	"github.com/cloudwego/eino/components/embedding"
+
+	arkprovider "github.com/superagent-ai/superagent-base/backend/pkg/embedding/providers/ark"
+	geminiprovider "github.com/superagent-ai/superagent-base/backend/pkg/embedding/providers/gemini"
+	ollamaprovider "github.com/superagent-ai/superagent-base/backend/pkg/embedding/providers/ollama"
+	openaiprovider "github.com/superagent-ai/superagent-base/backend/pkg/embedding/providers/openai"
 )
 
 // ---------------------------------------------------------------------------
 // ark embedding provider
 // ---------------------------------------------------------------------------
 
-type ArkAPIType = arkembed.APIType
-type ArkEmbeddingConfig = arkembed.EmbeddingConfig
-type ArkEmbedder = arkembed.Embedder
+type ArkAPIType = arkprovider.APIType
+type ArkEmbeddingConfig = arkprovider.EmbeddingConfig
 
 const (
-	ArkAPITypeText        ArkAPIType = arkembed.APITypeText
-	ArkAPITypeMultiModal  ArkAPIType = arkembed.APITypeMultiModal
+	ArkAPITypeText       ArkAPIType = arkprovider.APITypeText
+	ArkAPITypeMultiModal ArkAPIType = arkprovider.APITypeMultiModal
 )
 
-func ArkNewEmbedder(ctx context.Context, config *ArkEmbeddingConfig) (*ArkEmbedder, error) {
-	return arkembed.NewEmbedder(ctx, config)
+func ArkNewEmbedder(ctx context.Context, config *ArkEmbeddingConfig) (embedding.Embedder, error) {
+	return arkprovider.NewEmbedder(ctx, config)
 }
 
 // ---------------------------------------------------------------------------
 // gemini embedding provider
 // ---------------------------------------------------------------------------
 
-type GeminiEmbeddingConfig = gemini.EmbeddingConfig
-type GeminiEmbedder = gemini.Embedder
+type GeminiEmbeddingConfig = geminiprovider.EmbeddingConfig
 
-func GeminiNewEmbedder(ctx context.Context, config *GeminiEmbeddingConfig) (*GeminiEmbedder, error) {
-	return gemini.NewEmbedder(ctx, config)
+func GeminiNewEmbedder(ctx context.Context, config *GeminiEmbeddingConfig) (embedding.Embedder, error) {
+	return geminiprovider.NewEmbedder(ctx, config)
 }
 
 // ---------------------------------------------------------------------------
 // ollama embedding provider
 // ---------------------------------------------------------------------------
 
-type OllamaEmbeddingConfig = ollama.EmbeddingConfig
-type OllamaEmbedder = ollama.Embedder
+type OllamaEmbeddingConfig = ollamaprovider.EmbeddingConfig
 
-func OllamaNewEmbedder(ctx context.Context, config *OllamaEmbeddingConfig) (*OllamaEmbedder, error) {
-	return ollama.NewEmbedder(ctx, config)
+func OllamaNewEmbedder(ctx context.Context, config *OllamaEmbeddingConfig) (embedding.Embedder, error) {
+	return ollamaprovider.NewEmbedder(ctx, config)
 }
 
 // ---------------------------------------------------------------------------
 // openai embedding provider
 // ---------------------------------------------------------------------------
 
-type OpenAIEmbeddingConfig = openai.EmbeddingConfig
-type OpenAIEmbedder = openai.Embedder
+type OpenAIEmbeddingConfig = openaiprovider.EmbeddingConfig
 
-func OpenAINewEmbedder(ctx context.Context, config *OpenAIEmbeddingConfig) (*OpenAIEmbedder, error) {
-	return openai.NewEmbedder(ctx, config)
+func OpenAINewEmbedder(ctx context.Context, config *OpenAIEmbeddingConfig) (embedding.Embedder, error) {
+	return openaiprovider.NewEmbedder(ctx, config)
 }
