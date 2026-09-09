@@ -21,7 +21,6 @@ import (
 	"context"
 	"errors"
 
-	"github.com/cloudwego/eino/callbacks"
 	"github.com/cloudwego/eino/components"
 	"github.com/cloudwego/eino/components/model"
 
@@ -85,12 +84,12 @@ func (m *ModelForLLM) Generate(ctx context.Context, input []*einobridge.Message,
 		if !m.fallbackEnableCallback {
 			defer func() {
 				if err != nil {
-					_ = callbacks.OnError(ctx, err)
+					_ = einobridge.OnError(ctx, err)
 				} else {
-					_ = callbacks.OnEnd(ctx, output)
+					_ = einobridge.OnEnd(ctx, output)
 				}
 			}()
-			ctx = callbacks.OnStart(ctx, input)
+			ctx = einobridge.OnStart(ctx, input)
 		}
 		return m.FallbackModel.Generate(ctx, input, opts...)
 	}
@@ -98,12 +97,12 @@ func (m *ModelForLLM) Generate(ctx context.Context, input []*einobridge.Message,
 	if !m.modelEnableCallback {
 		defer func() {
 			if err != nil {
-				_ = callbacks.OnError(ctx, err)
+				_ = einobridge.OnError(ctx, err)
 			} else {
-				_ = callbacks.OnEnd(ctx, output)
+				_ = einobridge.OnEnd(ctx, output)
 			}
 		}()
-		ctx = callbacks.OnStart(ctx, input)
+		ctx = einobridge.OnStart(ctx, input)
 	}
 	return m.Model.Generate(ctx, input, opts...)
 }
@@ -115,12 +114,12 @@ func (m *ModelForLLM) Stream(ctx context.Context, input []*einobridge.Message, o
 		if !m.fallbackEnableCallback {
 			defer func() {
 				if err != nil {
-					_ = callbacks.OnError(ctx, err)
+					_ = einobridge.OnError(ctx, err)
 				} else {
-					_, output = callbacks.OnEndWithStreamOutput(ctx, output)
+					_, output = einobridge.OnEndWithStreamOutput(ctx, output)
 				}
 			}()
-			ctx = callbacks.OnStart(ctx, input)
+			ctx = einobridge.OnStart(ctx, input)
 		}
 		return m.FallbackModel.Stream(ctx, input, opts...)
 	}
@@ -128,12 +127,12 @@ func (m *ModelForLLM) Stream(ctx context.Context, input []*einobridge.Message, o
 	if !m.modelEnableCallback {
 		defer func() {
 			if err != nil {
-				_ = callbacks.OnError(ctx, err)
+				_ = einobridge.OnError(ctx, err)
 			} else {
-				_, output = callbacks.OnEndWithStreamOutput(ctx, output)
+				_, output = einobridge.OnEndWithStreamOutput(ctx, output)
 			}
 		}()
-		ctx = callbacks.OnStart(ctx, input)
+		ctx = einobridge.OnStart(ctx, input)
 	}
 	return m.Model.Stream(ctx, input, opts...)
 }

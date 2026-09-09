@@ -34,10 +34,10 @@ package evolution
 
 import (
 	"context"
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	"fmt"
 	"time"
 
-	"github.com/cloudwego/eino/callbacks"
 	"github.com/cloudwego/eino/components"
 	"github.com/cloudwego/eino/components/model"
 
@@ -47,17 +47,17 @@ import (
 // startKey is a context key for storing component start time.
 type startKey struct{}
 
-// NewEvolutionCallback builds an eino callbacks.Handler that feeds
+// NewEvolutionCallback builds an eino einobridge.Handler that feeds
 // Tool and Model execution events into the Engine's SignalCollector.
 //
 // The callback is designed to be registered globally:
 //
-//	callbacks.AppendGlobalHandlers(evolution.NewEvolutionCallback(engine))
+//	einobridge.AppendGlobalHandlers(evolution.NewEvolutionCallback(engine))
 //
 // It is safe to call with a nil engine — all hooks become no-ops.
-func NewEvolutionCallback(engine *Engine) callbacks.Handler {
+func NewEvolutionCallback(engine *Engine) einobridge.Handler {
 	cb := &evolutionCallback{engine: engine}
-	return callbacks.NewHandlerBuilder().
+	return einobridge.NewHandlerBuilder().
 		OnStartFn(cb.onStart).
 		OnEndFn(cb.onEnd).
 		OnErrorFn(cb.onError).
@@ -68,11 +68,11 @@ type evolutionCallback struct {
 	engine *Engine
 }
 
-func (c *evolutionCallback) onStart(ctx context.Context, _ *callbacks.RunInfo, _ callbacks.CallbackInput) context.Context {
+func (c *evolutionCallback) onStart(ctx context.Context, _ *einobridge.RunInfo, _ einobridge.CallbackInput) context.Context {
 	return context.WithValue(ctx, startKey{}, time.Now())
 }
 
-func (c *evolutionCallback) onEnd(ctx context.Context, info *callbacks.RunInfo, output callbacks.CallbackOutput) context.Context {
+func (c *evolutionCallback) onEnd(ctx context.Context, info *einobridge.RunInfo, output einobridge.CallbackOutput) context.Context {
 	if c.engine == nil || info == nil {
 		return ctx
 	}
@@ -84,7 +84,7 @@ func (c *evolutionCallback) onEnd(ctx context.Context, info *callbacks.RunInfo, 
 	return ctx
 }
 
-func (c *evolutionCallback) onError(ctx context.Context, info *callbacks.RunInfo, err error) context.Context {
+func (c *evolutionCallback) onError(ctx context.Context, info *einobridge.RunInfo, err error) context.Context {
 	if c.engine == nil || info == nil {
 		return ctx
 	}
@@ -95,8 +95,8 @@ func (c *evolutionCallback) onError(ctx context.Context, info *callbacks.RunInfo
 	return ctx
 }
 
-// einoToEvolutionRunInfo converts eino's callbacks.RunInfo to observe.CallbackRunInfo.
-func einoToEvolutionRunInfo(info *callbacks.RunInfo) observe.CallbackRunInfo {
+// einoToEvolutionRunInfo converts eino's einobridge.RunInfo to observe.CallbackRunInfo.
+func einoToEvolutionRunInfo(info *einobridge.RunInfo) observe.CallbackRunInfo {
 	comp := observe.ComponentOther
 	switch info.Component {
 	case components.ComponentOfChatModel:
@@ -108,7 +108,7 @@ func einoToEvolutionRunInfo(info *callbacks.RunInfo) observe.CallbackRunInfo {
 }
 
 // buildSuccessSignal constructs a Signal from ACL run info and eino callback output.
-func buildSuccessSignal(info observe.CallbackRunInfo, output callbacks.CallbackOutput, start time.Time) Signal {
+func buildSuccessSignal(info observe.CallbackRunInfo, output einobridge.CallbackOutput, start time.Time) Signal {
 	sig := Signal{
 		Component: info.Name,
 		Timestamp: time.Now(),

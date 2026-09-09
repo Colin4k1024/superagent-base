@@ -24,7 +24,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cloudwego/eino/callbacks"
 	"github.com/cloudwego/eino/compose"
 	"golang.org/x/exp/maps"
 
@@ -587,12 +586,12 @@ func (r *nodeRunner[O]) onStart(ctx context.Context, input map[string]any) (cont
 	if r.callbackInputConverter != nil {
 		convertedInput, err := r.callbackInputConverter(ctx, input)
 		if err != nil {
-			ctx = callbacks.OnStart(ctx, input)
+			ctx = einobridge.OnStart(ctx, input)
 			return ctx, err
 		}
-		ctx = callbacks.OnStart(ctx, convertedInput)
+		ctx = einobridge.OnStart(ctx, convertedInput)
 	} else {
-		ctx = callbacks.OnStart(ctx, input)
+		ctx = einobridge.OnStart(ctx, input)
 	}
 
 	return ctx, nil
@@ -608,12 +607,12 @@ func (r *nodeRunner[O]) onStartStream(ctx context.Context, input *einobridge.Str
 			}
 		}
 		callbackS := einobridge.StreamReaderWithConvert(copied[0], realConverter(ctx))
-		newCtx, unused := callbacks.OnStartWithStreamInput(ctx, callbackS)
+		newCtx, unused := einobridge.OnStartWithStreamInput(ctx, callbackS)
 		unused.Close()
 		return newCtx, copied[1], nil
 	}
 
-	newCtx, newInput := callbacks.OnStartWithStreamInput(ctx, input)
+	newCtx, newInput := einobridge.OnStartWithStreamInput(ctx, input)
 	return newCtx, newInput, nil
 }
 
@@ -816,9 +815,9 @@ func (r *nodeRunner[O]) onEnd(ctx context.Context, output map[string]any) error 
 		if err != nil {
 			return err
 		}
-		_ = callbacks.OnEnd(ctx, convertedOutput)
+		_ = einobridge.OnEnd(ctx, convertedOutput)
 	} else {
-		_ = callbacks.OnEnd(ctx, output)
+		_ = einobridge.OnEnd(ctx, output)
 	}
 
 	return nil
@@ -839,19 +838,19 @@ func (r *nodeRunner[O]) onEndStream(ctx context.Context, output *einobridge.Stre
 			}
 		}
 		callbackS := einobridge.StreamReaderWithConvert(copied[0], realConverter(ctx))
-		_, unused := callbacks.OnEndWithStreamOutput(ctx, callbackS)
+		_, unused := einobridge.OnEndWithStreamOutput(ctx, callbackS)
 		unused.Close()
 
 		return copied[1], nil
 	}
 
-	_, newOutput := callbacks.OnEndWithStreamOutput(ctx, output)
+	_, newOutput := einobridge.OnEndWithStreamOutput(ctx, output)
 	return newOutput, nil
 }
 
 func (r *nodeRunner[O]) onError(ctx context.Context, err error) (map[string]any, bool) {
 	if r.interrupted {
-		_ = callbacks.OnError(ctx, err)
+		_ = einobridge.OnError(ctx, err)
 		return nil, false
 	}
 
@@ -882,7 +881,7 @@ func (r *nodeRunner[O]) onError(ctx context.Context, err error) (map[string]any,
 			Output: d,
 			Error:  sErr,
 		}
-		_ = callbacks.OnEnd(ctx, sOutput)
+		_ = einobridge.OnEnd(ctx, sOutput)
 		return d, true
 	case vo.ErrorProcessTypeExceptionBranch:
 		s := make(map[string]any)
@@ -896,10 +895,10 @@ func (r *nodeRunner[O]) onError(ctx context.Context, err error) (map[string]any,
 			Output: s,
 			Error:  sErr,
 		}
-		_ = callbacks.OnEnd(ctx, sOutput)
+		_ = einobridge.OnEnd(ctx, sOutput)
 		return s, true
 	default:
-		_ = callbacks.OnError(ctx, sErr)
+		_ = einobridge.OnError(ctx, sErr)
 		return nil, false
 	}
 }

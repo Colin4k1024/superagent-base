@@ -22,7 +22,6 @@ import (
 	"errors"
 	"io"
 
-	"github.com/cloudwego/eino/callbacks"
 	"github.com/cloudwego/eino/components"
 	"github.com/cloudwego/eino/components/model"
 	"github.com/cloudwego/eino/components/retriever"
@@ -38,7 +37,7 @@ import (
 	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 )
 
-func newReplyCallback(_ context.Context, executeID string, returnDirectlyTools map[string]struct{}) (clb callbacks.Handler,
+func newReplyCallback(_ context.Context, executeID string, returnDirectlyTools map[string]struct{}) (clb einobridge.Handler,
 	sr *wfcompose.StreamReader[*entity.AgentEvent], sw *wfcompose.StreamWriter[*entity.AgentEvent],
 ) {
 	sr, sw = wfcompose.Pipe[*entity.AgentEvent](10)
@@ -49,7 +48,7 @@ func newReplyCallback(_ context.Context, executeID string, returnDirectlyTools m
 		returnDirectlyTools: returnDirectlyTools,
 	}
 
-	clb = callbacks.NewHandlerBuilder().
+	clb = einobridge.NewHandlerBuilder().
 		OnStartFn(rcc.OnStart).
 		OnEndFn(rcc.OnEnd).
 		OnEndWithStreamOutputFn(rcc.OnEndWithStreamOutput).
@@ -65,7 +64,7 @@ type replyChunkCallback struct {
 	returnDirectlyTools map[string]struct{}
 }
 
-func (r *replyChunkCallback) OnError(ctx context.Context, info *callbacks.RunInfo, err error) context.Context {
+func (r *replyChunkCallback) OnError(ctx context.Context, info *einobridge.RunInfo, err error) context.Context {
 	logs.CtxInfof(ctx, "info-OnError, info=%v, err=%v", conv.DebugJsonToStr(info), err)
 
 	switch info.Component {
@@ -106,7 +105,7 @@ func (r *replyChunkCallback) OnError(ctx context.Context, info *callbacks.RunInf
 	return ctx
 }
 
-func (r *replyChunkCallback) OnStart(ctx context.Context, info *callbacks.RunInfo, input callbacks.CallbackInput) context.Context {
+func (r *replyChunkCallback) OnStart(ctx context.Context, info *einobridge.RunInfo, input einobridge.CallbackInput) context.Context {
 	logs.CtxInfof(ctx, "info-OnStart, info=%v, input=%v", conv.DebugJsonToStr(info), conv.DebugJsonToStr(input))
 
 	switch info.Component {
@@ -124,7 +123,7 @@ func (r *replyChunkCallback) OnStart(ctx context.Context, info *callbacks.RunInf
 	return ctx
 }
 
-func (r *replyChunkCallback) OnEnd(ctx context.Context, info *callbacks.RunInfo, output callbacks.CallbackOutput) context.Context {
+func (r *replyChunkCallback) OnEnd(ctx context.Context, info *einobridge.RunInfo, output einobridge.CallbackOutput) context.Context {
 	logs.CtxInfof(ctx, "info-OnEnd, info=%v, output=%v", conv.DebugJsonToStr(info), conv.DebugJsonToStr(output))
 	switch info.Name {
 	case keyOfKnowledgeRetriever:
@@ -177,8 +176,8 @@ func (r *replyChunkCallback) OnEnd(ctx context.Context, info *callbacks.RunInfo,
 	return ctx
 }
 
-func (r *replyChunkCallback) OnEndWithStreamOutput(ctx context.Context, info *callbacks.RunInfo,
-	output *einobridge.StreamReader[callbacks.CallbackOutput],
+func (r *replyChunkCallback) OnEndWithStreamOutput(ctx context.Context, info *einobridge.RunInfo,
+	output *einobridge.StreamReader[einobridge.CallbackOutput],
 ) context.Context {
 	logs.CtxInfof(ctx, "info-OnEndWithStreamOutput, info=%v, output=%v", conv.DebugJsonToStr(info), conv.DebugJsonToStr(output))
 	switch info.Component {
@@ -187,7 +186,7 @@ func (r *replyChunkCallback) OnEndWithStreamOutput(ctx context.Context, info *ca
 			output.Close()
 			return ctx
 		}
-		sr := einobridge.StreamReaderWithConvert(output, func(t callbacks.CallbackOutput) (*einobridge.Message, error) {
+		sr := einobridge.StreamReaderWithConvert(output, func(t einobridge.CallbackOutput) (*einobridge.Message, error) {
 			cbOut := model.ConvCallbackOutput(t)
 			return cbOut.Message, nil
 		})
@@ -267,7 +266,7 @@ func convInterruptEventType(interruptEvent any) singleagent.InterruptEventType {
 	return interruptEventType
 }
 
-func (r *replyChunkCallback) concatToolsNodeOutput(ctx context.Context, output *einobridge.StreamReader[callbacks.CallbackOutput]) ([]*wfcompose.Message, error) {
+func (r *replyChunkCallback) concatToolsNodeOutput(ctx context.Context, output *einobridge.StreamReader[einobridge.CallbackOutput]) ([]*wfcompose.Message, error) {
 	var toolsMsgChunks [][]*wfcompose.Message
 	var sr *wfcompose.StreamReader[*wfcompose.Message]
 	var sw *wfcompose.StreamWriter[*wfcompose.Message]
@@ -346,7 +345,7 @@ func (r *replyChunkCallback) concatToolsNodeOutput(ctx context.Context, output *
 	return toolMessages, nil
 }
 
-func convToolsNodeCallbackInput(input callbacks.CallbackInput) *wfcompose.Message {
+func convToolsNodeCallbackInput(input einobridge.CallbackInput) *wfcompose.Message {
 	switch t := input.(type) {
 	case *einobridge.Message:
 		return einobridge.WrapMessage(t)
@@ -355,7 +354,7 @@ func convToolsNodeCallbackInput(input callbacks.CallbackInput) *wfcompose.Messag
 	}
 }
 
-func convToolsNodeCallbackOutput(output callbacks.CallbackOutput) []*wfcompose.Message {
+func convToolsNodeCallbackOutput(output einobridge.CallbackOutput) []*wfcompose.Message {
 	switch t := output.(type) {
 	case []*einobridge.Message:
 		return einobridge.WrapMessageSlice(t)
@@ -364,7 +363,7 @@ func convToolsNodeCallbackOutput(output callbacks.CallbackOutput) []*wfcompose.M
 	}
 }
 
-func convToolsPreRetrieverCallbackInput(output callbacks.CallbackOutput) []*wfcompose.Message {
+func convToolsPreRetrieverCallbackInput(output einobridge.CallbackOutput) []*wfcompose.Message {
 	switch t := output.(type) {
 	case []*einobridge.Message:
 		return einobridge.WrapMessageSlice(t)
@@ -373,7 +372,7 @@ func convToolsPreRetrieverCallbackInput(output callbacks.CallbackOutput) []*wfco
 	}
 }
 
-func convSuggestionNodeCallbackOutput(output callbacks.CallbackInput) []*wfcompose.Message {
+func convSuggestionNodeCallbackOutput(output einobridge.CallbackInput) []*wfcompose.Message {
 	var sg []*wfcompose.Message
 
 	switch so := output.(type) {

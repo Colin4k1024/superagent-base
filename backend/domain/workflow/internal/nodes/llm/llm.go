@@ -24,13 +24,11 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/cloudwego/eino/callbacks"
 	"github.com/cloudwego/eino/components/model"
 	"github.com/cloudwego/eino/components/prompt"
 	"github.com/cloudwego/eino/components/tool"
 	"github.com/cloudwego/eino/compose"
 	"github.com/cloudwego/eino/flow/agent/react"
-	callbacks2 "github.com/cloudwego/eino/utils/callbacks"
 	"golang.org/x/exp/maps"
 
 	workflow3 "github.com/superagent-ai/superagent-base/backend/api/model/workflow"
@@ -998,8 +996,8 @@ func (l *LLM) prepare(ctx context.Context, _ map[string]any, opts ...nodes.NodeO
 					ResumeData: resumeData,
 				}, allIEs))))
 
-		chatModelHandler := callbacks2.NewHandlerHelper().ChatModel(&callbacks2.ModelCallbackHandler{
-			OnStart: func(ctx context.Context, runInfo *callbacks.RunInfo, input *model.CallbackInput) context.Context {
+		chatModelHandler := einobridge.NewHandlerHelper().ChatModel(&einobridge.ModelCallbackHandler{
+			OnStart: func(ctx context.Context, runInfo *einobridge.RunInfo, input *model.CallbackInput) context.Context {
 				if runInfo.Name != agentModelName {
 					return ctx
 				}

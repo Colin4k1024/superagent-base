@@ -22,7 +22,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/cloudwego/eino/callbacks"
 	"github.com/cloudwego/eino/components/tool"
 	einoCompose "github.com/cloudwego/eino/compose"
 
@@ -162,7 +161,7 @@ func (i *invokableWorkflow) InvokableRun(ctx context.Context, argumentsInJSON st
 		}
 	}
 
-	ctx = callbacks.OnStart(ctx, &tool.CallbackInput{
+	ctx = einobridge.OnStart(ctx, &tool.CallbackInput{
 		ArgumentsInJSON: argumentsInJSON,
 		Extra: map[string]any{
 			execute.ToolCallIDKey: callID,
@@ -170,7 +169,7 @@ func (i *invokableWorkflow) InvokableRun(ctx context.Context, argumentsInJSON st
 	})
 	defer func() {
 		if err != nil {
-			_ = callbacks.OnError(ctx, err)
+			_ = einobridge.OnError(ctx, err)
 		}
 	}()
 
@@ -213,7 +212,7 @@ func (i *invokableWorkflow) InvokableRun(ctx context.Context, argumentsInJSON st
 			return "", err
 		}
 
-		_ = callbacks.OnEnd(ctx, &tool.CallbackOutput{
+		_ = einobridge.OnEnd(ctx, &tool.CallbackOutput{
 			Response: contentStr,
 			Extra: map[string]any{
 				execute.ToolCallIDKey: callID,
@@ -237,7 +236,7 @@ func (i *invokableWorkflow) InvokableRun(ctx context.Context, argumentsInJSON st
 		contentStr = strings.TrimSuffix(contentStr, nodes.KeyIsFinished)
 	}
 
-	_ = callbacks.OnEnd(ctx, &tool.CallbackOutput{
+	_ = einobridge.OnEnd(ctx, &tool.CallbackOutput{
 		Response: contentStr,
 		Extra: map[string]any{
 			execute.ToolCallIDKey: callID,
@@ -304,7 +303,7 @@ func (s *streamableWorkflow) StreamableRun(ctx context.Context, argumentsInJSON 
 		}
 	}
 
-	ctx = callbacks.OnStart(ctx, &tool.CallbackInput{
+	ctx = einobridge.OnStart(ctx, &tool.CallbackInput{
 		ArgumentsInJSON: argumentsInJSON,
 		Extra: map[string]any{
 			execute.ToolCallIDKey:     callID,
@@ -313,7 +312,7 @@ func (s *streamableWorkflow) StreamableRun(ctx context.Context, argumentsInJSON 
 	})
 	defer func() {
 		if err != nil {
-			_ = callbacks.OnError(ctx, err)
+			_ = einobridge.OnError(ctx, err)
 			close(toolFinishChan)
 		}
 	}()
@@ -357,7 +356,7 @@ func (s *streamableWorkflow) StreamableRun(ctx context.Context, argumentsInJSON 
 		close(toolFinishChan)
 	}()
 
-	_, callbackStream := callbacks.OnEndWithStreamOutput(ctx, einobridge.StreamReaderWithConvert(outStream,
+	_, callbackStream := einobridge.OnEndWithStreamOutput(ctx, einobridge.StreamReaderWithConvert(outStream,
 		func(in map[string]any) (*tool.CallbackOutput, error) {
 			content, ok := in["output"]
 			if !ok {

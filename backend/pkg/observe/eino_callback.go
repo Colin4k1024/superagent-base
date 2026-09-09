@@ -40,26 +40,25 @@ package observe
 import (
 	"context"
 
-	"github.com/cloudwego/eino/callbacks"
 	"github.com/cloudwego/eino/components"
 	"github.com/cloudwego/eino/components/model"
 	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 )
 
-// EinoObserveCallback adapts the ACL ObserveCallback to eino's callbacks.Handler.
+// EinoObserveCallback adapts the ACL ObserveCallback to eino's einobridge.Handler.
 type EinoObserveCallback struct {
 	acl *ObserveCallback
 }
 
-// NewEinoObserveCallback creates an eino callbacks.Handler backed by the
+// NewEinoObserveCallback creates an eino einobridge.Handler backed by the
 // framework-agnostic ObserveCallback.  The returned handler is registered
 // with the eino framework; all events are converted to ACL types and
 // delegated to ObserveCallback.
-func NewEinoObserveCallback() callbacks.Handler {
+func NewEinoObserveCallback() einobridge.Handler {
 	acl := NewObserveCallback()
 	cb := &EinoObserveCallback{acl: acl}
 	SetCallback(acl) // register as global ACL callback
-	return callbacks.NewHandlerBuilder().
+	return einobridge.NewHandlerBuilder().
 		OnStartFn(cb.OnStart).
 		OnEndFn(cb.OnEnd).
 		OnEndWithStreamOutputFn(cb.OnEndWithStream).
@@ -67,8 +66,8 @@ func NewEinoObserveCallback() callbacks.Handler {
 		Build()
 }
 
-// einoToACLRunInfo converts eino's callbacks.RunInfo to the ACL CallbackRunInfo.
-func einoToACLRunInfo(info *callbacks.RunInfo) CallbackRunInfo {
+// einoToACLRunInfo converts eino's einobridge.RunInfo to the ACL CallbackRunInfo.
+func einoToACLRunInfo(info *einobridge.RunInfo) CallbackRunInfo {
 	comp := ComponentOther
 	switch info.Component {
 	case components.ComponentOfChatModel:
@@ -79,8 +78,8 @@ func einoToACLRunInfo(info *callbacks.RunInfo) CallbackRunInfo {
 	return CallbackRunInfo{Component: comp, Name: info.Name}
 }
 
-// einoToACLInput converts eino's callbacks.CallbackInput to the ACL CallbackInput.
-func einoToACLInput(input callbacks.CallbackInput) CallbackInput {
+// einoToACLInput converts eino's einobridge.CallbackInput to the ACL CallbackInput.
+func einoToACLInput(input einobridge.CallbackInput) CallbackInput {
 	cbIn := model.ConvCallbackInput(input)
 	if cbIn != nil && cbIn.Messages != nil {
 		msgs := make([]*einoMsg, len(cbIn.Messages))
@@ -92,8 +91,8 @@ func einoToACLInput(input callbacks.CallbackInput) CallbackInput {
 	return CallbackInput{Raw: input}
 }
 
-// einoToACLOutput converts eino's callbacks.CallbackOutput to the ACL CallbackOutput.
-func einoToACLOutput(output callbacks.CallbackOutput) CallbackOutput {
+// einoToACLOutput converts eino's einobridge.CallbackOutput to the ACL CallbackOutput.
+func einoToACLOutput(output einobridge.CallbackOutput) CallbackOutput {
 	cbOut := model.ConvCallbackOutput(output)
 	if cbOut != nil && cbOut.Message != nil {
 		out := CallbackOutput{Raw: output}
@@ -106,15 +105,15 @@ func einoToACLOutput(output callbacks.CallbackOutput) CallbackOutput {
 	return CallbackOutput{Raw: output}
 }
 
-func (c *EinoObserveCallback) OnStart(ctx context.Context, info *callbacks.RunInfo, input callbacks.CallbackInput) context.Context {
+func (c *EinoObserveCallback) OnStart(ctx context.Context, info *einobridge.RunInfo, input einobridge.CallbackInput) context.Context {
 	return c.acl.OnStart(ctx, einoToACLRunInfo(info), einoToACLInput(input))
 }
 
-func (c *EinoObserveCallback) OnEnd(ctx context.Context, info *callbacks.RunInfo, output callbacks.CallbackOutput) context.Context {
+func (c *EinoObserveCallback) OnEnd(ctx context.Context, info *einobridge.RunInfo, output einobridge.CallbackOutput) context.Context {
 	return c.acl.OnEnd(ctx, einoToACLRunInfo(info), einoToACLOutput(output))
 }
 
-func (c *EinoObserveCallback) OnEndWithStream(ctx context.Context, info *callbacks.RunInfo, output *einobridge.StreamReader[callbacks.CallbackOutput]) context.Context {
+func (c *EinoObserveCallback) OnEndWithStream(ctx context.Context, info *einobridge.RunInfo, output *einobridge.StreamReader[einobridge.CallbackOutput]) context.Context {
 	// For streaming, we drain the eino stream reader to collect token counts.
 	// The ACL OnEndWithStream expects an llm.StreamReader, but we can't
 	// directly convert the eino stream reader.  Instead, we drain it here
@@ -144,7 +143,7 @@ func (c *EinoObserveCallback) OnEndWithStream(ctx context.Context, info *callbac
 	return ctx
 }
 
-func (c *EinoObserveCallback) OnError(ctx context.Context, info *callbacks.RunInfo, err error) context.Context {
+func (c *EinoObserveCallback) OnError(ctx context.Context, info *einobridge.RunInfo, err error) context.Context {
 	return c.acl.OnError(ctx, einoToACLRunInfo(info), err)
 }
 

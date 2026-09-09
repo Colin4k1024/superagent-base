@@ -21,9 +21,7 @@ import (
 	"context"
 	"sync"
 
-	"github.com/cloudwego/eino/callbacks"
 	"github.com/cloudwego/eino/components/model"
-	callbacks2 "github.com/cloudwego/eino/utils/callbacks"
 
 	"github.com/superagent-ai/superagent-base/backend/pkg/safego"
 	"github.com/superagent-ai/superagent-base/backend/pkg/sonic"
@@ -126,9 +124,9 @@ func getTokenCollector(ctx context.Context) *TokenCollector {
 	return c.TokenCollector
 }
 
-func GetTokenCallbackHandler() callbacks.Handler {
-	return callbacks2.NewHandlerHelper().ChatModel(&callbacks2.ModelCallbackHandler{
-		OnStart: func(ctx context.Context, runInfo *callbacks.RunInfo, input *model.CallbackInput) context.Context {
+func GetTokenCallbackHandler() einobridge.Handler {
+	return einobridge.NewHandlerHelper().ChatModel(&einobridge.ModelCallbackHandler{
+		OnStart: func(ctx context.Context, runInfo *einobridge.RunInfo, input *model.CallbackInput) context.Context {
 			c := getTokenCollector(ctx)
 			if c == nil {
 				return ctx
@@ -136,7 +134,7 @@ func GetTokenCallbackHandler() callbacks.Handler {
 			c.add(1)
 			return ctx
 		},
-		OnEnd: func(ctx context.Context, runInfo *callbacks.RunInfo, output *model.CallbackOutput) context.Context {
+		OnEnd: func(ctx context.Context, runInfo *einobridge.RunInfo, output *model.CallbackOutput) context.Context {
 			c := getTokenCollector(ctx)
 			if c == nil {
 				return ctx
@@ -149,7 +147,7 @@ func GetTokenCallbackHandler() callbacks.Handler {
 			c.wg.Done()
 			return ctx
 		},
-		OnEndWithStreamOutput: func(ctx context.Context, runInfo *callbacks.RunInfo, output *einobridge.StreamReader[*model.CallbackOutput]) context.Context {
+		OnEndWithStreamOutput: func(ctx context.Context, runInfo *einobridge.RunInfo, output *einobridge.StreamReader[*model.CallbackOutput]) context.Context {
 			c := getTokenCollector(ctx)
 			if c == nil {
 				output.Close()
@@ -187,7 +185,7 @@ func GetTokenCallbackHandler() callbacks.Handler {
 			})
 			return ctx
 		},
-		OnError: func(ctx context.Context, runInfo *callbacks.RunInfo, runErr error) context.Context {
+		OnError: func(ctx context.Context, runInfo *einobridge.RunInfo, runErr error) context.Context {
 			c := getTokenCollector(ctx)
 			if c == nil {
 				return ctx

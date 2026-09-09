@@ -29,10 +29,8 @@ import (
 
 	"github.com/superagent-ai/superagent-base/backend/pkg/sonic"
 
-	"github.com/cloudwego/eino/callbacks"
 	"github.com/cloudwego/eino/components/tool"
 	"github.com/cloudwego/eino/compose"
-	callbacks2 "github.com/cloudwego/eino/utils/callbacks"
 
 	workflowModel "github.com/superagent-ai/superagent-base/backend/crossdomain/workflow/model"
 	"github.com/superagent-ai/superagent-base/backend/domain/workflow"
@@ -74,7 +72,7 @@ type ToolHandler struct {
 
 func NewRootWorkflowHandler(wb *entity.WorkflowBasic, executeID int64, requireCheckpoint bool,
 	ch chan<- *Event, resumedEvent *entity.InterruptEvent, exeCfg workflowModel.ExecuteConfig, nodeCount int32,
-) callbacks.Handler {
+) einobridge.Handler {
 	return &WorkflowHandler{
 		ch:                ch,
 		rootWorkflowBasic: wb,
@@ -88,7 +86,7 @@ func NewRootWorkflowHandler(wb *entity.WorkflowBasic, executeID int64, requireCh
 
 func NewSubWorkflowHandler(parent *WorkflowHandler, subWB *entity.WorkflowBasic,
 	resumedEvent *entity.InterruptEvent, nodeCount int32,
-) callbacks.Handler {
+) einobridge.Handler {
 	return &WorkflowHandler{
 		ch:                parent.ch,
 		rootWorkflowBasic: parent.rootWorkflowBasic,
@@ -114,7 +112,7 @@ func (w *WorkflowHandler) getSubWorkflowID() int64 {
 	return 0
 }
 
-func NewNodeHandler(key string, name string, ch chan<- *Event, resumeEvent *entity.InterruptEvent, plan *vo.TerminatePlan) callbacks.Handler {
+func NewNodeHandler(key string, name string, ch chan<- *Event, resumeEvent *entity.InterruptEvent, plan *vo.TerminatePlan) einobridge.Handler {
 	var resumePath []string
 	if resumeEvent != nil {
 		resumePath = slices.Clone(resumeEvent.NodePath)
@@ -130,12 +128,12 @@ func NewNodeHandler(key string, name string, ch chan<- *Event, resumeEvent *enti
 	}
 }
 
-func NewToolHandler(ch chan<- *Event, info entity.FunctionInfo) callbacks.Handler {
+func NewToolHandler(ch chan<- *Event, info entity.FunctionInfo) einobridge.Handler {
 	th := &ToolHandler{
 		ch:   ch,
 		info: info,
 	}
-	return callbacks2.NewHandlerHelper().Tool(&callbacks2.ToolCallbackHandler{
+	return einobridge.NewHandlerHelper().Tool(&einobridge.ToolCallbackHandler{
 		OnStart:               th.OnStart,
 		OnEnd:                 th.OnEnd,
 		OnEndWithStreamOutput: th.OnEndWithStreamOutput,
@@ -210,7 +208,7 @@ func (w *WorkflowHandler) initWorkflowCtx(ctx context.Context) (context.Context,
 	return newCtx, resume
 }
 
-func (w *WorkflowHandler) OnStart(ctx context.Context, info *callbacks.RunInfo, input callbacks.CallbackInput) context.Context {
+func (w *WorkflowHandler) OnStart(ctx context.Context, info *einobridge.RunInfo, input einobridge.CallbackInput) context.Context {
 	if info.Component != compose.ComponentOfWorkflow || (info.Name != strconv.FormatInt(w.getRootWorkflowID(), 10) &&
 		info.Name != strconv.FormatInt(w.getSubWorkflowID(), 10)) {
 		return ctx
@@ -252,7 +250,7 @@ func (w *WorkflowHandler) OnStart(ctx context.Context, info *callbacks.RunInfo, 
 	return newCtx
 }
 
-func (w *WorkflowHandler) OnEnd(ctx context.Context, info *callbacks.RunInfo, output callbacks.CallbackOutput) context.Context {
+func (w *WorkflowHandler) OnEnd(ctx context.Context, info *einobridge.RunInfo, output einobridge.CallbackOutput) context.Context {
 	if info.Component != compose.ComponentOfWorkflow || (info.Name != strconv.FormatInt(w.getRootWorkflowID(), 10) &&
 		info.Name != strconv.FormatInt(w.getSubWorkflowID(), 10)) {
 		return ctx
@@ -330,7 +328,7 @@ func extractInterruptEvents(interruptInfo *compose.InterruptInfo, prefixes ...st
 	return interruptEvents, nil
 }
 
-func (w *WorkflowHandler) OnError(ctx context.Context, info *callbacks.RunInfo, err error) context.Context {
+func (w *WorkflowHandler) OnError(ctx context.Context, info *einobridge.RunInfo, err error) context.Context {
 	if info.Component != compose.ComponentOfWorkflow || (info.Name != strconv.FormatInt(w.getRootWorkflowID(), 10) &&
 		info.Name != strconv.FormatInt(w.getSubWorkflowID(), 10)) {
 		return ctx
@@ -411,8 +409,8 @@ func (w *WorkflowHandler) OnError(ctx context.Context, info *callbacks.RunInfo, 
 	return ctx
 }
 
-func (w *WorkflowHandler) OnStartWithStreamInput(ctx context.Context, info *callbacks.RunInfo,
-	input *einobridge.StreamReader[callbacks.CallbackInput],
+func (w *WorkflowHandler) OnStartWithStreamInput(ctx context.Context, info *einobridge.RunInfo,
+	input *einobridge.StreamReader[einobridge.CallbackInput],
 ) context.Context {
 	if info.Component != compose.ComponentOfWorkflow || (info.Name != strconv.FormatInt(w.getRootWorkflowID(), 10) &&
 		info.Name != strconv.FormatInt(w.getSubWorkflowID(), 10)) {
@@ -475,8 +473,8 @@ func (w *WorkflowHandler) OnStartWithStreamInput(ctx context.Context, info *call
 	return newCtx
 }
 
-func (w *WorkflowHandler) OnEndWithStreamOutput(ctx context.Context, info *callbacks.RunInfo,
-	output *einobridge.StreamReader[callbacks.CallbackOutput],
+func (w *WorkflowHandler) OnEndWithStreamOutput(ctx context.Context, info *einobridge.RunInfo,
+	output *einobridge.StreamReader[einobridge.CallbackOutput],
 ) context.Context {
 	if info.Component != compose.ComponentOfWorkflow || (info.Name != strconv.FormatInt(w.getRootWorkflowID(), 10) &&
 		info.Name != strconv.FormatInt(w.getSubWorkflowID(), 10)) {
@@ -606,7 +604,7 @@ func (n *NodeHandler) initNodeCtx(ctx context.Context, typ entity.NodeType) (con
 	return newCtx, resume
 }
 
-func (n *NodeHandler) OnStart(ctx context.Context, info *callbacks.RunInfo, input callbacks.CallbackInput) context.Context {
+func (n *NodeHandler) OnStart(ctx context.Context, info *einobridge.RunInfo, input einobridge.CallbackInput) context.Context {
 	if info.Component != compose.ComponentOfLambda || info.Name != string(n.nodeKey) {
 		return ctx
 	}
@@ -658,7 +656,7 @@ func (n *NodeHandler) OnStart(ctx context.Context, info *callbacks.RunInfo, inpu
 	return newCtx
 }
 
-func (n *NodeHandler) OnEnd(ctx context.Context, info *callbacks.RunInfo, output callbacks.CallbackOutput) context.Context {
+func (n *NodeHandler) OnEnd(ctx context.Context, info *einobridge.RunInfo, output einobridge.CallbackOutput) context.Context {
 	if info.Component != compose.ComponentOfLambda || info.Name != string(n.nodeKey) {
 		return ctx
 	}
@@ -741,7 +739,7 @@ func (n *NodeHandler) OnEnd(ctx context.Context, info *callbacks.RunInfo, output
 	return ctx
 }
 
-func (n *NodeHandler) OnError(ctx context.Context, info *callbacks.RunInfo, err error) context.Context {
+func (n *NodeHandler) OnError(ctx context.Context, info *einobridge.RunInfo, err error) context.Context {
 	if info.Component != compose.ComponentOfLambda || info.Name != string(n.nodeKey) {
 		return ctx
 	}
@@ -808,7 +806,7 @@ func (n *NodeHandler) OnError(ctx context.Context, info *callbacks.RunInfo, err 
 	return ctx
 }
 
-func (n *NodeHandler) OnStartWithStreamInput(ctx context.Context, info *callbacks.RunInfo, input *einobridge.StreamReader[callbacks.CallbackInput]) context.Context {
+func (n *NodeHandler) OnStartWithStreamInput(ctx context.Context, info *einobridge.RunInfo, input *einobridge.StreamReader[einobridge.CallbackInput]) context.Context {
 	if info.Component != compose.ComponentOfLambda || info.Name != string(n.nodeKey) {
 		input.Close()
 		return ctx
@@ -1066,7 +1064,7 @@ func buildStreamDeltaEvent(c *Context, chunk any, accumulated *nodes.StructuredC
 }
 
 func (n *NodeHandler) nonIncrementalEndProcessor(c *Context,
-	output *einobridge.StreamReader[callbacks.CallbackOutput]) error {
+	output *einobridge.StreamReader[einobridge.CallbackOutput]) error {
 	defer output.Close()
 
 	var (
@@ -1100,7 +1098,7 @@ func (n *NodeHandler) nonIncrementalEndProcessor(c *Context,
 }
 
 func (n *NodeHandler) incrementalEndProcessor(c *Context,
-	output *einobridge.StreamReader[callbacks.CallbackOutput]) error {
+	output *einobridge.StreamReader[einobridge.CallbackOutput]) error {
 	defer output.Close()
 	var (
 		firstEvent, previousEvent, secondPreviousEvent *Event
@@ -1171,7 +1169,7 @@ func (n *NodeHandler) incrementalEndProcessor(c *Context,
 	return nil
 }
 
-func (n *NodeHandler) OnEndWithStreamOutput(ctx context.Context, info *callbacks.RunInfo, output *einobridge.StreamReader[callbacks.CallbackOutput]) context.Context {
+func (n *NodeHandler) OnEndWithStreamOutput(ctx context.Context, info *einobridge.RunInfo, output *einobridge.StreamReader[einobridge.CallbackOutput]) context.Context {
 	if info.Component != compose.ComponentOfLambda || info.Name != string(n.nodeKey) {
 		output.Close()
 		return ctx
@@ -1219,7 +1217,7 @@ const (
 	ToolFinishChanKey = "tool_finish_chan"
 )
 
-func (t *ToolHandler) OnStart(ctx context.Context, info *callbacks.RunInfo,
+func (t *ToolHandler) OnStart(ctx context.Context, info *einobridge.RunInfo,
 	input *tool.CallbackInput,
 ) context.Context {
 	if info.Name != t.info.Name {
@@ -1269,7 +1267,7 @@ func (t *ToolHandler) OnStart(ctx context.Context, info *callbacks.RunInfo,
 	return ctx
 }
 
-func (t *ToolHandler) OnEnd(ctx context.Context, info *callbacks.RunInfo,
+func (t *ToolHandler) OnEnd(ctx context.Context, info *einobridge.RunInfo,
 	output *tool.CallbackOutput,
 ) context.Context {
 	if info.Name != t.info.Name {
@@ -1301,7 +1299,7 @@ func (t *ToolHandler) OnEnd(ctx context.Context, info *callbacks.RunInfo,
 	return ctx
 }
 
-func (t *ToolHandler) OnEndWithStreamOutput(ctx context.Context, info *callbacks.RunInfo,
+func (t *ToolHandler) OnEndWithStreamOutput(ctx context.Context, info *einobridge.RunInfo,
 	output *einobridge.StreamReader[*tool.CallbackOutput],
 ) context.Context {
 	if info.Name != t.info.Name {
@@ -1371,7 +1369,7 @@ func (t *ToolHandler) OnEndWithStreamOutput(ctx context.Context, info *callbacks
 	return ctx
 }
 
-func (t *ToolHandler) OnError(ctx context.Context, info *callbacks.RunInfo, err error) context.Context {
+func (t *ToolHandler) OnError(ctx context.Context, info *einobridge.RunInfo, err error) context.Context {
 	if info.Name != t.info.Name {
 		return ctx
 	}
