@@ -17,10 +17,9 @@
 package modelbuilder
 
 import (
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	"context"
 
-	"github.com/cloudwego/eino-ext/components/model/openai"
-	"github.com/cloudwego/eino-ext/components/model/qwen"
 
 	"github.com/superagent-ai/superagent-base/backend/api/model/admin/config"
 	"github.com/superagent-ai/superagent-base/backend/pkg/lang/ptr"
@@ -36,17 +35,17 @@ func newQwenModelBuilder(cfg *config.Model) Service {
 	}
 }
 
-func (q *qwenModelBuilder) getDefaultQwenConfig() *qwen.ChatModelConfig {
-	return &qwen.ChatModelConfig{
+func (q *qwenModelBuilder) getDefaultQwenConfig() *einobridge.QwenChatModelConfig {
+	return &einobridge.QwenChatModelConfig{
 		Temperature: ptr.Of(float32(0.7)),
-		ResponseFormat: &openai.ChatCompletionResponseFormat{
+		ResponseFormat: &einobridge.OpenAIChatCompletionResponseFormat{
 			Type:       "text",
 			JSONSchema: nil,
 		},
 	}
 }
 
-func (q *qwenModelBuilder) applyParamsToQwenConfig(conf *qwen.ChatModelConfig, params *LLMParams) {
+func (q *qwenModelBuilder) applyParamsToQwenConfig(conf *einobridge.QwenChatModelConfig, params *LLMParams) {
 	if params == nil {
 		return
 	}
@@ -91,5 +90,5 @@ func (q *qwenModelBuilder) Build(ctx context.Context, params *LLMParams) (ToolCa
 
 	q.applyParamsToQwenConfig(conf, params)
 
-	return qwen.NewChatModel(ctx, conf)
+	return einobridge.QwenNewChatModel(ctx, conf)
 }

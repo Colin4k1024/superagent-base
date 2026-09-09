@@ -22,7 +22,6 @@ import (
 	"os"
 	"testing"
 
-	"github.com/cloudwego/eino-ext/components/embedding/openai"
 	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	"github.com/stretchr/testify/assert"
 	"github.com/volcengine/volc-sdk-golang/service/vikingdb"
@@ -171,7 +170,7 @@ func TestBuiltinEmbeddingIntegration(t *testing.T) {
 		"https",
 	)
 
-	embConfig := &openai.EmbeddingConfig{
+	embConfig := &einobridge.OpenAIEmbeddingConfig{
 		APIKey:     os.Getenv("OPENAI_EMBEDDING_API_KEY"),
 		ByAzure:    true,
 		BaseURL:    os.Getenv("OPENAI_EMBEDDING_BASE_URL"),

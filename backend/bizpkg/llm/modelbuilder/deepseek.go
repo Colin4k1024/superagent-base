@@ -17,9 +17,9 @@
 package modelbuilder
 
 import (
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	"context"
 
-	"github.com/cloudwego/eino-ext/components/model/deepseek"
 
 	"github.com/superagent-ai/superagent-base/backend/api/model/admin/config"
 	"github.com/superagent-ai/superagent-base/backend/api/model/app/bot_common"
@@ -35,11 +35,11 @@ func newDeepseekModelBuilder(cfg *config.Model) Service {
 	}
 }
 
-func (d *deepseekModelBuilder) getDefaultDeepseekConfig() *deepseek.ChatModelConfig {
-	return &deepseek.ChatModelConfig{}
+func (d *deepseekModelBuilder) getDefaultDeepseekConfig() *einobridge.DeepSeekChatModelConfig {
+	return &einobridge.DeepSeekChatModelConfig{}
 }
 
-func (d *deepseekModelBuilder) applyParamsToChatModelConfig(conf *deepseek.ChatModelConfig, params *LLMParams) {
+func (d *deepseekModelBuilder) applyParamsToChatModelConfig(conf *einobridge.DeepSeekChatModelConfig, params *LLMParams) {
 	if params == nil {
 		return
 	}
@@ -65,9 +65,9 @@ func (d *deepseekModelBuilder) applyParamsToChatModelConfig(conf *deepseek.ChatM
 	}
 
 	if params.ResponseFormat == bot_common.ModelResponseFormat_JSON {
-		conf.ResponseFormatType = deepseek.ResponseFormatTypeJSONObject
+		conf.ResponseFormatType = einobridge.DeepSeekResponseFormatTypeJSONObject
 	} else {
-		conf.ResponseFormatType = deepseek.ResponseFormatTypeText
+		conf.ResponseFormatType = einobridge.DeepSeekResponseFormatTypeText
 	}
 }
 
@@ -83,5 +83,5 @@ func (d *deepseekModelBuilder) Build(ctx context.Context, params *LLMParams) (To
 
 	d.applyParamsToChatModelConfig(conf, params)
 
-	return deepseek.NewChatModel(ctx, conf)
+	return einobridge.DeepSeekNewChatModel(ctx, conf)
 }

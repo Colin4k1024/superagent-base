@@ -28,7 +28,6 @@ import (
 
 	"github.com/alicebob/miniredis/v2"
 	"github.com/bytedance/mockey"
-	"github.com/cloudwego/eino-ext/components/model/openai"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 	"gorm.io/driver/mysql"
@@ -67,7 +66,7 @@ func TestQuestionAnswer(t *testing.T) {
 		)
 
 		if len(accessKey) > 0 && len(baseURL) > 0 && len(modelName) > 0 {
-			chatModel, err = openai.NewChatModel(context.Background(), &openai.ChatModelConfig{
+			chatModel, err = einobridge.OpenAINewChatModel(context.Background(), &einobridge.OpenAIChatModelConfig{
 				APIKey:  accessKey,
 				ByAzure: true,
 				BaseURL: baseURL,

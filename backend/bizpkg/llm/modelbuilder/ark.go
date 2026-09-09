@@ -17,9 +17,9 @@
 package modelbuilder
 
 import (
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	"context"
 
-	"github.com/cloudwego/eino-ext/components/model/ark"
 	"github.com/volcengine/volcengine-go-sdk/service/arkruntime/model"
 
 	"github.com/superagent-ai/superagent-base/backend/api/model/admin/config"
@@ -40,11 +40,11 @@ func newArkModelBuilder(cfg *config.Model) Service {
 	}
 }
 
-func (b *arkModelBuilder) getDefaultConfig() *ark.ChatModelConfig {
-	return &ark.ChatModelConfig{}
+func (b *arkModelBuilder) getDefaultConfig() *einobridge.ArkChatModelConfig {
+	return &einobridge.ArkChatModelConfig{}
 }
 
-func (b *arkModelBuilder) applyParamsToChatModelConfig(chatModelConf *ark.ChatModelConfig, params *LLMParams) {
+func (b *arkModelBuilder) applyParamsToChatModelConfig(chatModelConf *einobridge.ArkChatModelConfig, params *LLMParams) {
 	if params == nil {
 		return
 	}
@@ -77,11 +77,11 @@ func (b *arkModelBuilder) applyParamsToChatModelConfig(chatModelConf *ark.ChatMo
 	switch params.ResponseFormat {
 	case bot_common.ModelResponseFormat_Text,
 		bot_common.ModelResponseFormat_Markdown:
-		chatModelConf.ResponseFormat = &ark.ResponseFormat{
+		chatModelConf.ResponseFormat = &einobridge.ArkResponseFormat{
 			Type: model.ResponseFormatText,
 		}
 	case bot_common.ModelResponseFormat_JSON:
-		chatModelConf.ResponseFormat = &ark.ResponseFormat{
+		chatModelConf.ResponseFormat = &einobridge.ArkResponseFormat{
 			Type: model.ResponseFormatJsonObject,
 		}
 	}
@@ -121,5 +121,5 @@ func (b *arkModelBuilder) Build(ctx context.Context, params *LLMParams) (ToolCal
 
 	logs.CtxDebugf(ctx, "build ark model with config: %v", conv.DebugJsonToStr(chatModelConf))
 
-	return ark.NewChatModel(ctx, chatModelConf)
+	return einobridge.ArkNewChatModel(ctx, chatModelConf)
 }

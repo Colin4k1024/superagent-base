@@ -17,15 +17,15 @@
 package wrap
 
 import (
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	"context"
 
-	"github.com/cloudwego/eino-ext/components/embedding/gemini"
 
 	contract "github.com/superagent-ai/superagent-base/backend/infra/embedding"
 )
 
-func NewGeminiEmbedder(ctx context.Context, config *gemini.EmbeddingConfig, dimensions int64, batchSize int) (contract.Embedder, error) {
-	emb, err := gemini.NewEmbedder(ctx, config)
+func NewGeminiEmbedder(ctx context.Context, config *einobridge.GeminiEmbeddingConfig, dimensions int64, batchSize int) (contract.Embedder, error) {
+	emb, err := einobridge.GeminiNewEmbedder(ctx, config)
 	if err != nil {
 		return nil, err
 	}

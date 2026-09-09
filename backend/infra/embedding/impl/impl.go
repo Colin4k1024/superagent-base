@@ -17,12 +17,10 @@
 package impl
 
 import (
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	"context"
 	"fmt"
 
-	"github.com/cloudwego/eino-ext/components/embedding/gemini"
-	"github.com/cloudwego/eino-ext/components/embedding/ollama"
-	"github.com/cloudwego/eino-ext/components/embedding/openai"
 	"google.golang.org/genai"
 
 	"github.com/superagent-ai/superagent-base/backend/api/model/admin/config"
@@ -44,7 +42,7 @@ func GetEmbedding(ctx context.Context, cfg *config.EmbeddingConfig) (embedding.E
 	switch cfg.Type {
 	case config.EmbeddingType_OpenAI:
 		openaiConnCfg := cfg.Connection.Openai
-		openAICfg := &openai.EmbeddingConfig{
+		openAICfg := &einobridge.OpenAIEmbeddingConfig{
 			APIKey:     connInfo.APIKey,
 			BaseURL:    connInfo.BaseURL,
 			Model:      connInfo.Model,
@@ -64,12 +62,12 @@ func GetEmbedding(ctx context.Context, cfg *config.EmbeddingConfig) (embedding.E
 	case config.EmbeddingType_Ark:
 		arkCfg := cfg.Connection.Ark
 
-		apiType := ark.APITypeText
-		if ark.APIType(arkCfg.APIType) == ark.APITypeMultiModal {
-			apiType = ark.APITypeMultiModal
+		apiType := einobridge.ArkAPITypeText
+		if einobridge.ArkAPIType(arkCfg.APIType) == einobridge.ArkAPITypeMultiModal {
+			apiType = einobridge.ArkAPITypeMultiModal
 		}
 
-		emb, err = ark.NewArkEmbedder(ctx, &ark.EmbeddingConfig{
+		emb, err = ark.NewArkEmbedder(ctx, &einobridge.ArkEmbeddingConfig{
 			APIKey:  connInfo.APIKey,
 			Model:   connInfo.Model,
 			BaseURL: connInfo.BaseURL,
@@ -80,7 +78,7 @@ func GetEmbedding(ctx context.Context, cfg *config.EmbeddingConfig) (embedding.E
 		}
 
 	case config.EmbeddingType_Ollama:
-		emb, err = wrap.NewOllamaEmbedder(ctx, &ollama.EmbeddingConfig{
+		emb, err = wrap.NewOllamaEmbedder(ctx, &einobridge.OllamaEmbeddingConfig{
 			BaseURL: connInfo.BaseURL,
 			Model:   connInfo.Model,
 		}, int64(embeddingInfo.Dims), int(cfg.MaxBatchSize))
@@ -110,7 +108,7 @@ func GetEmbedding(ctx context.Context, cfg *config.EmbeddingConfig) (embedding.E
 			return nil, fmt.Errorf("init gemini client failed, err=%w", err)
 		}
 
-		emb, err = wrap.NewGeminiEmbedder(ctx, &gemini.EmbeddingConfig{
+		emb, err = wrap.NewGeminiEmbedder(ctx, &einobridge.GeminiEmbeddingConfig{
 			Client:               geminiCli,
 			Model:                connInfo.Model,
 			OutputDimensionality: ptr.Of(int32(embeddingInfo.Dims)),
