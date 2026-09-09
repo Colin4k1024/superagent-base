@@ -38,6 +38,7 @@ package compose
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"sync"
 
 	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose"
@@ -422,8 +423,17 @@ func (g *Graph[I, O]) AddGraphNode(key string, sub any, opts ...GraphAddNodeOpt)
 	return nil
 }
 
-// AddBranch adds a conditional branch.
+// AddBranch adds a conditional branch to an existing node, preserving its lambda.
 func (g *Graph[I, O]) AddBranch(key string, branch *GraphBranch, opts ...GraphAddNodeOpt) error {
+	// Apply options to the existing node's config
+	if existing, ok := g.nodeMap[key]; ok {
+		existing.branch = branch
+		for _, opt := range opts {
+			opt(&existing.config)
+		}
+		return nil
+	}
+	// Node doesn't exist yet: create a branch-only entry
 	nc := NodeConfig{name: key}
 	for _, opt := range opts {
 		opt(&nc)
@@ -468,9 +478,16 @@ func (g *Graph[I, O]) compileInternal(ctx context.Context, opts ...GraphCompileO
 		outEdges[e.from] = append(outEdges[e.from], e.to)
 	}
 
+	// Evaluate graph options (NewGraphOption) to get genLocalState
+	gc := &graphConfig{}
+	for _, opt := range g.opts {
+		opt(gc)
+	}
+
 	cg := &compiledGraph{
-		nodes:    g.nodeMap,
-		outEdges: outEdges,
+		nodes:         g.nodeMap,
+		outEdges:      outEdges,
+		genLocalState: gc.genLocalState,
 		compileConfig: cc,
 	}
 
@@ -481,9 +498,17 @@ func (g *Graph[I, O]) compileInternal(ctx context.Context, opts ...GraphCompileO
 // compiledGraph
 // ---------------------------------------------------------------------------
 
+type staticValueEntry struct {
+	path FieldPath
+	val  any
+}
+
 type compiledGraph struct {
-	nodes    map[string]*nodeEntry
-	outEdges map[string][]string
+	nodes         map[string]*nodeEntry
+	outEdges      map[string][]string
+	fieldMappings map[string][]depEntry
+	staticValues  map[string][]staticValueEntry
+	genLocalState func(ctx context.Context) any
 	*compileConfig
 }
 
@@ -497,7 +522,7 @@ func (cg *compiledGraph) Stream(ctx context.Context, input any, opts ...wfcompos
 
 	// Execute the graph starting from the entry node
 	// For now, support linear execution: follow edges from entry to exit
-	result, err := cg.executeNode(ctx, entryKeys[0], input)
+	result, err := cg.executeGraph(ctx, entryKeys[0], input)
 	if err != nil {
 		return nil, err
 	}
@@ -540,18 +565,6 @@ func (cg *compiledGraph) executeNode(ctx context.Context, key string, input any)
 		return nil, fmt.Errorf("compose: node %q failed: %w", key, err)
 	}
 
-	// Follow edges to next node
-	nexts := cg.outEdges[key]
-	if len(nexts) == 0 || (len(nexts) == 1 && nexts[0] == END) {
-		return output, nil
-	}
-
-	// Execute next node
-	if len(nexts) == 1 {
-		return cg.executeNode(ctx, nexts[0], output)
-	}
-
-	// Multiple edges: not supported in basic implementation
 	return output, nil
 }
 
@@ -559,6 +572,32 @@ func (cg *compiledGraph) executeLambda(ctx context.Context, node *nodeEntry, inp
 	if node.lambda == nil {
 		return nil, fmt.Errorf("compose: lambda node %q has no lambda", node.key)
 	}
+
+	// State is already set up by executeChain (shared across all nodes)
+
+	// Call state pre-handler if configured (using reflection for generic state type)
+	if node.config.StatePreHandler != nil {
+		state := ctx.Value(stateKey{})
+		if state != nil {
+			preVal := reflect.ValueOf(node.config.StatePreHandler)
+			if preVal.Kind() == reflect.Func {
+				args := []reflect.Value{reflect.ValueOf(ctx), reflect.ValueOf(input), reflect.ValueOf(state)}
+				results := preVal.Call(args)
+				if len(results) >= 2 && !results[1].IsNil() {
+					errVal := results[1].Interface()
+					if err, ok := errVal.(error); ok {
+						return nil, fmt.Errorf("compose: state pre-handler for node %q failed: %w", node.key, err)
+					}
+				}
+				if len(results) >= 1 && !results[0].IsNil() {
+					if newInput, ok := results[0].Interface().(map[string]any); ok {
+						input = newInput
+					}
+				}
+			}
+		}
+	}
+
 	l := node.lambda
 	if l.invoke != nil {
 		return l.invoke(ctx, input)
@@ -614,37 +653,22 @@ func (cg *compiledGraph) executeSubGraph(ctx context.Context, node *nodeEntry, i
 }
 
 func (cg *compiledGraph) executeBranch(ctx context.Context, node *nodeEntry, input any) (any, error) {
-	if node.branch == nil {
-		return nil, fmt.Errorf("compose: branch node %q has no branch", node.key)
-	}
-	b := node.branch
-	if b.isStream {
-		// Stream branch: input should be a stream reader
-		sr, ok := input.(*wfcompose.StreamReader[any])
-		if !ok {
-			wrapped := wfcompose.StreamReaderFromArray([]any{input})
-			sr = wrapped
-		}
-		condFn := b.condition.(func(context.Context, *wfcompose.StreamReader[any]) (string, error))
-		nextKey, err := condFn(ctx, sr)
-		if err != nil {
-			return nil, err
-		}
-		if b.endNodes[nextKey] {
-			return sr, nil
-		}
-		return cg.executeNode(ctx, nextKey, sr)
-	}
-	// Non-stream branch
-	condFn := b.condition.(func(context.Context, any) (string, error))
-	nextKey, err := condFn(ctx, input)
+	selected, err := cg.evalBranchCondition(ctx, node, input)
 	if err != nil {
 		return nil, err
 	}
-	if b.endNodes[nextKey] {
-		return input, nil
+	// For backward compatibility: execute the first selected non-end target
+	b := node.branch
+	for target, shouldExec := range selected {
+		if !shouldExec {
+			continue
+		}
+		if b.endNodes[target] {
+			return input, nil
+		}
+		return cg.executeNode(ctx, target, input)
 	}
-	return cg.executeNode(ctx, nextKey, input)
+	return input, nil
 }
 
 // executeValue executes the graph and returns a single value (non-streaming).
@@ -653,7 +677,475 @@ func (cg *compiledGraph) executeValue(ctx context.Context, input any) (any, erro
 	if len(entryKeys) == 0 {
 		return nil, fmt.Errorf("compose: no entry node")
 	}
-	return cg.executeNode(ctx, entryKeys[0], input)
+	return cg.executeGraph(ctx, entryKeys[0], input)
+}
+
+// executeGraph runs the full DAG using BFS, handling branches and convergence.
+func (cg *compiledGraph) executeGraph(ctx context.Context, entryKey string, input any) (any, error) {
+	// Create state once for the entire graph execution
+	if cg.genLocalState != nil {
+		state := cg.genLocalState(ctx)
+		if state != nil {
+			ctx = context.WithValue(ctx, stateKey{}, state)
+		}
+	}
+
+	// Build inEdges from outEdges
+	inEdges := make(map[string][]string)
+	for from, tos := range cg.outEdges {
+		for _, to := range tos {
+			if to == END {
+				continue
+			}
+			inEdges[to] = append(inEdges[to], from)
+		}
+	}
+
+	nodeOutputs := make(map[string]any)
+	executed := make(map[string]bool)
+
+	// Execute entry node
+	output, err := cg.executeNode(ctx, entryKey, input)
+	if err != nil {
+		return nil, err
+	}
+	nodeOutputs[entryKey] = output
+	executed[entryKey] = true
+	cg.markExecuted(ctx, entryKey)
+
+	// BFS queue
+	queue := make([]string, 0)
+	for _, next := range cg.outEdges[entryKey] {
+		if next != END {
+			queue = append(queue, next)
+		}
+	}
+
+	var lastOutput any = output
+	maxIterations := 10000
+
+	for len(queue) > 0 && maxIterations > 0 {
+		maxIterations--
+		progress := false
+		var deferred []string
+
+		for len(queue) > 0 {
+			nextKey := queue[0]
+			queue = queue[1:]
+
+			if nextKey == END || executed[nextKey] {
+				continue
+			}
+
+			// Check if all predecessors are executed
+			allPredsDone := true
+			for _, pred := range inEdges[nextKey] {
+				if !executed[pred] {
+					allPredsDone = false
+					break
+				}
+			}
+
+			if !allPredsDone {
+				deferred = append(deferred, nextKey)
+				continue
+			}
+
+			progress = true
+			resolvedInput := cg.resolveAllInputs(nextKey, nodeOutputs, inEdges)
+
+			// Handle branch node specially
+			node := cg.nodes[nextKey]
+			if node != nil && node.branch != nil {
+				// If the node also has a lambda, execute it first
+				var branchInput any = resolvedInput
+				if node.lambda != nil {
+					lambdaOutput, err := cg.executeLambda(ctx, node, resolvedInput)
+					if err != nil {
+						return nil, fmt.Errorf("compose: node %q failed: %w", nextKey, err)
+					}
+					nodeOutputs[nextKey] = lambdaOutput
+					lastOutput = lambdaOutput
+					branchInput = lambdaOutput
+				} else {
+					nodeOutputs[nextKey] = resolvedInput
+					lastOutput = resolvedInput
+				}
+
+				selected, err := cg.evalBranchCondition(ctx, node, branchInput)
+				if err != nil {
+					return nil, fmt.Errorf("compose: node %q failed: %w", nextKey, err)
+				}
+				executed[nextKey] = true
+				cg.markExecuted(ctx, nextKey)
+
+				for target, shouldExec := range selected {
+					if shouldExec && !executed[target] && target != END {
+						queue = append(queue, target)
+					}
+				}
+				for _, next := range cg.outEdges[nextKey] {
+					if !executed[next] && next != END {
+						queue = append(queue, next)
+					}
+				}
+				continue
+			}
+
+			// Execute regular node
+			output, err = cg.executeNode(ctx, nextKey, resolvedInput)
+			if err != nil {
+				return nil, err
+			}
+			nodeOutputs[nextKey] = output
+			executed[nextKey] = true
+			cg.markExecuted(ctx, nextKey)
+			lastOutput = output
+
+			for _, next := range cg.outEdges[nextKey] {
+				if !executed[next] && next != END {
+					queue = append(queue, next)
+				}
+			}
+		}
+
+		if !progress && len(deferred) > 0 {
+			// Force-execute deferred nodes (predecessors that will never run)
+			forceKey := deferred[0]
+			deferred = deferred[1:]
+			progress = true
+
+			resolvedInput := cg.resolveAllInputs(forceKey, nodeOutputs, inEdges)
+
+			node := cg.nodes[forceKey]
+			if node != nil && node.branch != nil {
+				var branchInput any = resolvedInput
+				if node.lambda != nil {
+					lambdaOutput, err := cg.executeLambda(ctx, node, resolvedInput)
+					if err != nil {
+						return nil, fmt.Errorf("compose: node %q failed: %w", forceKey, err)
+					}
+					nodeOutputs[forceKey] = lambdaOutput
+					lastOutput = lambdaOutput
+					branchInput = lambdaOutput
+				} else {
+					nodeOutputs[forceKey] = resolvedInput
+					lastOutput = resolvedInput
+				}
+
+				selected, err := cg.evalBranchCondition(ctx, node, branchInput)
+				if err != nil {
+					return nil, fmt.Errorf("compose: node %q failed: %w", forceKey, err)
+				}
+				executed[forceKey] = true
+				cg.markExecuted(ctx, forceKey)
+
+				for target, shouldExec := range selected {
+					if shouldExec && !executed[target] && target != END {
+						queue = append(queue, target)
+					}
+				}
+				for _, next := range cg.outEdges[forceKey] {
+					if !executed[next] && next != END {
+						queue = append(queue, next)
+					}
+				}
+			} else {
+				output, err = cg.executeNode(ctx, forceKey, resolvedInput)
+				if err != nil {
+					return nil, err
+				}
+				nodeOutputs[forceKey] = output
+				executed[forceKey] = true
+				cg.markExecuted(ctx, forceKey)
+				lastOutput = output
+
+				for _, next := range cg.outEdges[forceKey] {
+					if !executed[next] && next != END {
+						queue = append(queue, next)
+					}
+				}
+			}
+		}
+
+		queue = deferred
+	}
+
+	// Return output of the node that connects to END
+	for key, out := range nodeOutputs {
+		for _, next := range cg.outEdges[key] {
+			if next == END {
+				return out, nil
+			}
+		}
+	}
+
+	return lastOutput, nil
+}
+
+// resolveAllInputs resolves field mappings from ALL executed predecessors.
+func (cg *compiledGraph) resolveAllInputs(nodeKey string, nodeOutputs map[string]any, inEdges map[string][]string) map[string]any {
+	result := make(map[string]any)
+
+	if cg.fieldMappings != nil {
+		if entries, ok := cg.fieldMappings[nodeKey]; ok {
+			for _, entry := range entries {
+				predOutput, exists := nodeOutputs[entry.fromKey]
+				if !exists {
+					continue
+				}
+				predMap, ok := predOutput.(map[string]any)
+				if !ok {
+					result[entry.fromKey] = predOutput
+					continue
+				}
+				if len(entry.fieldMappings) == 0 {
+					for k, v := range predMap {
+						result[k] = v
+					}
+				} else {
+					for _, fm := range entry.fieldMappings {
+						val, found := getNestedValue(predMap, fm.from)
+						if found {
+							setNestedValue(result, fm.to, val)
+						}
+					}
+				}
+			}
+			// Apply static values
+			if cg.staticValues != nil {
+				if svs, ok := cg.staticValues[nodeKey]; ok {
+					for _, sv := range svs {
+						setNestedValue(result, sv.path, sv.val)
+					}
+				}
+			}
+			return result
+		}
+	}
+
+	// No field mappings: merge all predecessor outputs using inEdges
+	for _, predKey := range inEdges[nodeKey] {
+		predOutput, exists := nodeOutputs[predKey]
+		if !exists {
+			continue
+		}
+		predMap, ok := predOutput.(map[string]any)
+		if !ok {
+			result[predKey] = predOutput
+			continue
+		}
+		for k, v := range predMap {
+			result[k] = v
+		}
+	}
+	// Apply static values
+	if cg.staticValues != nil {
+		if svs, ok := cg.staticValues[nodeKey]; ok {
+			for _, sv := range svs {
+				setNestedValue(result, sv.path, sv.val)
+			}
+		}
+	}
+	return result
+}
+
+// evalBranchCondition evaluates a branch condition using reflection.
+func (cg *compiledGraph) evalBranchCondition(ctx context.Context, node *nodeEntry, input any) (map[string]bool, error) {
+	b := node.branch
+	if b == nil {
+		return nil, fmt.Errorf("compose: branch node %q has no branch", node.key)
+	}
+
+	if b.isMulti {
+		if b.isStream {
+			sr, ok := input.(*wfcompose.StreamReader[any])
+			if !ok {
+				sr = wfcompose.StreamReaderFromArray([]any{input})
+			}
+			condVal := reflect.ValueOf(b.condition)
+			results := condVal.Call([]reflect.Value{
+				reflect.ValueOf(ctx),
+				reflect.ValueOf(sr),
+			})
+			selected, ok := results[0].Interface().(map[string]bool)
+			if !ok {
+				return nil, fmt.Errorf("compose: multi-branch condition returned non-map result")
+			}
+			var err error
+			if !results[1].IsNil() {
+				err = results[1].Interface().(error)
+			}
+			return selected, err
+		}
+		condVal := reflect.ValueOf(b.condition)
+		results := condVal.Call([]reflect.Value{
+			reflect.ValueOf(ctx),
+			reflect.ValueOf(input),
+		})
+		selected, ok := results[0].Interface().(map[string]bool)
+		if !ok {
+			return nil, fmt.Errorf("compose: multi-branch condition returned non-map result")
+		}
+		var err error
+		if !results[1].IsNil() {
+			err = results[1].Interface().(error)
+		}
+		return selected, err
+	}
+
+	// Single branch
+	var nextKey string
+	var err error
+	var ok bool
+	if b.isStream {
+		var sr *wfcompose.StreamReader[any]
+		sr, ok = input.(*wfcompose.StreamReader[any])
+		if !ok {
+			sr = wfcompose.StreamReaderFromArray([]any{input})
+		}
+		condVal := reflect.ValueOf(b.condition)
+		results := condVal.Call([]reflect.Value{
+			reflect.ValueOf(ctx),
+			reflect.ValueOf(sr),
+		})
+		nextKey, ok = results[0].Interface().(string)
+		if !ok {
+			return nil, fmt.Errorf("compose: branch condition returned non-string result")
+		}
+		if !results[1].IsNil() {
+			err = results[1].Interface().(error)
+		}
+	} else {
+		condVal := reflect.ValueOf(b.condition)
+		results := condVal.Call([]reflect.Value{
+			reflect.ValueOf(ctx),
+			reflect.ValueOf(input),
+		})
+		nextKey, ok = results[0].Interface().(string)
+		if !ok {
+			return nil, fmt.Errorf("compose: branch condition returned non-string result")
+		}
+		if !results[1].IsNil() {
+			err = results[1].Interface().(error)
+		}
+	}
+	return map[string]bool{nextKey: true}, err
+}
+
+// markExecuted marks a node as executed in the state (using reflection).
+func (cg *compiledGraph) markExecuted(ctx context.Context, key string) {
+	state := ctx.Value(stateKey{})
+	if state == nil {
+		return
+	}
+	// Use reflection to set ExecutedNodes[key] = true
+	v := reflect.ValueOf(state)
+	if v.Kind() == reflect.Ptr {
+		v = v.Elem()
+	}
+	if v.Kind() != reflect.Struct {
+		return
+	}
+	executedField := v.FieldByName("ExecutedNodes")
+	if !executedField.IsValid() {
+		return
+	}
+	if executedField.Kind() != reflect.Map {
+		return
+	}
+	// Set key=true in the map
+	keyVal := reflect.ValueOf(key)
+	boolVal := reflect.ValueOf(true)
+	if !keyVal.Type().AssignableTo(executedField.Type().Key()) {
+		// Try converting key to the map's key type
+		keyVal = keyVal.Convert(executedField.Type().Key())
+	}
+	executedField.SetMapIndex(keyVal, boolVal)
+}
+
+// resolveInput resolves field mappings from predecessor output to node input.
+func (cg *compiledGraph) resolveInput(nodeKey, predKey string, predOutput any) map[string]any {
+	result := make(map[string]any)
+	if cg.fieldMappings == nil {
+		// No field mappings: pass entire predecessor output
+		result[predKey] = predOutput
+		return result
+	}
+
+	entries, ok := cg.fieldMappings[nodeKey]
+	if !ok {
+		result[predKey] = predOutput
+		return result
+	}
+
+	predMap, ok := predOutput.(map[string]any)
+	if !ok {
+		result[predKey] = predOutput
+		return result
+	}
+
+	for _, entry := range entries {
+		if entry.fromKey != predKey {
+			continue
+		}
+		if len(entry.fieldMappings) == 0 {
+			// No specific mappings: merge entire predecessor output
+			for k, v := range predMap {
+				result[k] = v
+			}
+		} else {
+			// Apply specific field mappings
+			for _, fm := range entry.fieldMappings {
+				fromFields := fm.from
+				toFields := fm.to
+				val, found := getNestedValue(predMap, fromFields)
+				if found {
+					setNestedValue(result, toFields, val)
+				}
+			}
+		}
+	}
+	return result
+}
+
+// getNestedValue retrieves a value from a nested map using a field path.
+func getNestedValue(m map[string]any, path FieldPath) (any, bool) {
+	if len(path) == 0 {
+		return nil, false
+	}
+	v, ok := m[path[0]]
+	if !ok {
+		return nil, false
+	}
+	for i := 1; i < len(path); i++ {
+		m2, ok := v.(map[string]any)
+		if !ok {
+			return nil, false
+		}
+		v, ok = m2[path[i]]
+		if !ok {
+			return nil, false
+		}
+	}
+	return v, true
+}
+
+// setNestedValue sets a value in a nested map using a field path.
+func setNestedValue(m map[string]any, path FieldPath, val any) {
+	if len(path) == 0 {
+		return
+	}
+	if len(path) == 1 {
+		m[path[0]] = val
+		return
+	}
+	sub, ok := m[path[0]].(map[string]any)
+	if !ok {
+		sub = make(map[string]any)
+		m[path[0]] = sub
+	}
+	setNestedValue(sub, path[1:], val)
 }
 
 // ---------------------------------------------------------------------------
@@ -880,8 +1372,18 @@ func RegisterSerializableType[T any](name string) error {
 	return nil
 }
 
+type stateKey struct{}
+
 func ProcessState[S any](ctx context.Context, handler func(context.Context, S) error) error {
-	return nil
+	v := ctx.Value(stateKey{})
+	if v == nil {
+		return nil
+	}
+	s, ok := v.(S)
+	if !ok {
+		return nil
+	}
+	return handler(ctx, s)
 }
 
 func GetToolCallID(ctx context.Context) string {
@@ -1092,37 +1594,105 @@ func (r *Runnable[I, O]) GetCompiledGraph() *compiledGraph {
 // Workflow is a specialized graph for workflow composition.
 type Workflow[I, O any] struct {
 	*Graph[I, O]
+	workflowNodes map[string]*WorkflowNode
 }
 
 // NewWorkflow creates a new workflow graph.
 func NewWorkflow[I, O any](opts ...NewGraphOption) *Workflow[I, O] {
-	return &Workflow[I, O]{Graph: NewGraph[I, O]()}
+	return &Workflow[I, O]{
+		Graph:         NewGraph[I, O](opts...),
+		workflowNodes: make(map[string]*WorkflowNode),
+	}
+}
+
+// initNode creates or retrieves a WorkflowNode for the given key.
+func (w *Workflow[I, O]) initNode(key string) *WorkflowNode {
+	if n, ok := w.workflowNodes[key]; ok {
+		return n
+	}
+	n := &WorkflowNode{key: key}
+	w.workflowNodes[key] = n
+	return n
 }
 
 // AddLambdaNode adds a lambda node and returns the node for further configuration.
-func (w *Workflow[I, O]) AddLambdaNode(key string, lambda *Lambda, opts ...GraphAddNodeOpt) *Lambda {
+func (w *Workflow[I, O]) AddLambdaNode(key string, lambda *Lambda, opts ...GraphAddNodeOpt) *WorkflowNode {
 	_ = w.Graph.AddLambdaNode(key, lambda, opts...)
-	return lambda
+	return w.initNode(key)
 }
 
 // End finalizes the workflow and returns the end node.
-func (w *Workflow[I, O]) End() *Lambda {
-	return &Lambda{}
+func (w *Workflow[I, O]) End() *WorkflowNode {
+	return w.initNode(END)
 }
 
 // Compile compiles the workflow.
 func (w *Workflow[I, O]) Compile(ctx context.Context, opts ...GraphCompileOption) (*Runnable[I, O], error) {
-	return w.Graph.Compile(ctx, opts...)
+	// Resolve dependencies into edges
+	for key, node := range w.workflowNodes {
+		for _, dep := range node.depEntries {
+			_ = w.Graph.AddEdge(dep.fromKey, key)
+		}
+	}
+	r, err := w.Graph.Compile(ctx, opts...)
+	if err != nil {
+		return nil, err
+	}
+	// Store field mappings in the compiled graph
+	for key, node := range w.workflowNodes {
+		if len(node.depEntries) > 0 {
+			if r.graph.fieldMappings == nil {
+				r.graph.fieldMappings = make(map[string][]depEntry)
+			}
+			r.graph.fieldMappings[key] = node.depEntries
+		}
+		if len(node.staticValues) > 0 {
+			if r.graph.staticValues == nil {
+				r.graph.staticValues = make(map[string][]staticValueEntry)
+			}
+			r.graph.staticValues[key] = node.staticValues
+		}
+	}
+	return r, nil
+}
+
+// AddChatTemplateNode adds a chat template node.
+func (w *Workflow[I, O]) AddChatTemplateNode(key string, tpl wfcompose.ChatTemplate, opts ...GraphAddNodeOpt) *WorkflowNode {
+	_ = w.Graph.AddChatTemplateNode(key, tpl, opts...)
+	return w.initNode(key)
+}
+
+// WorkflowNode represents a node in a workflow, tracking dependencies.
+type WorkflowNode struct {
+	key          string
+	depEntries   []depEntry
+	staticValues []staticValueEntry
+}
+
+type depEntry struct {
+	fromKey      string
+	fieldMappings []*FieldMapping
 }
 
 // AddInput adds an input dependency to the node.
-func (l *Lambda) AddInput(fromNodeKey string, fieldMappings ...*FieldMapping) {}
+func (n *WorkflowNode) AddInput(fromNodeKey string, fieldMappings ...*FieldMapping) *WorkflowNode {
+	n.depEntries = append(n.depEntries, depEntry{fromKey: fromNodeKey, fieldMappings: fieldMappings})
+	return n
+}
 
 // AddInputWithOptions adds an input dependency with options.
-func (l *Lambda) AddInputWithOptions(fromNodeKey string, fieldMappings []*FieldMapping, opts ...NewGraphOption) {}
+func (n *WorkflowNode) AddInputWithOptions(fromNodeKey string, fieldMappings []*FieldMapping, opts ...NewGraphOption) *WorkflowNode {
+	n.depEntries = append(n.depEntries, depEntry{fromKey: fromNodeKey, fieldMappings: fieldMappings})
+	return n
+}
 
 // AddDependency adds a dependency to the node.
-func (l *Lambda) AddDependency(key string) {}
+func (n *WorkflowNode) AddDependency(key string) *WorkflowNode {
+	n.depEntries = append(n.depEntries, depEntry{fromKey: key})
+	return n
+}
 
-// SetStaticValue sets a static value for the node.
-func (l *Lambda) SetStaticValue(path FieldPath, val any) {}
+// SetStaticValue sets a static value for the node (called without chaining).
+func (n *WorkflowNode) SetStaticValue(path FieldPath, val any) {
+	n.staticValues = append(n.staticValues, staticValueEntry{path: path, val: val})
+}
