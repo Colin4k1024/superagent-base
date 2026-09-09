@@ -24,7 +24,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/cloudwego/eino/components/model"
 	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 
 	"github.com/superagent-ai/superagent-base/backend/pkg/llm"
@@ -32,12 +31,12 @@ import (
 
 // ChatModelAdapter wraps an eino ToolCallingChatModel as an llm.ChatModel.
 type ChatModelAdapter struct {
-	chatModel model.ToolCallingChatModel
+	chatModel einobridge.ToolCallingChatModel
 	modelID   string
 }
 
 // NewChatModelAdapter creates an llm.ChatModel from an eino chat model.
-func NewChatModelAdapter(chatModel model.ToolCallingChatModel, modelID string) *ChatModelAdapter {
+func NewChatModelAdapter(chatModel einobridge.ToolCallingChatModel, modelID string) *ChatModelAdapter {
 	return &ChatModelAdapter{chatModel: chatModel, modelID: modelID}
 }
 
@@ -165,6 +164,6 @@ var _ llm.ChatModel = (*ChatModelAdapter)(nil)
 // This is used during the migration transition period where eino's adk
 // still requires the raw eino model type. Once the migration to the
 // target framework is complete, this method will be removed.
-func (a *ChatModelAdapter) UnwrapEinoModel() model.ToolCallingChatModel {
+func (a *ChatModelAdapter) UnwrapEinoModel() einobridge.ToolCallingChatModel {
 	return a.chatModel
 }

@@ -18,13 +18,13 @@ package ark
 
 import (
 	"context"
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	"errors"
 	"fmt"
 	"math"
 	"net/http"
 
 	"github.com/cloudwego/eino-ext/components/embedding/ark"
-	"github.com/cloudwego/eino/components/embedding"
 	"github.com/volcengine/volcengine-go-sdk/service/arkruntime/model"
 
 	contract "github.com/superagent-ai/superagent-base/backend/infra/embedding"
@@ -54,10 +54,10 @@ func NewArkEmbedder(ctx context.Context, config *ark.EmbeddingConfig, dimensions
 type embWrap struct {
 	dims      int64
 	batchSize int
-	embedding.Embedder
+	einobridge.Embedder
 }
 
-func (d *embWrap) EmbedStrings(ctx context.Context, texts []string, opts ...embedding.Option) ([][]float64, error) {
+func (d *embWrap) EmbedStrings(ctx context.Context, texts []string, opts ...einobridge.EmbeddingOption) ([][]float64, error) {
 	resp := make([][]float64, 0, len(texts))
 	for _, part := range slices.Chunks(texts, d.batchSize) {
 		partResult, err := d.Embedder.EmbedStrings(ctx, part, opts...)
@@ -87,7 +87,7 @@ func (d *embWrap) EmbedStrings(ctx context.Context, texts []string, opts ...embe
 	return resp, nil
 }
 
-func (d *embWrap) EmbedStringsHybrid(ctx context.Context, texts []string, opts ...embedding.Option) ([][]float64, []map[int]float64, error) {
+func (d *embWrap) EmbedStringsHybrid(ctx context.Context, texts []string, opts ...einobridge.EmbeddingOption) ([][]float64, []map[int]float64, error) {
 	return nil, nil, fmt.Errorf("[arkEmbedder] EmbedStringsHybrid not support")
 }
 

@@ -26,7 +26,6 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/cloudwego/eino/components/document/parser"
 	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 
 	"github.com/superagent-ai/superagent-base/backend/infra/document"
@@ -74,7 +73,7 @@ func (p *pyPDFTableIterator) NextRow() (row []string, end bool, err error) {
 }
 
 func ParseByPython(config *contract.Config, storage storage.Storage, ocr ocr.OCR, pyPath, scriptPath string) ParseFn {
-	return func(ctx context.Context, reader io.Reader, opts ...parser.Option) (docs []*einobridge.Document, err error) {
+	return func(ctx context.Context, reader io.Reader, opts ...einobridge.ParserOption) (docs []*einobridge.Document, err error) {
 		pr, pw, err := os.Pipe()
 		if err != nil {
 			return nil, fmt.Errorf("[ParseByPython] create rpipe failed, %w", err)
@@ -83,7 +82,7 @@ func ParseByPython(config *contract.Config, storage storage.Storage, ocr ocr.OCR
 		if err != nil {
 			return nil, fmt.Errorf("[ParseByPython] create pipe failed: %w", err)
 		}
-		options := parser.GetCommonOptions(&parser.Options{ExtraMeta: map[string]any{}}, opts...)
+		options := einobridge.ParserGetCommonOptions(&einobridge.ParserOptions{ExtraMeta: map[string]any{}}, opts...)
 
 		reqb, err := json.Marshal(pyParseRequest{
 			ExtractImages: config.ParsingStrategy.ExtractImage,

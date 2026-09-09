@@ -18,6 +18,7 @@ package eino
 
 import (
 	"context"
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	"fmt"
 	"strings"
 
@@ -26,7 +27,6 @@ import (
 	einodeepseek "github.com/cloudwego/eino-ext/components/model/deepseek"
 	einoollama "github.com/cloudwego/eino-ext/components/model/ollama"
 	einoopenai "github.com/cloudwego/eino-ext/components/model/openai"
-	"github.com/cloudwego/eino/components/model"
 
 	"github.com/superagent-ai/superagent-base/backend/pkg/llm"
 )
@@ -35,7 +35,7 @@ import (
 // It delegates to eino-ext's provider-specific constructors.
 type Provider struct {
 	protocol string
-	create   func(ctx context.Context, cfg llm.ModelConfig) (model.ToolCallingChatModel, error)
+	create   func(ctx context.Context, cfg llm.ModelConfig) (einobridge.ToolCallingChatModel, error)
 }
 
 // Protocol returns the provider protocol name.
@@ -57,7 +57,7 @@ func NewDefaultRegistry(defaultBaseURL string) *llm.ModelProviderRegistry {
 
 	reg.Register(&Provider{
 		protocol: "openai",
-		create: func(ctx context.Context, cfg llm.ModelConfig) (model.ToolCallingChatModel, error) {
+		create: func(ctx context.Context, cfg llm.ModelConfig) (einobridge.ToolCallingChatModel, error) {
 			return einoopenai.NewChatModel(ctx, &einoopenai.ChatModelConfig{
 				BaseURL: cfg.BaseURL,
 				APIKey:  cfg.APIKey,
@@ -68,7 +68,7 @@ func NewDefaultRegistry(defaultBaseURL string) *llm.ModelProviderRegistry {
 
 	reg.Register(&Provider{
 		protocol: "qwen",
-		create: func(ctx context.Context, cfg llm.ModelConfig) (model.ToolCallingChatModel, error) {
+		create: func(ctx context.Context, cfg llm.ModelConfig) (einobridge.ToolCallingChatModel, error) {
 			return einoopenai.NewChatModel(ctx, &einoopenai.ChatModelConfig{
 				BaseURL: cfg.BaseURL,
 				APIKey:  cfg.APIKey,
@@ -79,7 +79,7 @@ func NewDefaultRegistry(defaultBaseURL string) *llm.ModelProviderRegistry {
 
 	reg.Register(&Provider{
 		protocol: "claude",
-		create: func(ctx context.Context, cfg llm.ModelConfig) (model.ToolCallingChatModel, error) {
+		create: func(ctx context.Context, cfg llm.ModelConfig) (einobridge.ToolCallingChatModel, error) {
 			return einoclaude.NewChatModel(ctx, &einoclaude.Config{
 				BaseURL: &cfg.BaseURL,
 				APIKey:  cfg.APIKey,
@@ -90,7 +90,7 @@ func NewDefaultRegistry(defaultBaseURL string) *llm.ModelProviderRegistry {
 
 	reg.Register(&Provider{
 		protocol: "ark",
-		create: func(ctx context.Context, cfg llm.ModelConfig) (model.ToolCallingChatModel, error) {
+		create: func(ctx context.Context, cfg llm.ModelConfig) (einobridge.ToolCallingChatModel, error) {
 			return einoark.NewChatModel(ctx, &einoark.ChatModelConfig{
 				BaseURL: cfg.BaseURL,
 				APIKey:  cfg.APIKey,
@@ -101,7 +101,7 @@ func NewDefaultRegistry(defaultBaseURL string) *llm.ModelProviderRegistry {
 
 	reg.Register(&Provider{
 		protocol: "deepseek",
-		create: func(ctx context.Context, cfg llm.ModelConfig) (model.ToolCallingChatModel, error) {
+		create: func(ctx context.Context, cfg llm.ModelConfig) (einobridge.ToolCallingChatModel, error) {
 			baseURL := cfg.BaseURL
 			if baseURL == "" || baseURL == defaultBaseURL {
 				baseURL = "https://api.deepseek.com/v1"
@@ -116,7 +116,7 @@ func NewDefaultRegistry(defaultBaseURL string) *llm.ModelProviderRegistry {
 
 	reg.Register(&Provider{
 		protocol: "ollama",
-		create: func(ctx context.Context, cfg llm.ModelConfig) (model.ToolCallingChatModel, error) {
+		create: func(ctx context.Context, cfg llm.ModelConfig) (einobridge.ToolCallingChatModel, error) {
 			ollamaURL := cfg.BaseURL
 			if ollamaURL == "" || ollamaURL == defaultBaseURL {
 				ollamaURL = "http://localhost:11434"
@@ -131,7 +131,7 @@ func NewDefaultRegistry(defaultBaseURL string) *llm.ModelProviderRegistry {
 
 	reg.Register(&Provider{
 		protocol: "gemini",
-		create: func(ctx context.Context, cfg llm.ModelConfig) (model.ToolCallingChatModel, error) {
+		create: func(ctx context.Context, cfg llm.ModelConfig) (einobridge.ToolCallingChatModel, error) {
 			// Gemini requires an OpenAI-compatible proxy (e.g. LiteLLM).
 			if cfg.BaseURL == "" {
 				return nil, fmt.Errorf("gemini protocol requires base_url pointing to an OpenAI-compatible proxy")

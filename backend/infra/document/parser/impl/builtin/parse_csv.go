@@ -22,7 +22,6 @@ import (
 	"errors"
 	"io"
 
-	"github.com/cloudwego/eino/components/document/parser"
 	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	"github.com/dimchansky/utfbom"
 
@@ -30,7 +29,7 @@ import (
 )
 
 func ParseCSV(config *contract.Config) ParseFn {
-	return func(ctx context.Context, reader io.Reader, opts ...parser.Option) (docs []*einobridge.Document, err error) {
+	return func(ctx context.Context, reader io.Reader, opts ...einobridge.ParserOption) (docs []*einobridge.Document, err error) {
 		iter := &csvIterator{csv.NewReader(utfbom.SkipOnly(reader))}
 		return parseByRowIterator(iter, config, opts...)
 	}

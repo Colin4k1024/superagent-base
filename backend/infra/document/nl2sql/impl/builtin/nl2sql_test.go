@@ -20,8 +20,6 @@ import (
 	"context"
 	"testing"
 
-	"github.com/cloudwego/eino/components/model"
-	"github.com/cloudwego/eino/components/prompt"
 	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	"github.com/stretchr/testify/assert"
 
@@ -32,7 +30,7 @@ func TestNL2SQL(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("test table meta not provided", func(t *testing.T) {
-		impl, err := NewNL2SQL(ctx, &mockChatModel{"mock resp"}, prompt.FromMessages(einobridge.Jinja2,
+		impl, err := NewNL2SQL(ctx, &mockChatModel{"mock resp"}, einobridge.PromptFromMessages(einobridge.Jinja2,
 			einobridge.SystemMessage("system message 123"),
 			einobridge.UserMessage("{{messages}}, {{table_meta}}"),
 		))
@@ -44,7 +42,7 @@ func TestNL2SQL(t *testing.T) {
 	})
 
 	t.Run("test parse failed", func(t *testing.T) {
-		impl, err := NewNL2SQL(ctx, &mockChatModel{"mock resp"}, prompt.FromMessages(einobridge.Jinja2,
+		impl, err := NewNL2SQL(ctx, &mockChatModel{"mock resp"}, einobridge.PromptFromMessages(einobridge.Jinja2,
 			einobridge.SystemMessage("system message 123"),
 			einobridge.UserMessage("{{messages}}, {{table_meta}}"),
 		))
@@ -81,7 +79,7 @@ func TestNL2SQL(t *testing.T) {
 	})
 
 	t.Run("test success", func(t *testing.T) {
-		impl, err := NewNL2SQL(ctx, &mockChatModel{`{"sql":"mock sql","err_code":0,"err_msg":""}`}, prompt.FromMessages(einobridge.Jinja2,
+		impl, err := NewNL2SQL(ctx, &mockChatModel{`{"sql":"mock sql","err_code":0,"err_msg":""}`}, einobridge.PromptFromMessages(einobridge.Jinja2,
 			einobridge.SystemMessage("system message 123"),
 			einobridge.UserMessage("{{messages}}, {{table_meta}}"),
 		))
@@ -123,11 +121,11 @@ type mockChatModel struct {
 	content string
 }
 
-func (m mockChatModel) Generate(ctx context.Context, input []*einobridge.Message, opts ...model.Option) (*einobridge.Message, error) {
+func (m mockChatModel) Generate(ctx context.Context, input []*einobridge.Message, opts ...einobridge.ModelOption) (*einobridge.Message, error) {
 	return einobridge.AssistantMessage(m.content, nil), nil
 }
 
-func (m mockChatModel) Stream(ctx context.Context, input []*einobridge.Message, opts ...model.Option) (*einobridge.StreamReader[*einobridge.Message], error) {
+func (m mockChatModel) Stream(ctx context.Context, input []*einobridge.Message, opts ...einobridge.ModelOption) (*einobridge.StreamReader[*einobridge.Message], error) {
 	return nil, nil
 }
 

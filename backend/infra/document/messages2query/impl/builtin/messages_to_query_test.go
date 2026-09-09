@@ -20,15 +20,13 @@ import (
 	"context"
 	"testing"
 
-	"github.com/cloudwego/eino/components/model"
-	"github.com/cloudwego/eino/components/prompt"
 	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestM2Q(t *testing.T) {
 	ctx := context.Background()
-	impl, err := NewMessagesToQuery(ctx, &mockChatModel{}, prompt.FromMessages(einobridge.Jinja2,
+	impl, err := NewMessagesToQuery(ctx, &mockChatModel{}, einobridge.PromptFromMessages(einobridge.Jinja2,
 		einobridge.SystemMessage("system message 123"),
 		einobridge.UserMessage("{{messages}}")))
 	assert.NoError(t, err)
@@ -51,11 +49,11 @@ func TestM2Q(t *testing.T) {
 
 type mockChatModel struct{}
 
-func (m mockChatModel) Generate(ctx context.Context, input []*einobridge.Message, opts ...model.Option) (*einobridge.Message, error) {
+func (m mockChatModel) Generate(ctx context.Context, input []*einobridge.Message, opts ...einobridge.ModelOption) (*einobridge.Message, error) {
 	return einobridge.AssistantMessage("mock resp", nil), nil
 }
 
-func (m mockChatModel) Stream(ctx context.Context, input []*einobridge.Message, opts ...model.Option) (*einobridge.StreamReader[*einobridge.Message], error) {
+func (m mockChatModel) Stream(ctx context.Context, input []*einobridge.Message, opts ...einobridge.ModelOption) (*einobridge.StreamReader[*einobridge.Message], error) {
 	return nil, nil
 }
 

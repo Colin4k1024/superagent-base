@@ -21,7 +21,6 @@ import (
 	"context"
 	"sync"
 
-	"github.com/cloudwego/eino/components/model"
 
 	"github.com/superagent-ai/superagent-base/backend/pkg/safego"
 	"github.com/superagent-ai/superagent-base/backend/pkg/sonic"
@@ -29,7 +28,7 @@ import (
 
 type TokenCollector struct {
 	Key    string
-	Usage  *model.TokenUsage
+	Usage  *einobridge.ModelTokenUsage
 	wg     sync.WaitGroup
 	mu     sync.Mutex
 	Parent *TokenCollector
@@ -38,12 +37,12 @@ type TokenCollector struct {
 func newTokenCollector(key string, parent *TokenCollector) *TokenCollector {
 	return &TokenCollector{
 		Key:    key,
-		Usage:  &model.TokenUsage{},
+		Usage:  &einobridge.ModelTokenUsage{},
 		Parent: parent,
 	}
 }
 
-func (t *TokenCollector) addTokenUsage(usage *model.TokenUsage) {
+func (t *TokenCollector) addTokenUsage(usage *einobridge.ModelTokenUsage) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	t.Usage.PromptTokens += usage.PromptTokens
@@ -55,11 +54,11 @@ func (t *TokenCollector) addTokenUsage(usage *model.TokenUsage) {
 	}
 }
 
-func (t *TokenCollector) wait() *model.TokenUsage {
+func (t *TokenCollector) wait() *einobridge.ModelTokenUsage {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	t.wg.Wait()
-	usage := &model.TokenUsage{
+	usage := &einobridge.ModelTokenUsage{
 		PromptTokens:     t.Usage.PromptTokens,
 		CompletionTokens: t.Usage.CompletionTokens,
 		TotalTokens:      t.Usage.TotalTokens,
@@ -91,7 +90,7 @@ func (t *TokenCollector) finishStreamCounting() {
 
 type tokenCollector struct {
 	Key    string
-	Usage  *model.TokenUsage
+	Usage  *einobridge.ModelTokenUsage
 	Parent *TokenCollector
 }
 
@@ -126,7 +125,7 @@ func getTokenCollector(ctx context.Context) *TokenCollector {
 
 func GetTokenCallbackHandler() einobridge.Handler {
 	return einobridge.NewHandlerHelper().ChatModel(&einobridge.ModelCallbackHandler{
-		OnStart: func(ctx context.Context, runInfo *einobridge.RunInfo, input *model.CallbackInput) context.Context {
+		OnStart: func(ctx context.Context, runInfo *einobridge.RunInfo, input *einobridge.ModelCallbackInput) context.Context {
 			c := getTokenCollector(ctx)
 			if c == nil {
 				return ctx
@@ -134,7 +133,7 @@ func GetTokenCallbackHandler() einobridge.Handler {
 			c.add(1)
 			return ctx
 		},
-		OnEnd: func(ctx context.Context, runInfo *einobridge.RunInfo, output *model.CallbackOutput) context.Context {
+		OnEnd: func(ctx context.Context, runInfo *einobridge.RunInfo, output *einobridge.ModelCallbackOutput) context.Context {
 			c := getTokenCollector(ctx)
 			if c == nil {
 				return ctx
@@ -147,7 +146,7 @@ func GetTokenCallbackHandler() einobridge.Handler {
 			c.wg.Done()
 			return ctx
 		},
-		OnEndWithStreamOutput: func(ctx context.Context, runInfo *einobridge.RunInfo, output *einobridge.StreamReader[*model.CallbackOutput]) context.Context {
+		OnEndWithStreamOutput: func(ctx context.Context, runInfo *einobridge.RunInfo, output *einobridge.StreamReader[*einobridge.ModelCallbackOutput]) context.Context {
 			c := getTokenCollector(ctx)
 			if c == nil {
 				output.Close()
@@ -160,7 +159,7 @@ func GetTokenCallbackHandler() einobridge.Handler {
 					c.wg.Done()
 				}()
 
-				newC := &model.TokenUsage{}
+				newC := &einobridge.ModelTokenUsage{}
 
 				for {
 					chunk, err := output.Recv()

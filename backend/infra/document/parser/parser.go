@@ -16,6 +16,6 @@
 
 package parser
 
-import "github.com/cloudwego/eino/components/document/parser"
+import "github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 
-type Parser = parser.Parser
+type Parser = einobridge.DocParser

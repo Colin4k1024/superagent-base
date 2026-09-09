@@ -18,14 +18,13 @@ package agentflow
 
 import (
 	"context"
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	"fmt"
 	"sort"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/cloudwego/eino/components/tool"
-	"github.com/cloudwego/eino/components/tool/utils"
 
 	"github.com/superagent-ai/superagent-base/backend/domain/agent/singleagent/entity"
 	"github.com/superagent-ai/superagent-base/backend/pkg/lang/ptr"
@@ -105,14 +104,14 @@ func (d *databaseTool) Invoke(ctx context.Context, req ExecuteSQLRequest) (strin
 	return formatDatabaseResult(sqlResult), nil
 }
 
-func newDatabaseTools(ctx context.Context, conf *databaseConfig) ([]tool.InvokableTool, error) {
+func newDatabaseTools(ctx context.Context, conf *databaseConfig) ([]einobridge.InvokableTool, error) {
 	if conf == nil || len(conf.databaseConf) == 0 {
 		return nil, nil
 	}
 
 	dbInfos := conf.databaseConf
 
-	tools := make([]tool.InvokableTool, 0, len(dbInfos))
+	tools := make([]einobridge.InvokableTool, 0, len(dbInfos))
 	for _, dbInfo := range dbInfos {
 		tID, err := strconv.ParseInt(dbInfo.GetTableId(), 10, 64)
 		if err != nil {
@@ -127,7 +126,7 @@ func newDatabaseTools(ctx context.Context, conf *databaseConfig) ([]tool.Invokab
 			databaseID:     tID,
 		}
 
-		dbTool, err := utils.InferTool(dbInfo.GetTableName(), buildDatabaseToolDescription(dbInfo), d.Invoke)
+		dbTool, err := einobridge.InferTool(dbInfo.GetTableName(), buildDatabaseToolDescription(dbInfo), d.Invoke)
 		if err != nil {
 			return nil, err
 		}

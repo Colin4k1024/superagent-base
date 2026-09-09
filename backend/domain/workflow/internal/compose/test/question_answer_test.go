@@ -29,7 +29,6 @@ import (
 	"github.com/alicebob/miniredis/v2"
 	"github.com/bytedance/mockey"
 	"github.com/cloudwego/eino-ext/components/model/openai"
-	model2 "github.com/cloudwego/eino/components/model"
 	"github.com/cloudwego/eino/compose"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
@@ -64,7 +63,7 @@ func TestQuestionAnswer(t *testing.T) {
 		baseURL := os.Getenv("OPENAI_BASE_URL")
 		modelName := os.Getenv("OPENAI_MODEL_NAME")
 		var (
-			chatModel model2.BaseChatModel
+			chatModel einobridge.BaseChatModel
 			err       error
 		)
 

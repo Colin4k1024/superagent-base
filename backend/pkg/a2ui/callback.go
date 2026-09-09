@@ -38,8 +38,6 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/cloudwego/eino/components"
-	"github.com/cloudwego/eino/components/tool"
 
 	"github.com/superagent-ai/superagent-base/backend/pkg/observe"
 )
@@ -115,9 +113,9 @@ func (c *a2uiCallback) OnError(ctx context.Context, info *einobridge.RunInfo, er
 func einoToA2UIRunInfo(info *einobridge.RunInfo) observe.CallbackRunInfo {
 	comp := observe.ComponentOther
 	switch info.Component {
-	case components.ComponentOfChatModel:
+	case einobridge.ComponentOfChatModel:
 		comp = observe.ComponentChatModel
-	case components.ComponentOfTool:
+	case einobridge.ComponentOfTool:
 		comp = observe.ComponentTool
 	}
 	return observe.CallbackRunInfo{Component: comp, Name: info.Name}
@@ -128,7 +126,7 @@ func extractToolArgs(input einobridge.CallbackInput) map[string]any {
 	if input == nil {
 		return nil
 	}
-	in := tool.ConvCallbackInput(input)
+	in := einobridge.ToolConvCallbackInput(input)
 	if in == nil {
 		return nil
 	}
@@ -147,7 +145,7 @@ func extractToolResult(output einobridge.CallbackOutput) string {
 	if output == nil {
 		return ""
 	}
-	out := tool.ConvCallbackOutput(output)
+	out := einobridge.ToolConvCallbackOutput(output)
 	if out == nil {
 		return fmt.Sprintf("%v", output)
 	}

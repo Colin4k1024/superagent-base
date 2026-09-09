@@ -18,9 +18,8 @@ package agentflow
 
 import (
 	"context"
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 
-	"github.com/cloudwego/eino/components/tool"
-	"github.com/cloudwego/eino/components/tool/utils"
 
 	"github.com/superagent-ai/superagent-base/backend/api/model/data/variable/kvmemory"
 	"github.com/superagent-ai/superagent-base/backend/api/model/data/variable/project_memory"
@@ -59,8 +58,8 @@ func loadAgentVariables(ctx context.Context, vc *variableConf) (map[string]strin
 	return vbs, nil
 }
 
-func newAgentVariableTools(ctx context.Context, v *variableConf) ([]tool.InvokableTool, error) {
-	tools := make([]tool.InvokableTool, 0, 1)
+func newAgentVariableTools(ctx context.Context, v *variableConf) ([]einobridge.InvokableTool, error) {
+	tools := make([]einobridge.InvokableTool, 0, 1)
 	a := &avTool{
 		Agent:       v.Agent,
 		UserID:      v.UserID,
@@ -77,7 +76,7 @@ func newAgentVariableTools(ctx context.Context, v *variableConf) ([]tool.Invokab
 - Only make decisions regarding tool invocation based on the user's intention and input related to variable setting.
 - Do not call the tool in any other situation not meeting the above conditions.
 `
-	at, err := utils.InferTool("setKeywordMemory", desc, a.Invoke)
+	at, err := einobridge.InferTool("setKeywordMemory", desc, a.Invoke)
 	if err != nil {
 		return nil, err
 	}

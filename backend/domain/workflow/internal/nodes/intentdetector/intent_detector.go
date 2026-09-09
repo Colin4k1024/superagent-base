@@ -25,7 +25,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/cloudwego/eino/components/prompt"
 	"github.com/cloudwego/eino/compose"
 	"github.com/spf13/cast"
 
@@ -146,7 +145,7 @@ func (c *Config) Build(ctx context.Context, _ *schema2.NodeSchema, _ ...schema2.
 	if err != nil {
 		return nil, err
 	}
-	prompts := prompt.FromMessages(einobridge.Jinja2,
+	prompts := einobridge.PromptFromMessages(einobridge.Jinja2,
 		&einobridge.Message{Content: sptTemplate, Role: einobridge.System},
 		&einobridge.Message{Content: "{{query}}", Role: einobridge.User})
 

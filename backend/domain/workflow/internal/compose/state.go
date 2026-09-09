@@ -22,7 +22,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/cloudwego/eino/components/model"
 	"github.com/cloudwego/eino/compose"
 
 	workflow2 "github.com/superagent-ai/superagent-base/backend/api/model/workflow"
@@ -60,7 +59,7 @@ func init() {
 	_ = compose.RegisterSerializableType[entity.NodeType]("node_type")
 	_ = compose.RegisterSerializableType[*entity.InterruptEvent]("interrupt_event")
 	_ = compose.RegisterSerializableType[workflow2.EventType]("workflow_event_type")
-	_ = compose.RegisterSerializableType[*model.TokenUsage]("model_token_usage")
+	_ = compose.RegisterSerializableType[*einobridge.ModelTokenUsage]("model_token_usage")
 	_ = compose.RegisterSerializableType[*nodes.NestedWorkflowState]("composite_state")
 	_ = compose.RegisterSerializableType[*compose.InterruptInfo]("interrupt_info")
 	_ = compose.RegisterSerializableType[*schema2.SourceInfo]("source_info")
@@ -80,7 +79,7 @@ func init() {
 	_ = compose.RegisterSerializableType[*einobridge.Message]("schema_message")
 	_ = compose.RegisterSerializableType[*crossmessage.WfMessage]("history_messages")
 	_ = compose.RegisterSerializableType[*crossmessage.Content]("content")
-	_ = compose.RegisterSerializableType[*model.PromptTokenDetails]("prompt_token_details")
+	_ = compose.RegisterSerializableType[*einobridge.PromptTokenDetails]("prompt_token_details")
 
 	_ = compose.RegisterSerializableType[*vo.TypeInfo]("type_info")
 	_ = compose.RegisterSerializableType[vo.DataType]("data_type")

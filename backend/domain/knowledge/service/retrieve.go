@@ -24,7 +24,6 @@ import (
 	"sync"
 	"unicode/utf8"
 
-	"github.com/cloudwego/eino/components/retriever"
 	"github.com/cloudwego/eino/compose"
 	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	"golang.org/x/sync/errgroup"
@@ -275,10 +274,10 @@ func (k *knowledgeSVC) retrieveChannels(ctx context.Context, req *RetrieveContex
 		if len(partitions) == 0 {
 			continue
 		}
-		opts := []retriever.Option{
+		opts := []einobridge.RetrieverOption{
 			searchstore.WithRetrieverPartitionKey(fieldNameDocumentID),
 			searchstore.WithPartitions(partitions),
-			retriever.WithDSLInfo(dsl.DSL()),
+			einobridge.WithDSLInfo(dsl.DSL()),
 		}
 		if info.DocumentType == knowledgeModel.DocumentTypeTable && !k.enableCompactTable {
 			var matchCols []string

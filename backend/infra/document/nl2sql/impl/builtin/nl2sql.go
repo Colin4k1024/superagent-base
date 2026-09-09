@@ -23,7 +23,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/cloudwego/eino/components/prompt"
 	"github.com/cloudwego/eino/compose"
 	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 
@@ -38,7 +37,7 @@ const (
 	defaultColumnFmt = "| %s | %s | %s | %t |\n\n"
 )
 
-func NewNL2SQL(_ context.Context, cm modelbuilder.BaseChatModel, tpl prompt.ChatTemplate) (nl2sql.NL2SQL, error) {
+func NewNL2SQL(_ context.Context, cm modelbuilder.BaseChatModel, tpl einobridge.ChatTemplate) (nl2sql.NL2SQL, error) {
 	return &n2s{cm: cm, tpl: tpl}, nil
 }
 
@@ -47,7 +46,7 @@ type n2s struct {
 	runnable compose.Runnable[*nl2sqlInput, string]
 
 	cm  modelbuilder.BaseChatModel
-	tpl prompt.ChatTemplate
+	tpl einobridge.ChatTemplate
 }
 
 func (n *n2s) NL2SQL(ctx context.Context, messages []*einobridge.Message, tables []*document.TableSchema, opts ...nl2sql.Option) (sql string, err error) {

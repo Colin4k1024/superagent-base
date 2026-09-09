@@ -18,11 +18,10 @@ package agentflow
 
 import (
 	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
-	"github.com/cloudwego/eino/components/prompt"
 )
 
 var (
-	chatPrompt = prompt.FromMessages(einobridge.Jinja2,
+	chatPrompt = einobridge.PromptFromMessages(einobridge.Jinja2,
 		einobridge.SystemMessage(REACT_SYSTEM_PROMPT_JINJA2),
 		einobridge.MessagesPlaceholder(placeholderOfChatHistory, true),
 		einobridge.MessagesPlaceholder(placeholderOfUserInput, false),

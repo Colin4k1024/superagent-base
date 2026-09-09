@@ -19,7 +19,6 @@ package builtin
 import (
 	"encoding/json"
 
-	"github.com/cloudwego/eino/components/document/parser"
 	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 
 	"github.com/superagent-ai/superagent-base/backend/infra/document"
@@ -30,11 +29,11 @@ type rowIterator interface {
 	NextRow() (row []string, end bool, err error)
 }
 
-func parseByRowIterator(iter rowIterator, config *contract.Config, opts ...parser.Option) (
+func parseByRowIterator(iter rowIterator, config *contract.Config, opts ...einobridge.ParserOption) (
 	docs []*einobridge.Document, err error) {
 
 	ps := config.ParsingStrategy
-	options := parser.GetCommonOptions(&parser.Options{}, opts...)
+	options := einobridge.ParserGetCommonOptions(&einobridge.ParserOptions{}, opts...)
 	i := 0
 	columnsProvides := ps.IsAppend || len(ps.Columns) > 0
 	rev := make(map[int]*document.Column)

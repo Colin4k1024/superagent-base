@@ -18,10 +18,10 @@ package workflow
 
 import (
 	"context"
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 
 	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose"
 
-	"github.com/cloudwego/eino/components/tool"
 
 	workflowModel "github.com/superagent-ai/superagent-base/backend/crossdomain/workflow/model"
 	conventity "github.com/superagent-ai/superagent-base/backend/domain/conversation/conversation/entity"
@@ -118,7 +118,7 @@ type ExecuteHistoryStore interface {
 }
 
 type ToolFromWorkflow interface {
-	tool.BaseTool
+	einobridge.BaseTool
 	TerminatePlan() vo.TerminatePlan
 	GetWorkflow() *entity.Workflow
 }

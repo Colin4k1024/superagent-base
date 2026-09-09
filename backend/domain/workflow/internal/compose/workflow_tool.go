@@ -22,7 +22,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/cloudwego/eino/components/tool"
 	einoCompose "github.com/cloudwego/eino/compose"
 
 	workflowModel "github.com/superagent-ai/superagent-base/backend/crossdomain/workflow/model"
@@ -88,7 +87,7 @@ func resumeOnce(rInfo *entity.ResumeRequest, callID string, allIEs map[string]in
 }
 
 func (wt *workflowTool) prepare(ctx context.Context, rInfo *entity.ResumeRequest,
-	argumentsInJSON string, opts ...tool.Option) (
+	argumentsInJSON string, opts ...einobridge.ToolOption) (
 	cancelCtx context.Context, executeID int64, input map[string]any,
 	lastEventChan <-chan *execute.Event, callOpts []einoCompose.Option, err error) {
 	cfg := execute.GetExecuteConfig(opts...)
@@ -145,7 +144,7 @@ func (wt *workflowTool) prepare(ctx context.Context, rInfo *entity.ResumeRequest
 	return
 }
 
-func (i *invokableWorkflow) InvokableRun(ctx context.Context, argumentsInJSON string, opts ...tool.Option) (
+func (i *invokableWorkflow) InvokableRun(ctx context.Context, argumentsInJSON string, opts ...einobridge.ToolOption) (
 	contentStr string, err error) {
 	rInfo, allIEs := execute.GetResumeRequest(opts...)
 	var (
@@ -161,7 +160,7 @@ func (i *invokableWorkflow) InvokableRun(ctx context.Context, argumentsInJSON st
 		}
 	}
 
-	ctx = einobridge.OnStart(ctx, &tool.CallbackInput{
+	ctx = einobridge.OnStart(ctx, &einobridge.ToolCallbackInput{
 		ArgumentsInJSON: argumentsInJSON,
 		Extra: map[string]any{
 			execute.ToolCallIDKey: callID,
@@ -212,7 +211,7 @@ func (i *invokableWorkflow) InvokableRun(ctx context.Context, argumentsInJSON st
 			return "", err
 		}
 
-		_ = einobridge.OnEnd(ctx, &tool.CallbackOutput{
+		_ = einobridge.OnEnd(ctx, &einobridge.ToolCallbackOutput{
 			Response: contentStr,
 			Extra: map[string]any{
 				execute.ToolCallIDKey: callID,
@@ -236,7 +235,7 @@ func (i *invokableWorkflow) InvokableRun(ctx context.Context, argumentsInJSON st
 		contentStr = strings.TrimSuffix(contentStr, nodes.KeyIsFinished)
 	}
 
-	_ = einobridge.OnEnd(ctx, &tool.CallbackOutput{
+	_ = einobridge.OnEnd(ctx, &einobridge.ToolCallbackOutput{
 		Response: contentStr,
 		Extra: map[string]any{
 			execute.ToolCallIDKey: callID,
@@ -286,7 +285,7 @@ func (s *streamableWorkflow) Info(_ context.Context) (*einobridge.ToolInfo, erro
 	return s.info, nil
 }
 
-func (s *streamableWorkflow) StreamableRun(ctx context.Context, argumentsInJSON string, opts ...tool.Option) (
+func (s *streamableWorkflow) StreamableRun(ctx context.Context, argumentsInJSON string, opts ...einobridge.ToolOption) (
 	out *einobridge.StreamReader[string], err error) {
 	rInfo, allIEs := execute.GetResumeRequest(opts...)
 	var (
@@ -303,7 +302,7 @@ func (s *streamableWorkflow) StreamableRun(ctx context.Context, argumentsInJSON 
 		}
 	}
 
-	ctx = einobridge.OnStart(ctx, &tool.CallbackInput{
+	ctx = einobridge.OnStart(ctx, &einobridge.ToolCallbackInput{
 		ArgumentsInJSON: argumentsInJSON,
 		Extra: map[string]any{
 			execute.ToolCallIDKey:     callID,
@@ -357,7 +356,7 @@ func (s *streamableWorkflow) StreamableRun(ctx context.Context, argumentsInJSON 
 	}()
 
 	_, callbackStream := einobridge.OnEndWithStreamOutput(ctx, einobridge.StreamReaderWithConvert(outStream,
-		func(in map[string]any) (*tool.CallbackOutput, error) {
+		func(in map[string]any) (*einobridge.ToolCallbackOutput, error) {
 			content, ok := in["output"]
 			if !ok {
 				return nil, fmt.Errorf("no output found when stream plan is use output content. out: %v", in)
@@ -372,12 +371,12 @@ func (s *streamableWorkflow) StreamableRun(ctx context.Context, argumentsInJSON 
 				contentStr = strings.TrimSuffix(contentStr, nodes.KeyIsFinished)
 			}
 
-			return &tool.CallbackOutput{
+			return &einobridge.ToolCallbackOutput{
 				Response: contentStr,
 			}, nil
 		}))
 
-	return einobridge.StreamReaderWithConvert(callbackStream, func(in *tool.CallbackOutput) (string, error) {
+	return einobridge.StreamReaderWithConvert(callbackStream, func(in *einobridge.ToolCallbackOutput) (string, error) {
 		return in.Response, nil
 	}), nil
 }

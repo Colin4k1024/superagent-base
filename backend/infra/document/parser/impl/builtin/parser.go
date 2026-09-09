@@ -20,7 +20,6 @@ import (
 	"context"
 	"io"
 
-	"github.com/cloudwego/eino/components/document/parser"
 	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 )
 
@@ -28,8 +27,8 @@ type Parser struct {
 	ParseFn
 }
 
-func (p Parser) Parse(ctx context.Context, reader io.Reader, opts ...parser.Option) ([]*einobridge.Document, error) {
+func (p Parser) Parse(ctx context.Context, reader io.Reader, opts ...einobridge.ParserOption) ([]*einobridge.Document, error) {
 	return p.ParseFn(ctx, reader, opts...)
 }
 
-type ParseFn func(ctx context.Context, reader io.Reader, opts ...parser.Option) (docs []*einobridge.Document, err error)
+type ParseFn func(ctx context.Context, reader io.Reader, opts ...einobridge.ParserOption) (docs []*einobridge.Document, err error)

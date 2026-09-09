@@ -21,7 +21,6 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/cloudwego/eino/components/prompt"
 	"github.com/cloudwego/eino/compose"
 	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 
@@ -29,13 +28,13 @@ import (
 	"github.com/superagent-ai/superagent-base/backend/infra/document/messages2query"
 )
 
-func NewMessagesToQuery(_ context.Context, model modelbuilder.BaseChatModel, template prompt.ChatTemplate) (messages2query.MessagesToQuery, error) {
+func NewMessagesToQuery(_ context.Context, model modelbuilder.BaseChatModel, template einobridge.ChatTemplate) (messages2query.MessagesToQuery, error) {
 	return &m2q{model, template}, nil
 }
 
 type m2q struct {
 	cm  modelbuilder.BaseChatModel
-	tpl prompt.ChatTemplate
+	tpl einobridge.ChatTemplate
 }
 
 func (m *m2q) MessagesToQuery(ctx context.Context, messages []*einobridge.Message, opts ...messages2query.Option) (newQuery string, err error) {

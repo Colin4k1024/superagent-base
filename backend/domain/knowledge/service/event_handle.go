@@ -25,7 +25,6 @@ import (
 	"time"
 
 	"github.com/bytedance/sonic"
-	"github.com/cloudwego/eino/components/document/parser"
 	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 
 	knowledge "github.com/superagent-ai/superagent-base/backend/crossdomain/knowledge/model"
@@ -301,7 +300,7 @@ func (k *knowledgeSVC) parseAndCacheDocument(ctx context.Context, doc *entity.Do
 	}
 
 	// Parse document content
-	parseResult, err := docParser.Parse(ctx, bytes.NewReader(bodyBytes), parser.WithExtraMeta(map[string]any{
+	parseResult, err := docParser.Parse(ctx, bytes.NewReader(bodyBytes), einobridge.WithExtraMeta(map[string]any{
 		document.MetaDataKeyCreatorID: doc.CreatorID,
 		document.MetaDataKeyExternalStorage: map[string]any{
 			"document_id": doc.ID,

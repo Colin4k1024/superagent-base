@@ -23,8 +23,6 @@ import (
 	"reflect"
 	"strconv"
 
-	"github.com/cloudwego/eino/components/indexer"
-	"github.com/cloudwego/eino/components/retriever"
 	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	"github.com/volcengine/volc-sdk-golang/service/vikingdb"
 
@@ -42,12 +40,12 @@ type vkSearchStore struct {
 	index      *vikingdb.Index
 }
 
-func (v *vkSearchStore) Store(ctx context.Context, docs []*einobridge.Document, opts ...indexer.Option) (ids []string, err error) {
+func (v *vkSearchStore) Store(ctx context.Context, docs []*einobridge.Document, opts ...einobridge.IndexerOption) (ids []string, err error) {
 	if len(docs) == 0 {
 		return nil, nil
 	}
 
-	implSpecOptions := indexer.GetImplSpecificOptions(&searchstore.IndexerOptions{}, opts...)
+	implSpecOptions := einobridge.IndexerGetImplSpecificOptions(&searchstore.IndexerOptions{}, opts...)
 
 	defer func() {
 		if err != nil {
@@ -85,7 +83,7 @@ func (v *vkSearchStore) Store(ctx context.Context, docs []*einobridge.Document, 
 	return
 }
 
-func (v *vkSearchStore) Retrieve(ctx context.Context, query string, opts ...retriever.Option) (docs []*einobridge.Document, err error) {
+func (v *vkSearchStore) Retrieve(ctx context.Context, query string, opts ...einobridge.RetrieverOption) (docs []*einobridge.Document, err error) {
 	indexClient := v.index
 	if indexClient == nil {
 		foundIndex := false
@@ -105,8 +103,8 @@ func (v *vkSearchStore) Retrieve(ctx context.Context, query string, opts ...retr
 		}
 	}
 
-	options := retriever.GetCommonOptions(&retriever.Options{TopK: ptr.Of(4)}, opts...)
-	implSpecOptions := retriever.GetImplSpecificOptions(&searchstore.RetrieverOptions{}, opts...)
+	options := einobridge.RetrieverGetCommonOptions(&einobridge.RetrieverOptions{TopK: ptr.Of(4)}, opts...)
+	implSpecOptions := einobridge.RetrieverGetImplSpecificOptions(&searchstore.RetrieverOptions{}, opts...)
 
 	searchOpts := vikingdb.NewSearchOptions().
 		SetLimit(int64(ptr.From(options.TopK))).
@@ -280,7 +278,7 @@ func (v *vkSearchStore) parseSearchResult(result []*vikingdb.Data) ([]*einobridg
 	return docs, nil
 }
 
-func (v *vkSearchStore) genFilter(ctx context.Context, co *retriever.Options, ro *searchstore.RetrieverOptions) (map[string]any, error) {
+func (v *vkSearchStore) genFilter(ctx context.Context, co *einobridge.RetrieverOptions, ro *searchstore.RetrieverOptions) (map[string]any, error) {
 	filter, err := v.dsl2Filter(ctx, co.DSLInfo)
 	if err != nil {
 		return nil, err

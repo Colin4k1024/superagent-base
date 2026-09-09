@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 
-	einotool "github.com/cloudwego/eino/components/tool"
 	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 
 	"github.com/superagent-ai/superagent-base/backend/pkg/llm"
@@ -86,21 +85,21 @@ func aclParamsToEino(params map[string]*llm.ParameterInfo) map[string]*einobridg
 }
 
 // InvokableRun executes the underlying llm.Tool.
-func (a *ToolAdapter) InvokableRun(ctx context.Context, argsJSON string, _ ...einotool.Option) (string, error) {
+func (a *ToolAdapter) InvokableRun(ctx context.Context, argsJSON string, _ ...einobridge.ToolOption) (string, error) {
 	return a.tool.Run(ctx, argsJSON, llm.ToolOptionWithContext(ctx))
 }
 
-var _ einotool.InvokableTool = (*ToolAdapter)(nil)
+var _ einobridge.InvokableTool = (*ToolAdapter)(nil)
 
 // ReverseToolAdapter wraps an eino InvokableTool as an llm.Tool, so that
 // existing eino-based tools (MCP adapter, builtin tools) can be used
 // through the framework-agnostic interface.
 type ReverseToolAdapter struct {
-	tool einotool.InvokableTool
+	tool einobridge.InvokableTool
 }
 
 // NewReverseToolAdapter creates an llm.Tool from an eino InvokableTool.
-func NewReverseToolAdapter(t einotool.InvokableTool) *ReverseToolAdapter {
+func NewReverseToolAdapter(t einobridge.InvokableTool) *ReverseToolAdapter {
 	return &ReverseToolAdapter{tool: t}
 }
 
@@ -167,7 +166,7 @@ func einoParamsToACL(p *einobridge.ParamsOneOf) map[string]*llm.ParameterInfo {
 // ReverseToolAdapter. Returns nil if the tool is not a ReverseToolAdapter.
 // This is used during the migration transition period where eino's adk
 // still requires the raw eino tool type.
-func UnwrapEinoTool(t llm.Tool) einotool.BaseTool {
+func UnwrapEinoTool(t llm.Tool) einobridge.BaseTool {
 	if rta, ok := t.(*ReverseToolAdapter); ok {
 		return rta.tool
 	}
@@ -178,8 +177,8 @@ func UnwrapEinoTool(t llm.Tool) einotool.BaseTool {
 
 // UnwrapEinoToolFromSlice converts a slice of llm.Tool to eino InvokableTool,
 // unwrapping ReverseToolAdapters and wrapping plain llm.Tools via ToolAdapter.
-func UnwrapEinoToolFromSlice(tools []llm.Tool) []einotool.BaseTool {
-	result := make([]einotool.BaseTool, 0, len(tools))
+func UnwrapEinoToolFromSlice(tools []llm.Tool) []einobridge.BaseTool {
+	result := make([]einobridge.BaseTool, 0, len(tools))
 	for _, t := range tools {
 		if unwrapped := UnwrapEinoTool(t); unwrapped != nil {
 			result = append(result, unwrapped)

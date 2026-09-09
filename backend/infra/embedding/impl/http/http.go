@@ -18,6 +18,7 @@ package http
 
 import (
 	"bytes"
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -27,7 +28,6 @@ import (
 	"strconv"
 	"time"
 
-	opt "github.com/cloudwego/eino/components/embedding"
 
 	"github.com/superagent-ai/superagent-base/backend/pkg/logs"
 
@@ -114,7 +114,7 @@ type embedder struct {
 	status    embedding.SupportStatus
 }
 
-func (e *embedder) EmbedStrings(ctx context.Context, texts []string, opts ...opt.Option) ([][]float64, error) {
+func (e *embedder) EmbedStrings(ctx context.Context, texts []string, opts ...einobridge.EmbeddingOption) ([][]float64, error) {
 	dense := make([][]float64, 0, len(texts))
 	for _, part := range slices.Chunks(texts, e.batchSize) {
 		rb, err := json.Marshal(&embedReq{
@@ -142,7 +142,7 @@ func (e *embedder) EmbedStrings(ctx context.Context, texts []string, opts ...opt
 	return dense, nil
 }
 
-func (e *embedder) EmbedStringsHybrid(ctx context.Context, texts []string, opts ...opt.Option) ([][]float64, []map[int]float64, error) {
+func (e *embedder) EmbedStringsHybrid(ctx context.Context, texts []string, opts ...einobridge.EmbeddingOption) ([][]float64, []map[int]float64, error) {
 	if e.status == embedding.SupportDense {
 		return nil, nil, fmt.Errorf("support status=%d not support EmbedStringsHybrid", e.status)
 	}

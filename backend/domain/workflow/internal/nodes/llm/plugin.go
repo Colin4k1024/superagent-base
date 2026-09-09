@@ -19,7 +19,6 @@ import (
 	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	"context"
 
-	"github.com/cloudwego/eino/components/tool"
 
 	crossplugin "github.com/superagent-ai/superagent-base/backend/crossdomain/plugin"
 	"github.com/superagent-ai/superagent-base/backend/domain/workflow/internal/execute"
@@ -29,7 +28,7 @@ type pluginInvokableTool struct {
 	pluginInvokableTool crossplugin.InvokableTool
 }
 
-func newInvokableTool(pl crossplugin.InvokableTool) tool.InvokableTool {
+func newInvokableTool(pl crossplugin.InvokableTool) einobridge.InvokableTool {
 	return &pluginInvokableTool{
 		pluginInvokableTool: pl,
 	}
@@ -39,7 +38,7 @@ func (p pluginInvokableTool) Info(ctx context.Context) (*einobridge.ToolInfo, er
 	return p.pluginInvokableTool.Info(ctx)
 }
 
-func (p pluginInvokableTool) InvokableRun(ctx context.Context, argumentsInJSON string, opts ...tool.Option) (string, error) {
+func (p pluginInvokableTool) InvokableRun(ctx context.Context, argumentsInJSON string, opts ...einobridge.ToolOption) (string, error) {
 	execCfg := execute.GetExecuteConfig(opts...)
 	return p.pluginInvokableTool.PluginInvoke(ctx, argumentsInJSON, execCfg)
 }
