@@ -17,12 +17,12 @@
 package textprocessor
 
 import (
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	"context"
 	"fmt"
 	"reflect"
 	"strings"
 
-	"github.com/cloudwego/eino/compose"
 
 	"github.com/superagent-ai/superagent-base/backend/domain/workflow/entity"
 	"github.com/superagent-ai/superagent-base/backend/domain/workflow/entity/vo"
@@ -128,7 +128,7 @@ func (t *TextProcessor) Invoke(ctx context.Context, input map[string]any) (map[s
 		}
 
 		var resolvedSources map[string]*schema.SourceInfo
-		_ = compose.ProcessState(ctx, func(_ context.Context, state nodes.DynamicStreamContainer) error {
+		_ = einobridge.ProcessState(ctx, func(_ context.Context, state nodes.DynamicStreamContainer) error {
 			resolvedSources = state.GetFullSources(t.nodeKey)
 			return nil
 		})

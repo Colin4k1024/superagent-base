@@ -23,7 +23,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/cloudwego/eino/compose"
 	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 
 	"github.com/superagent-ai/superagent-base/backend/bizpkg/llm/modelbuilder"
@@ -42,8 +41,8 @@ func NewNL2SQL(_ context.Context, cm modelbuilder.BaseChatModel, tpl einobridge.
 }
 
 type n2s struct {
-	ch       *compose.Chain[*nl2sqlInput, string]
-	runnable compose.Runnable[*nl2sqlInput, string]
+	ch       *einobridge.Chain[*nl2sqlInput, string]
+	runnable einobridge.Runnable[*nl2sqlInput, string]
 
 	cm  modelbuilder.BaseChatModel
 	tpl einobridge.ChatTemplate
@@ -59,8 +58,8 @@ func (n *n2s) NL2SQL(ctx context.Context, messages []*einobridge.Message, tables
 		return "", fmt.Errorf("[NL2SQL] chat model not configured")
 	}
 
-	c := compose.NewChain[*nl2sqlInput, string]().
-		AppendLambda(compose.InvokableLambda(func(ctx context.Context, input *nl2sqlInput) (output map[string]any, err error) {
+	c := einobridge.NewChain[*nl2sqlInput, string]().
+		AppendLambda(einobridge.InvokableLambda(func(ctx context.Context, input *nl2sqlInput) (output map[string]any, err error) {
 			if len(input.tables) == 0 {
 				return nil, errors.New("table meta is empty")
 			}
@@ -79,7 +78,7 @@ func (n *n2s) NL2SQL(ctx context.Context, messages []*einobridge.Message, tables
 		})).
 		AppendChatTemplate(n.tpl).
 		AppendChatModel(o.ChatModel).
-		AppendLambda(compose.InvokableLambda(func(ctx context.Context, msg *einobridge.Message) (sql string, err error) {
+		AppendLambda(einobridge.InvokableLambda(func(ctx context.Context, msg *einobridge.Message) (sql string, err error) {
 			var promptResp *promptResponse
 			if err := json.Unmarshal([]byte(msg.Content), &promptResp); err != nil {
 				logs.CtxWarnf(ctx, "unmarshal failed: %v", err)

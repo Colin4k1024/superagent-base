@@ -29,7 +29,6 @@ import (
 
 	"github.com/superagent-ai/superagent-base/backend/pkg/sonic"
 
-	"github.com/cloudwego/eino/compose"
 
 	workflowModel "github.com/superagent-ai/superagent-base/backend/crossdomain/workflow/model"
 	"github.com/superagent-ai/superagent-base/backend/domain/workflow"
@@ -208,7 +207,7 @@ func (w *WorkflowHandler) initWorkflowCtx(ctx context.Context) (context.Context,
 }
 
 func (w *WorkflowHandler) OnStart(ctx context.Context, info *einobridge.RunInfo, input einobridge.CallbackInput) context.Context {
-	if info.Component != compose.ComponentOfWorkflow || (info.Name != strconv.FormatInt(w.getRootWorkflowID(), 10) &&
+	if info.Component != einobridge.ComponentOfWorkflow || (info.Name != strconv.FormatInt(w.getRootWorkflowID(), 10) &&
 		info.Name != strconv.FormatInt(w.getSubWorkflowID(), 10)) {
 		return ctx
 	}
@@ -250,7 +249,7 @@ func (w *WorkflowHandler) OnStart(ctx context.Context, info *einobridge.RunInfo,
 }
 
 func (w *WorkflowHandler) OnEnd(ctx context.Context, info *einobridge.RunInfo, output einobridge.CallbackOutput) context.Context {
-	if info.Component != compose.ComponentOfWorkflow || (info.Name != strconv.FormatInt(w.getRootWorkflowID(), 10) &&
+	if info.Component != einobridge.ComponentOfWorkflow || (info.Name != strconv.FormatInt(w.getRootWorkflowID(), 10) &&
 		info.Name != strconv.FormatInt(w.getSubWorkflowID(), 10)) {
 		return ctx
 	}
@@ -279,7 +278,7 @@ func (w *WorkflowHandler) OnEnd(ctx context.Context, info *einobridge.RunInfo, o
 
 const InterruptEventIndexPrefix = "interrupt_event_index_"
 
-func extractInterruptEvents(interruptInfo *compose.InterruptInfo, prefixes ...string) (interruptEvents []*entity.InterruptEvent, err error) {
+func extractInterruptEvents(interruptInfo *einobridge.InterruptInfo, prefixes ...string) (interruptEvents []*entity.InterruptEvent, err error) {
 	for _, nodeKey := range interruptInfo.RerunNodes {
 
 		extra := interruptInfo.RerunNodesExtra[nodeKey]
@@ -328,14 +327,14 @@ func extractInterruptEvents(interruptInfo *compose.InterruptInfo, prefixes ...st
 }
 
 func (w *WorkflowHandler) OnError(ctx context.Context, info *einobridge.RunInfo, err error) context.Context {
-	if info.Component != compose.ComponentOfWorkflow || (info.Name != strconv.FormatInt(w.getRootWorkflowID(), 10) &&
+	if info.Component != einobridge.ComponentOfWorkflow || (info.Name != strconv.FormatInt(w.getRootWorkflowID(), 10) &&
 		info.Name != strconv.FormatInt(w.getSubWorkflowID(), 10)) {
 		return ctx
 	}
 
 	c := GetExeCtx(ctx)
 
-	interruptInfo, ok := compose.ExtractInterruptInfo(err)
+	interruptInfo, ok := einobridge.ExtractInterruptInfo(err)
 	if ok {
 		if w.subWorkflowBasic != nil {
 			return ctx
@@ -411,7 +410,7 @@ func (w *WorkflowHandler) OnError(ctx context.Context, info *einobridge.RunInfo,
 func (w *WorkflowHandler) OnStartWithStreamInput(ctx context.Context, info *einobridge.RunInfo,
 	input *einobridge.StreamReader[einobridge.CallbackInput],
 ) context.Context {
-	if info.Component != compose.ComponentOfWorkflow || (info.Name != strconv.FormatInt(w.getRootWorkflowID(), 10) &&
+	if info.Component != einobridge.ComponentOfWorkflow || (info.Name != strconv.FormatInt(w.getRootWorkflowID(), 10) &&
 		info.Name != strconv.FormatInt(w.getSubWorkflowID(), 10)) {
 		input.Close()
 		return ctx
@@ -475,7 +474,7 @@ func (w *WorkflowHandler) OnStartWithStreamInput(ctx context.Context, info *eino
 func (w *WorkflowHandler) OnEndWithStreamOutput(ctx context.Context, info *einobridge.RunInfo,
 	output *einobridge.StreamReader[einobridge.CallbackOutput],
 ) context.Context {
-	if info.Component != compose.ComponentOfWorkflow || (info.Name != strconv.FormatInt(w.getRootWorkflowID(), 10) &&
+	if info.Component != einobridge.ComponentOfWorkflow || (info.Name != strconv.FormatInt(w.getRootWorkflowID(), 10) &&
 		info.Name != strconv.FormatInt(w.getSubWorkflowID(), 10)) {
 		output.Close()
 		return ctx
@@ -604,7 +603,7 @@ func (n *NodeHandler) initNodeCtx(ctx context.Context, typ entity.NodeType) (con
 }
 
 func (n *NodeHandler) OnStart(ctx context.Context, info *einobridge.RunInfo, input einobridge.CallbackInput) context.Context {
-	if info.Component != compose.ComponentOfLambda || info.Name != string(n.nodeKey) {
+	if info.Component != einobridge.ComponentOfLambda || info.Name != string(n.nodeKey) {
 		return ctx
 	}
 
@@ -656,7 +655,7 @@ func (n *NodeHandler) OnStart(ctx context.Context, info *einobridge.RunInfo, inp
 }
 
 func (n *NodeHandler) OnEnd(ctx context.Context, info *einobridge.RunInfo, output einobridge.CallbackOutput) context.Context {
-	if info.Component != compose.ComponentOfLambda || info.Name != string(n.nodeKey) {
+	if info.Component != einobridge.ComponentOfLambda || info.Name != string(n.nodeKey) {
 		return ctx
 	}
 
@@ -739,14 +738,14 @@ func (n *NodeHandler) OnEnd(ctx context.Context, info *einobridge.RunInfo, outpu
 }
 
 func (n *NodeHandler) OnError(ctx context.Context, info *einobridge.RunInfo, err error) context.Context {
-	if info.Component != compose.ComponentOfLambda || info.Name != string(n.nodeKey) {
+	if info.Component != einobridge.ComponentOfLambda || info.Name != string(n.nodeKey) {
 		return ctx
 	}
 
 	c := GetExeCtx(ctx)
 
-	if _, ok := compose.IsInterruptRerunError(err); ok { // current node interrupts
-		if err := compose.ProcessState[ExeContextStore](ctx, func(ctx context.Context, state ExeContextStore) error {
+	if _, ok := einobridge.IsInterruptRerunError(err); ok { // current node interrupts
+		if err := einobridge.ProcessState[ExeContextStore](ctx, func(ctx context.Context, state ExeContextStore) error {
 			if state == nil {
 				return errors.New("state is nil")
 			}
@@ -806,7 +805,7 @@ func (n *NodeHandler) OnError(ctx context.Context, info *einobridge.RunInfo, err
 }
 
 func (n *NodeHandler) OnStartWithStreamInput(ctx context.Context, info *einobridge.RunInfo, input *einobridge.StreamReader[einobridge.CallbackInput]) context.Context {
-	if info.Component != compose.ComponentOfLambda || info.Name != string(n.nodeKey) {
+	if info.Component != einobridge.ComponentOfLambda || info.Name != string(n.nodeKey) {
 		input.Close()
 		return ctx
 	}
@@ -1169,7 +1168,7 @@ func (n *NodeHandler) incrementalEndProcessor(c *Context,
 }
 
 func (n *NodeHandler) OnEndWithStreamOutput(ctx context.Context, info *einobridge.RunInfo, output *einobridge.StreamReader[einobridge.CallbackOutput]) context.Context {
-	if info.Component != compose.ComponentOfLambda || info.Name != string(n.nodeKey) {
+	if info.Component != einobridge.ComponentOfLambda || info.Name != string(n.nodeKey) {
 		output.Close()
 		return ctx
 	}
@@ -1247,7 +1246,7 @@ func (t *ToolHandler) OnStart(ctx context.Context, info *einobridge.RunInfo,
 	}
 
 	if len(callID) == 0 {
-		callID = compose.GetToolCallID(ctx)
+		callID = einobridge.GetToolCallID(ctx)
 	}
 
 	t.ch <- &Event{
@@ -1282,7 +1281,7 @@ func (t *ToolHandler) OnEnd(ctx context.Context, info *einobridge.RunInfo,
 	}
 
 	if len(callID) == 0 {
-		callID = compose.GetToolCallID(ctx)
+		callID = einobridge.GetToolCallID(ctx)
 	}
 
 	t.ch <- &Event{
@@ -1312,7 +1311,7 @@ func (t *ToolHandler) OnEndWithStreamOutput(ctx context.Context, info *einobridg
 		var (
 			firstEvent, previousEvent *Event
 			fullResponse              string
-			callID                    = compose.GetToolCallID(ctx)
+			callID                    = einobridge.GetToolCallID(ctx)
 		)
 
 		for {
@@ -1378,7 +1377,7 @@ func (t *ToolHandler) OnError(ctx context.Context, info *einobridge.RunInfo, err
 		functionCall: &FunctionCallInfo{
 			FunctionCallInfo: &entity.FunctionCallInfo{
 				FunctionInfo: t.info,
-				CallID:       compose.GetToolCallID(ctx),
+				CallID:       einobridge.GetToolCallID(ctx),
 			},
 		},
 		Err: err,

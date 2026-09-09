@@ -17,11 +17,11 @@
 package httprequester
 
 import (
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	"fmt"
 	"regexp"
 	"strings"
 
-	"github.com/cloudwego/eino/compose"
 
 	"github.com/superagent-ai/superagent-base/backend/domain/workflow/entity"
 	"github.com/superagent-ai/superagent-base/backend/domain/workflow/entity/vo"
@@ -46,7 +46,7 @@ func extractBracesContent(s string) []string {
 
 type ImplicitNodeDependency struct {
 	NodeID            string
-	FieldPath         compose.FieldPath
+	FieldPath         einobridge.FieldPath
 	TypeInfo          *vo.TypeInfo
 	IsIntermediateVar bool
 }
@@ -314,7 +314,7 @@ func setHttpRequesterInputsForNodeSchema(n *vo.Node, ns *schema.NodeSchema, impl
 				return err
 			}
 			ns.SetInputType(bearerTokenKey, tInfo)
-			sources, err := convert.CanvasBlockInputToFieldInfo(bearTokenParam.Input, compose.FieldPath{bearerTokenKey}, n.Parent())
+			sources, err := convert.CanvasBlockInputToFieldInfo(bearTokenParam.Input, einobridge.FieldPath{bearerTokenKey}, n.Parent())
 			if err != nil {
 				return err
 			}
@@ -334,7 +334,7 @@ func setHttpRequesterInputsForNodeSchema(n *vo.Node, ns *schema.NodeSchema, impl
 				return err
 			}
 			ns.SetInputType(customDataDataKey, keyTypeInfo)
-			sources, err := convert.CanvasBlockInputToFieldInfo(keyParam.Input, compose.FieldPath{customDataDataKey}, n.Parent())
+			sources, err := convert.CanvasBlockInputToFieldInfo(keyParam.Input, einobridge.FieldPath{customDataDataKey}, n.Parent())
 			if err != nil {
 				return err
 			}
@@ -346,7 +346,7 @@ func setHttpRequesterInputsForNodeSchema(n *vo.Node, ns *schema.NodeSchema, impl
 				return err
 			}
 			ns.SetInputType(customDataDataValue, valueTypeInfo)
-			sources, err = convert.CanvasBlockInputToFieldInfo(valueParam.Input, compose.FieldPath{customDataDataValue}, n.Parent())
+			sources, err = convert.CanvasBlockInputToFieldInfo(valueParam.Input, einobridge.FieldPath{customDataDataValue}, n.Parent())
 			if err != nil {
 				return err
 			}
@@ -371,7 +371,7 @@ func setHttpRequesterInputsForNodeSchema(n *vo.Node, ns *schema.NodeSchema, impl
 		ns.SetInputType(fileURLName, &vo.TypeInfo{
 			Type: vo.DataTypeString,
 		})
-		sources, err := convert.CanvasBlockInputToFieldInfo(fileURLInput, compose.FieldPath{fileURLName}, n.Parent())
+		sources, err := convert.CanvasBlockInputToFieldInfo(fileURLInput, einobridge.FieldPath{fileURLName}, n.Parent())
 		if err != nil {
 			return err
 		}
@@ -404,7 +404,7 @@ func applyParamsToSchema(ns *schema.NodeSchema, prefix string, params []*vo.Para
 
 		fieldName := prefix + crypto.MD5HexValue(name)
 		ns.SetInputType(fieldName, tInfo)
-		sources, err := convert.CanvasBlockInputToFieldInfo(param.Input, compose.FieldPath{fieldName}, parentNode)
+		sources, err := convert.CanvasBlockInputToFieldInfo(param.Input, einobridge.FieldPath{fieldName}, parentNode)
 		if err != nil {
 			return err
 		}

@@ -17,12 +17,12 @@
 package convert
 
 import (
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	"fmt"
 
 	"strconv"
 	"strings"
 
-	einoCompose "github.com/cloudwego/eino/compose"
 
 	"github.com/superagent-ai/superagent-base/backend/domain/workflow/entity/vo"
 	"github.com/superagent-ai/superagent-base/backend/domain/workflow/internal/schema"
@@ -177,7 +177,7 @@ func CanvasBlockInputToTypeInfo(b *vo.BlockInput) (tInfo *vo.TypeInfo, err error
 	return tInfo, nil
 }
 
-func CanvasBlockInputToFieldInfo(b *vo.BlockInput, path einoCompose.FieldPath, parentNode *vo.Node) (sources []*vo.FieldInfo, err error) {
+func CanvasBlockInputToFieldInfo(b *vo.BlockInput, path einobridge.FieldPath, parentNode *vo.Node) (sources []*vo.FieldInfo, err error) {
 	value := b.Value
 	if value == nil {
 		return nil, fmt.Errorf("input %v has no value, type= %s", path, b.Type)
@@ -512,7 +512,7 @@ func SetInputsForNodeSchema(n *vo.Node, ns *schema.NodeSchema) error {
 
 		ns.SetInputType(name, tInfo)
 
-		sources, err := CanvasBlockInputToFieldInfo(param.Input, einoCompose.FieldPath{name}, n.Parent())
+		sources, err := CanvasBlockInputToFieldInfo(param.Input, einobridge.FieldPath{name}, n.Parent())
 		if err != nil {
 			return err
 		}
@@ -559,7 +559,7 @@ func SetOutputsForNodeSchema(n *vo.Node, ns *schema.NodeSchema) error {
 
 		ns.SetOutputType(name, tInfo)
 
-		sources, err := CanvasBlockInputToFieldInfo(param.Input, einoCompose.FieldPath{name}, n.Parent())
+		sources, err := CanvasBlockInputToFieldInfo(param.Input, einobridge.FieldPath{name}, n.Parent())
 		if err != nil {
 			return err
 		}

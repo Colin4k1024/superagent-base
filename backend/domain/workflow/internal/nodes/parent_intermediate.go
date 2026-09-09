@@ -17,11 +17,11 @@
 package nodes
 
 import (
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	"context"
 	"fmt"
 	"sync"
 
-	"github.com/cloudwego/eino/compose"
 
 	"github.com/superagent-ai/superagent-base/backend/domain/workflow/entity/vo"
 	"github.com/superagent-ai/superagent-base/backend/domain/workflow/variable"
@@ -37,7 +37,7 @@ func (p *ParentIntermediateStore) Init(_ context.Context) {
 	return
 }
 
-func (p *ParentIntermediateStore) Get(ctx context.Context, path compose.FieldPath, opts ...variable.OptionFn) (any, error) {
+func (p *ParentIntermediateStore) Get(ctx context.Context, path einobridge.FieldPath, opts ...variable.OptionFn) (any, error) {
 	defer p.mu.RUnlock()
 	p.mu.RLock()
 
@@ -58,7 +58,7 @@ func (p *ParentIntermediateStore) Get(ctx context.Context, path compose.FieldPat
 	return *v, nil
 }
 
-func (p *ParentIntermediateStore) Set(ctx context.Context, path compose.FieldPath, value any, opts ...variable.OptionFn) error {
+func (p *ParentIntermediateStore) Set(ctx context.Context, path einobridge.FieldPath, value any, opts ...variable.OptionFn) error {
 	defer p.mu.Unlock()
 	p.mu.Lock()
 

@@ -17,11 +17,11 @@
 package selector
 
 import (
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	"context"
 	"fmt"
 	"strconv"
 
-	"github.com/cloudwego/eino/compose"
 
 	"github.com/superagent-ai/superagent-base/backend/domain/workflow/entity/vo"
 	"github.com/superagent-ai/superagent-base/backend/domain/workflow/internal/nodes"
@@ -185,12 +185,12 @@ func (s *Selector) selectorInputConverter(in map[string]any) (out []Operants, er
 
 	for i, oneConf := range conf {
 		if oneConf.Single != nil {
-			left, ok := nodes.TakeMapValue(in, compose.FieldPath{strconv.Itoa(i), LeftKey})
+			left, ok := nodes.TakeMapValue(in, einobridge.FieldPath{strconv.Itoa(i), LeftKey})
 			if !ok {
 				return nil, fmt.Errorf("failed to take left operant from input map: %v, clause index= %d", in, i)
 			}
 
-			right, ok := nodes.TakeMapValue(in, compose.FieldPath{strconv.Itoa(i), RightKey})
+			right, ok := nodes.TakeMapValue(in, einobridge.FieldPath{strconv.Itoa(i), RightKey})
 			if ok {
 				out = append(out, Operants{Left: left, Right: right})
 			} else {
@@ -199,11 +199,11 @@ func (s *Selector) selectorInputConverter(in map[string]any) (out []Operants, er
 		} else if oneConf.Multi != nil {
 			multiClause := make([]*Operants, 0)
 			for j := range oneConf.Multi.Clauses {
-				left, ok := nodes.TakeMapValue(in, compose.FieldPath{strconv.Itoa(i), strconv.Itoa(j), LeftKey})
+				left, ok := nodes.TakeMapValue(in, einobridge.FieldPath{strconv.Itoa(i), strconv.Itoa(j), LeftKey})
 				if !ok {
 					return nil, fmt.Errorf("failed to take left operant from input map: %v, clause index= %d, single clause index= %d", in, i, j)
 				}
-				right, ok := nodes.TakeMapValue(in, compose.FieldPath{strconv.Itoa(i), strconv.Itoa(j), RightKey})
+				right, ok := nodes.TakeMapValue(in, einobridge.FieldPath{strconv.Itoa(i), strconv.Itoa(j), RightKey})
 				if ok {
 					multiClause = append(multiClause, &Operants{Left: left, Right: right})
 				} else {

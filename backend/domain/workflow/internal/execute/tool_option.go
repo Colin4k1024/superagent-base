@@ -18,7 +18,6 @@ package execute
 
 import (
 	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
-	"github.com/cloudwego/eino/compose"
 
 	workflowModel "github.com/superagent-ai/superagent-base/backend/crossdomain/workflow/model"
 	"github.com/superagent-ai/superagent-base/backend/domain/workflow/entity"
@@ -70,7 +69,7 @@ func GetExecuteConfig(opts ...einobridge.ToolOption) workflowModel.ExecuteConfig
 // This Option will apply to ALL workflow tools to be executed by eino's ToolsNode.
 // The workflow tools will emit messages to this stream.
 // The caller can receive from the returned StreamReader to get the messages from the tool workflow.
-func WithMessagePipe() (compose.Option, *einobridge.StreamReader[*entity.Message], func()) {
+func WithMessagePipe() (einobridge.Option, *einobridge.StreamReader[*entity.Message], func()) {
 	sr, sw := einobridge.Pipe[*entity.Message](10)
 	container := &StreamContainer{
 		sw:         sw,
@@ -79,7 +78,7 @@ func WithMessagePipe() (compose.Option, *einobridge.StreamReader[*entity.Message
 
 	go container.PipeAll()
 
-	opt := compose.WithToolsNodeOption(compose.WithToolOption(WithParentStreamContainer(container)))
+	opt := einobridge.WithToolsNodeOption(einobridge.WithToolOption(WithParentStreamContainer(container)))
 	return opt, sr, func() {
 		container.Done()
 	}

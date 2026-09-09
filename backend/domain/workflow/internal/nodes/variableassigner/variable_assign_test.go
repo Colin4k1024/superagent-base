@@ -17,10 +17,10 @@
 package variableassigner
 
 import (
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	"context"
 	"testing"
 
-	"github.com/cloudwego/eino/compose"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/superagent-ai/superagent-base/backend/domain/workflow/entity/vo"
@@ -40,31 +40,31 @@ func TestVariableAssigner(t *testing.T) {
 		pairs: []*Pair{
 			{
 				Left: vo.Reference{
-					FromPath:     compose.FieldPath{"int_var_s"},
+					FromPath:     einobridge.FieldPath{"int_var_s"},
 					VariableType: ptr.Of(vo.ParentIntermediate),
 				},
-				Right: compose.FieldPath{"int_var_t"},
+				Right: einobridge.FieldPath{"int_var_t"},
 			},
 			{
 				Left: vo.Reference{
-					FromPath:     compose.FieldPath{"str_var_s"},
+					FromPath:     einobridge.FieldPath{"str_var_s"},
 					VariableType: ptr.Of(vo.ParentIntermediate),
 				},
-				Right: compose.FieldPath{"str_var_t"},
+				Right: einobridge.FieldPath{"str_var_t"},
 			},
 			{
 				Left: vo.Reference{
-					FromPath:     compose.FieldPath{"obj_var_s"},
+					FromPath:     einobridge.FieldPath{"obj_var_s"},
 					VariableType: ptr.Of(vo.ParentIntermediate),
 				},
-				Right: compose.FieldPath{"obj_var_t"},
+				Right: einobridge.FieldPath{"obj_var_t"},
 			},
 			{
 				Left: vo.Reference{
-					FromPath:     compose.FieldPath{"arr_var_s"},
+					FromPath:     einobridge.FieldPath{"arr_var_s"},
 					VariableType: ptr.Of(vo.ParentIntermediate),
 				},
-				Right: compose.FieldPath{"arr_var_t"},
+				Right: einobridge.FieldPath{"arr_var_t"},
 			},
 		},
 		intermediateVarStore: &nodes.ParentIntermediateStore{},

@@ -29,7 +29,6 @@ import (
 	"github.com/alicebob/miniredis/v2"
 	"github.com/bytedance/mockey"
 	"github.com/cloudwego/eino-ext/components/model/openai"
-	"github.com/cloudwego/eino/compose"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 	"gorm.io/driver/mysql"
@@ -130,11 +129,11 @@ func TestQuestionAnswer(t *testing.T) {
 				},
 				InputSources: []*vo.FieldInfo{
 					{
-						Path: compose.FieldPath{"input"},
+						Path: einobridge.FieldPath{"input"},
 						Source: vo.FieldSource{
 							Ref: &vo.Reference{
 								FromNodeKey: entryN.Key,
-								FromPath:    compose.FieldPath{"query"},
+								FromPath:    einobridge.FieldPath{"query"},
 							},
 						},
 					},
@@ -149,11 +148,11 @@ func TestQuestionAnswer(t *testing.T) {
 				},
 				InputSources: []*vo.FieldInfo{
 					{
-						Path: compose.FieldPath{"answer"},
+						Path: einobridge.FieldPath{"answer"},
 						Source: vo.FieldSource{
 							Ref: &vo.Reference{
 								FromNodeKey: "qa_node_key",
-								FromPath:    compose.FieldPath{qa.UserResponseKey},
+								FromPath:    einobridge.FieldPath{qa.UserResponseKey},
 							},
 						},
 					},
@@ -186,20 +185,20 @@ func TestQuestionAnswer(t *testing.T) {
 			checkPointID := fmt.Sprintf("%d", time.Now().Nanosecond())
 			_, err = wf.Runner.Invoke(context.Background(), map[string]any{
 				"query": "what's your name?",
-			}, compose.WithCheckPointID(checkPointID))
+			}, einobridge.WithCheckPointID(checkPointID))
 			assert.Error(t, err)
 
-			info, existed := compose.ExtractInterruptInfo(err)
+			info, existed := einobridge.ExtractInterruptInfo(err)
 			assert.True(t, existed)
 			assert.Equal(t, "what's your name?", info.State.(*compose2.State).
 				IntermediateResult[ns.Key][qa.QuestionsKey].([]map[string]any)[0][qa.QuestionKey].(string))
 
 			answer := "my name is eino"
-			stateModifier := func(ctx context.Context, path compose.NodePath, state any) error {
+			stateModifier := func(ctx context.Context, path einobridge.NodePath, state any) error {
 				state.(*compose2.State).ResumeData[ns.Key] = answer
 				return nil
 			}
-			out, err := wf.Runner.Invoke(context.Background(), nil, compose.WithCheckPointID(checkPointID), compose.WithStateModifier(stateModifier))
+			out, err := wf.Runner.Invoke(context.Background(), nil, einobridge.WithCheckPointID(checkPointID), einobridge.WithStateModifier(stateModifier))
 			assert.NoError(t, err)
 			assert.Equal(t, map[string]any{
 				"answer": answer,
@@ -238,29 +237,29 @@ func TestQuestionAnswer(t *testing.T) {
 				},
 				InputSources: []*vo.FieldInfo{
 					{
-						Path: compose.FieldPath{"input"},
+						Path: einobridge.FieldPath{"input"},
 						Source: vo.FieldSource{
 							Ref: &vo.Reference{
 								FromNodeKey: entryN.Key,
-								FromPath:    compose.FieldPath{"query"},
+								FromPath:    einobridge.FieldPath{"query"},
 							},
 						},
 					},
 					{
-						Path: compose.FieldPath{"choice1"},
+						Path: einobridge.FieldPath{"choice1"},
 						Source: vo.FieldSource{
 							Ref: &vo.Reference{
 								FromNodeKey: entryN.Key,
-								FromPath:    compose.FieldPath{"choice1"},
+								FromPath:    einobridge.FieldPath{"choice1"},
 							},
 						},
 					},
 					{
-						Path: compose.FieldPath{"choice2"},
+						Path: einobridge.FieldPath{"choice2"},
 						Source: vo.FieldSource{
 							Ref: &vo.Reference{
 								FromNodeKey: entryN.Key,
-								FromPath:    compose.FieldPath{"choice2"},
+								FromPath:    einobridge.FieldPath{"choice2"},
 							},
 						},
 					},
@@ -275,20 +274,20 @@ func TestQuestionAnswer(t *testing.T) {
 				},
 				InputSources: []*vo.FieldInfo{
 					{
-						Path: compose.FieldPath{"option_id"},
+						Path: einobridge.FieldPath{"option_id"},
 						Source: vo.FieldSource{
 							Ref: &vo.Reference{
 								FromNodeKey: "qa_node_key",
-								FromPath:    compose.FieldPath{qa.OptionIDKey},
+								FromPath:    einobridge.FieldPath{qa.OptionIDKey},
 							},
 						},
 					},
 					{
-						Path: compose.FieldPath{"option_content"},
+						Path: einobridge.FieldPath{"option_content"},
 						Source: vo.FieldSource{
 							Ref: &vo.Reference{
 								FromNodeKey: "qa_node_key",
-								FromPath:    compose.FieldPath{qa.OptionContentKey},
+								FromPath:    einobridge.FieldPath{qa.OptionContentKey},
 							},
 						},
 					},
@@ -298,7 +297,7 @@ func TestQuestionAnswer(t *testing.T) {
 			lambda := &schema2.NodeSchema{
 				Key:  "lambda",
 				Type: entity.NodeTypeLambda,
-				Lambda: compose.InvokableLambda(func(ctx context.Context, in map[string]any) (out map[string]any, err error) {
+				Lambda: einobridge.InvokableLambda(func(ctx context.Context, in map[string]any) (out map[string]any, err error) {
 					return out, nil
 				}),
 			}
@@ -351,10 +350,10 @@ func TestQuestionAnswer(t *testing.T) {
 				"query":   "what's would you make in Coze?",
 				"choice1": "make agent",
 				"choice2": "make workflow",
-			}, compose.WithCheckPointID(checkPointID))
+			}, einobridge.WithCheckPointID(checkPointID))
 			assert.Error(t, err)
 
-			info, existed := compose.ExtractInterruptInfo(err)
+			info, existed := einobridge.ExtractInterruptInfo(err)
 			assert.True(t, existed)
 			assert.Equal(t, "what's would you make in Coze?", info.State.(*compose2.State).
 				IntermediateResult[ns.Key][qa.QuestionsKey].([]map[string]any)[0][qa.QuestionKey].(string))
@@ -364,11 +363,11 @@ func TestQuestionAnswer(t *testing.T) {
 				IntermediateResult[ns.Key][qa.QuestionsKey].([]map[string]any)[0][qa.ChoicesKey].([]string)[1])
 
 			chosenContent := "I would make all kinds of stuff"
-			stateModifier := func(ctx context.Context, path compose.NodePath, state any) error {
+			stateModifier := func(ctx context.Context, path einobridge.NodePath, state any) error {
 				state.(*compose2.State).ResumeData[ns.Key] = chosenContent
 				return nil
 			}
-			out, err := wf.Runner.Invoke(context.Background(), nil, compose.WithCheckPointID(checkPointID), compose.WithStateModifier(stateModifier))
+			out, err := wf.Runner.Invoke(context.Background(), nil, einobridge.WithCheckPointID(checkPointID), einobridge.WithStateModifier(stateModifier))
 			assert.NoError(t, err)
 			assert.Equal(t, map[string]any{
 				"option_id":      "other",
@@ -393,20 +392,20 @@ func TestQuestionAnswer(t *testing.T) {
 				},
 				InputSources: []*vo.FieldInfo{
 					{
-						Path: compose.FieldPath{"input"},
+						Path: einobridge.FieldPath{"input"},
 						Source: vo.FieldSource{
 							Ref: &vo.Reference{
 								FromNodeKey: entryN.Key,
-								FromPath:    compose.FieldPath{"query"},
+								FromPath:    einobridge.FieldPath{"query"},
 							},
 						},
 					},
 					{
-						Path: compose.FieldPath{qa.DynamicChoicesKey},
+						Path: einobridge.FieldPath{qa.DynamicChoicesKey},
 						Source: vo.FieldSource{
 							Ref: &vo.Reference{
 								FromNodeKey: entryN.Key,
-								FromPath:    compose.FieldPath{"choices"},
+								FromPath:    einobridge.FieldPath{"choices"},
 							},
 						},
 					},
@@ -421,20 +420,20 @@ func TestQuestionAnswer(t *testing.T) {
 				},
 				InputSources: []*vo.FieldInfo{
 					{
-						Path: compose.FieldPath{"option_id"},
+						Path: einobridge.FieldPath{"option_id"},
 						Source: vo.FieldSource{
 							Ref: &vo.Reference{
 								FromNodeKey: "qa_node_key",
-								FromPath:    compose.FieldPath{qa.OptionIDKey},
+								FromPath:    einobridge.FieldPath{qa.OptionIDKey},
 							},
 						},
 					},
 					{
-						Path: compose.FieldPath{"option_content"},
+						Path: einobridge.FieldPath{"option_content"},
 						Source: vo.FieldSource{
 							Ref: &vo.Reference{
 								FromNodeKey: "qa_node_key",
-								FromPath:    compose.FieldPath{qa.OptionContentKey},
+								FromPath:    einobridge.FieldPath{qa.OptionContentKey},
 							},
 						},
 					},
@@ -444,7 +443,7 @@ func TestQuestionAnswer(t *testing.T) {
 			lambda := &schema2.NodeSchema{
 				Key:  "lambda",
 				Type: entity.NodeTypeLambda,
-				Lambda: compose.InvokableLambda(func(ctx context.Context, in map[string]any) (out map[string]any, err error) {
+				Lambda: einobridge.InvokableLambda(func(ctx context.Context, in map[string]any) (out map[string]any, err error) {
 					return out, nil
 				}),
 			}
@@ -491,10 +490,10 @@ func TestQuestionAnswer(t *testing.T) {
 			_, err = wf.Runner.Invoke(context.Background(), map[string]any{
 				"query":   "what's the capital city of China?",
 				"choices": []any{"beijing", "shanghai"},
-			}, compose.WithCheckPointID(checkPointID))
+			}, einobridge.WithCheckPointID(checkPointID))
 			assert.Error(t, err)
 
-			info, existed := compose.ExtractInterruptInfo(err)
+			info, existed := einobridge.ExtractInterruptInfo(err)
 			assert.True(t, existed)
 			assert.Equal(t, "what's the capital city of China?", info.State.(*compose2.State).
 				IntermediateResult[ns.Key][qa.QuestionsKey].([]map[string]any)[0][qa.QuestionKey].(string))
@@ -504,11 +503,11 @@ func TestQuestionAnswer(t *testing.T) {
 				IntermediateResult[ns.Key][qa.QuestionsKey].([]map[string]any)[0][qa.ChoicesKey].([]string)[1])
 
 			chosenContent := "beijing"
-			stateModifier := func(ctx context.Context, path compose.NodePath, state any) error {
+			stateModifier := func(ctx context.Context, path einobridge.NodePath, state any) error {
 				state.(*compose2.State).ResumeData[ns.Key] = chosenContent
 				return nil
 			}
-			out, err := wf.Runner.Invoke(context.Background(), nil, compose.WithCheckPointID(checkPointID), compose.WithStateModifier(stateModifier))
+			out, err := wf.Runner.Invoke(context.Background(), nil, einobridge.WithCheckPointID(checkPointID), einobridge.WithStateModifier(stateModifier))
 			assert.NoError(t, err)
 			assert.Equal(t, map[string]any{
 				"option_id":      "A",
@@ -562,20 +561,20 @@ func TestQuestionAnswer(t *testing.T) {
 				},
 				InputSources: []*vo.FieldInfo{
 					{
-						Path: compose.FieldPath{"input"},
+						Path: einobridge.FieldPath{"input"},
 						Source: vo.FieldSource{
 							Ref: &vo.Reference{
 								FromNodeKey: entryN.Key,
-								FromPath:    compose.FieldPath{"query"},
+								FromPath:    einobridge.FieldPath{"query"},
 							},
 						},
 					},
 					{
-						Path: compose.FieldPath{"prompt"},
+						Path: einobridge.FieldPath{"prompt"},
 						Source: vo.FieldSource{
 							Ref: &vo.Reference{
 								FromNodeKey: entryN.Key,
-								FromPath:    compose.FieldPath{"prompt"},
+								FromPath:    einobridge.FieldPath{"prompt"},
 							},
 						},
 					},
@@ -600,29 +599,29 @@ func TestQuestionAnswer(t *testing.T) {
 				},
 				InputSources: []*vo.FieldInfo{
 					{
-						Path: compose.FieldPath{"name"},
+						Path: einobridge.FieldPath{"name"},
 						Source: vo.FieldSource{
 							Ref: &vo.Reference{
 								FromNodeKey: "qa_node_key",
-								FromPath:    compose.FieldPath{"name"},
+								FromPath:    einobridge.FieldPath{"name"},
 							},
 						},
 					},
 					{
-						Path: compose.FieldPath{"age"},
+						Path: einobridge.FieldPath{"age"},
 						Source: vo.FieldSource{
 							Ref: &vo.Reference{
 								FromNodeKey: "qa_node_key",
-								FromPath:    compose.FieldPath{"age"},
+								FromPath:    einobridge.FieldPath{"age"},
 							},
 						},
 					},
 					{
-						Path: compose.FieldPath{qa.UserResponseKey},
+						Path: einobridge.FieldPath{qa.UserResponseKey},
 						Source: vo.FieldSource{
 							Ref: &vo.Reference{
 								FromNodeKey: "qa_node_key",
-								FromPath:    compose.FieldPath{qa.UserResponseKey},
+								FromPath:    einobridge.FieldPath{qa.UserResponseKey},
 							},
 						},
 					},
@@ -656,32 +655,32 @@ func TestQuestionAnswer(t *testing.T) {
 			_, err = wf.Runner.Invoke(ctx, map[string]any{
 				"query":  "what's your name?",
 				"prompt": "You are a helpful assistant.",
-			}, compose.WithCheckPointID(checkPointID))
+			}, einobridge.WithCheckPointID(checkPointID))
 			assert.Error(t, err)
 
-			info, existed := compose.ExtractInterruptInfo(err)
+			info, existed := einobridge.ExtractInterruptInfo(err)
 			assert.True(t, existed)
 			assert.Equal(t, "what's your name?", info.State.(*compose2.State).
 				IntermediateResult[ns.Key][qa.QuestionsKey].([]map[string]any)[0][qa.QuestionKey].(string))
 
 			qaCount++
 			answer := "my name is eino"
-			stateModifier := func(ctx context.Context, path compose.NodePath, state any) error {
+			stateModifier := func(ctx context.Context, path einobridge.NodePath, state any) error {
 				state.(*compose2.State).ResumeData[ns.Key] = answer
 				return nil
 			}
-			_, err = wf.Runner.Invoke(ctx, map[string]any{}, compose.WithCheckPointID(checkPointID), compose.WithStateModifier(stateModifier))
+			_, err = wf.Runner.Invoke(ctx, map[string]any{}, einobridge.WithCheckPointID(checkPointID), einobridge.WithStateModifier(stateModifier))
 			assert.Error(t, err)
-			info, existed = compose.ExtractInterruptInfo(err)
+			info, existed = einobridge.ExtractInterruptInfo(err)
 			assert.True(t, existed)
 
 			qaCount++
 			answer = "my age is 1 years old"
-			stateModifier = func(ctx context.Context, path compose.NodePath, state any) error {
+			stateModifier = func(ctx context.Context, path einobridge.NodePath, state any) error {
 				state.(*compose2.State).ResumeData[ns.Key] = answer
 				return nil
 			}
-			out, err := wf.Runner.Invoke(ctx, map[string]any{}, compose.WithCheckPointID(checkPointID), compose.WithStateModifier(stateModifier))
+			out, err := wf.Runner.Invoke(ctx, map[string]any{}, einobridge.WithCheckPointID(checkPointID), einobridge.WithStateModifier(stateModifier))
 			assert.NoError(t, err)
 			assert.Equal(t, map[string]any{
 				qa.UserResponseKey: answer,

@@ -17,10 +17,10 @@
 package test
 
 import (
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	"context"
 	"testing"
 
-	"github.com/cloudwego/eino/compose"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/superagent-ai/superagent-base/backend/domain/workflow/entity"
@@ -54,28 +54,28 @@ func TestAddSelector(t *testing.T) {
 				Source: vo.FieldSource{
 					Ref: &vo.Reference{
 						FromNodeKey: "lambda1",
-						FromPath:    compose.FieldPath{"lambda1"},
+						FromPath:    einobridge.FieldPath{"lambda1"},
 					},
 				},
-				Path: compose.FieldPath{"lambda1"},
+				Path: einobridge.FieldPath{"lambda1"},
 			},
 			{
 				Source: vo.FieldSource{
 					Ref: &vo.Reference{
 						FromNodeKey: "lambda2",
-						FromPath:    compose.FieldPath{"lambda2"},
+						FromPath:    einobridge.FieldPath{"lambda2"},
 					},
 				},
-				Path: compose.FieldPath{"lambda2"},
+				Path: einobridge.FieldPath{"lambda2"},
 			},
 			{
 				Source: vo.FieldSource{
 					Ref: &vo.Reference{
 						FromNodeKey: "lambda3",
-						FromPath:    compose.FieldPath{"lambda3"},
+						FromPath:    einobridge.FieldPath{"lambda3"},
 					},
 				},
-				Path: compose.FieldPath{"lambda3"},
+				Path: einobridge.FieldPath{"lambda3"},
 			},
 		},
 	}
@@ -89,7 +89,7 @@ func TestAddSelector(t *testing.T) {
 	lambdaNode1 := &schema.NodeSchema{
 		Key:    "lambda1",
 		Type:   entity.NodeTypeLambda,
-		Lambda: compose.InvokableLambda(lambda1),
+		Lambda: einobridge.InvokableLambda(lambda1),
 	}
 
 	lambda2 := func(ctx context.Context, in map[string]any) (map[string]any, error) {
@@ -101,7 +101,7 @@ func TestAddSelector(t *testing.T) {
 	LambdaNode2 := &schema.NodeSchema{
 		Key:    "lambda2",
 		Type:   entity.NodeTypeLambda,
-		Lambda: compose.InvokableLambda(lambda2),
+		Lambda: einobridge.InvokableLambda(lambda2),
 	}
 
 	lambda3 := func(ctx context.Context, in map[string]any) (map[string]any, error) {
@@ -113,7 +113,7 @@ func TestAddSelector(t *testing.T) {
 	lambdaNode3 := &schema.NodeSchema{
 		Key:    "lambda3",
 		Type:   entity.NodeTypeLambda,
-		Lambda: compose.InvokableLambda(lambda3),
+		Lambda: einobridge.InvokableLambda(lambda3),
 	}
 
 	ns := &schema.NodeSchema{
@@ -135,44 +135,44 @@ func TestAddSelector(t *testing.T) {
 		}},
 		InputSources: []*vo.FieldInfo{
 			{
-				Path: compose.FieldPath{"0", selector.LeftKey},
+				Path: einobridge.FieldPath{"0", selector.LeftKey},
 				Source: vo.FieldSource{
 					Ref: &vo.Reference{
 						FromNodeKey: entryN.Key,
-						FromPath:    compose.FieldPath{"key1"},
+						FromPath:    einobridge.FieldPath{"key1"},
 					},
 				},
 			},
 			{
-				Path: compose.FieldPath{"0", selector.RightKey},
+				Path: einobridge.FieldPath{"0", selector.RightKey},
 				Source: vo.FieldSource{
 					Val: "value1",
 				},
 			},
 			{
-				Path: compose.FieldPath{"1", "0", selector.LeftKey},
+				Path: einobridge.FieldPath{"1", "0", selector.LeftKey},
 				Source: vo.FieldSource{
 					Ref: &vo.Reference{
 						FromNodeKey: entryN.Key,
-						FromPath:    compose.FieldPath{"key2"},
+						FromPath:    einobridge.FieldPath{"key2"},
 					},
 				},
 			},
 			{
-				Path: compose.FieldPath{"1", "0", selector.RightKey},
+				Path: einobridge.FieldPath{"1", "0", selector.RightKey},
 				Source: vo.FieldSource{
 					Ref: &vo.Reference{
 						FromNodeKey: entryN.Key,
-						FromPath:    compose.FieldPath{"key3"},
+						FromPath:    einobridge.FieldPath{"key3"},
 					},
 				},
 			},
 			{
-				Path: compose.FieldPath{"1", "1", selector.LeftKey},
+				Path: einobridge.FieldPath{"1", "1", selector.LeftKey},
 				Source: vo.FieldSource{
 					Ref: &vo.Reference{
 						FromNodeKey: entryN.Key,
-						FromPath:    compose.FieldPath{"key4"},
+						FromPath:    einobridge.FieldPath{"key4"},
 					},
 				},
 			},
@@ -323,20 +323,20 @@ func TestVariableAggregator(t *testing.T) {
 		},
 		InputSources: []*vo.FieldInfo{
 			{
-				Path: compose.FieldPath{"Group1"},
+				Path: einobridge.FieldPath{"Group1"},
 				Source: vo.FieldSource{
 					Ref: &vo.Reference{
 						FromNodeKey: "va",
-						FromPath:    compose.FieldPath{"Group1"},
+						FromPath:    einobridge.FieldPath{"Group1"},
 					},
 				},
 			},
 			{
-				Path: compose.FieldPath{"Group2"},
+				Path: einobridge.FieldPath{"Group2"},
 				Source: vo.FieldSource{
 					Ref: &vo.Reference{
 						FromNodeKey: "va",
-						FromPath:    compose.FieldPath{"Group2"},
+						FromPath:    einobridge.FieldPath{"Group2"},
 					},
 				},
 			},
@@ -359,20 +359,20 @@ func TestVariableAggregator(t *testing.T) {
 		},
 		InputSources: []*vo.FieldInfo{
 			{
-				Path: compose.FieldPath{"Group1", "0"},
+				Path: einobridge.FieldPath{"Group1", "0"},
 				Source: vo.FieldSource{
 					Ref: &vo.Reference{
 						FromNodeKey: entryN.Key,
-						FromPath:    compose.FieldPath{"Str1"},
+						FromPath:    einobridge.FieldPath{"Str1"},
 					},
 				},
 			},
 			{
-				Path: compose.FieldPath{"Group2", "0"},
+				Path: einobridge.FieldPath{"Group2", "0"},
 				Source: vo.FieldSource{
 					Ref: &vo.Reference{
 						FromNodeKey: entryN.Key,
-						FromPath:    compose.FieldPath{"Int1"},
+						FromPath:    einobridge.FieldPath{"Int1"},
 					},
 				},
 			},
@@ -466,11 +466,11 @@ func TestTextProcessor(t *testing.T) {
 			},
 			InputSources: []*vo.FieldInfo{
 				{
-					Path: compose.FieldPath{"output"},
+					Path: einobridge.FieldPath{"output"},
 					Source: vo.FieldSource{
 						Ref: &vo.Reference{
 							FromNodeKey: "tp",
-							FromPath:    compose.FieldPath{"output"},
+							FromPath:    einobridge.FieldPath{"output"},
 						},
 					},
 				},
@@ -486,11 +486,11 @@ func TestTextProcessor(t *testing.T) {
 			},
 			InputSources: []*vo.FieldInfo{
 				{
-					Path: compose.FieldPath{"String"},
+					Path: einobridge.FieldPath{"String"},
 					Source: vo.FieldSource{
 						Ref: &vo.Reference{
 							FromNodeKey: entryN.Key,
-							FromPath:    compose.FieldPath{"Str"},
+							FromPath:    einobridge.FieldPath{"Str"},
 						},
 					},
 				},
@@ -543,11 +543,11 @@ func TestTextProcessor(t *testing.T) {
 			},
 			InputSources: []*vo.FieldInfo{
 				{
-					Path: compose.FieldPath{"output"},
+					Path: einobridge.FieldPath{"output"},
 					Source: vo.FieldSource{
 						Ref: &vo.Reference{
 							FromNodeKey: "tp",
-							FromPath:    compose.FieldPath{"output"},
+							FromPath:    einobridge.FieldPath{"output"},
 						},
 					},
 				},
@@ -564,29 +564,29 @@ func TestTextProcessor(t *testing.T) {
 			},
 			InputSources: []*vo.FieldInfo{
 				{
-					Path: compose.FieldPath{"String1"},
+					Path: einobridge.FieldPath{"String1"},
 					Source: vo.FieldSource{
 						Ref: &vo.Reference{
 							FromNodeKey: entryN.Key,
-							FromPath:    compose.FieldPath{"Str1"},
+							FromPath:    einobridge.FieldPath{"Str1"},
 						},
 					},
 				},
 				{
-					Path: compose.FieldPath{"String2"},
+					Path: einobridge.FieldPath{"String2"},
 					Source: vo.FieldSource{
 						Ref: &vo.Reference{
 							FromNodeKey: entryN.Key,
-							FromPath:    compose.FieldPath{"Str2"},
+							FromPath:    einobridge.FieldPath{"Str2"},
 						},
 					},
 				},
 				{
-					Path: compose.FieldPath{"String3"},
+					Path: einobridge.FieldPath{"String3"},
 					Source: vo.FieldSource{
 						Ref: &vo.Reference{
 							FromNodeKey: entryN.Key,
-							FromPath:    compose.FieldPath{"Str3"},
+							FromPath:    einobridge.FieldPath{"Str3"},
 						},
 					},
 				},

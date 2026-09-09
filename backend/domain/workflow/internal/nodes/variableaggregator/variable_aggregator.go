@@ -29,7 +29,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/cloudwego/eino/compose"
 	"github.com/mohae/deepcopy"
 
 	"github.com/superagent-ai/superagent-base/backend/domain/workflow/entity"
@@ -82,7 +81,7 @@ func (c *Config) Adapt(_ context.Context, n *vo.Node, _ ...nodes.AdaptOption) (*
 				return nil, err
 			}
 			tInfo.Properties[name] = valueTypeInfo
-			sources, err := convert.CanvasBlockInputToFieldInfo(v, compose.FieldPath{group.Name, name}, n.Parent())
+			sources, err := convert.CanvasBlockInputToFieldInfo(v, einobridge.FieldPath{group.Name, name}, n.Parent())
 			if err != nil {
 				return nil, err
 			}
@@ -120,7 +119,7 @@ func (c *Config) Build(_ context.Context, ns *schema2.NodeSchema, _ ...schema2.B
 	}, nil
 }
 
-func (c *Config) FieldStreamType(path compose.FieldPath, ns *schema2.NodeSchema,
+func (c *Config) FieldStreamType(path einobridge.FieldPath, ns *schema2.NodeSchema,
 	sc *schema2.WorkflowSchema) (schema2.FieldStreamType, error) {
 	if !sc.RequireStreaming() {
 		return schema2.FieldNotStream, nil
@@ -220,7 +219,7 @@ func (v *VariableAggregator) Invoke(ctx context.Context, input map[string]any) (
 		}
 	}
 
-	_ = compose.ProcessState(ctx, func(ctx context.Context, state nodes.IntermediateResultStore) error {
+	_ = einobridge.ProcessState(ctx, func(ctx context.Context, state nodes.IntermediateResultStore) error {
 		state.SetIntermediateResult(v.nodeKey, groupToChoice)
 		return nil
 	})
@@ -255,7 +254,7 @@ func (v *VariableAggregator) Transform(ctx context.Context, input *wfcompose.Str
 	inStream := streamInputConverter(einoInput)
 
 	var resolvedSources map[string]*schema2.SourceInfo
-	_ = compose.ProcessState(ctx, func(_ context.Context, state nodes.DynamicStreamContainer) error {
+	_ = einobridge.ProcessState(ctx, func(_ context.Context, state nodes.DynamicStreamContainer) error {
 		resolvedSources = state.GetFullSources(v.nodeKey)
 		return nil
 	})
@@ -369,7 +368,7 @@ func (v *VariableAggregator) Transform(ctx context.Context, input *wfcompose.Str
 		}
 
 		if allSkip { // no need to convert input streams for the output, because all groups are skipped
-			_ = compose.ProcessState(ctx, func(ctx context.Context, state nodes.IntermediateResultStore) error {
+			_ = einobridge.ProcessState(ctx, func(ctx context.Context, state nodes.IntermediateResultStore) error {
 				state.SetIntermediateResult(v.nodeKey, groupToChoice)
 				return nil
 			})
@@ -468,7 +467,7 @@ func (v *VariableAggregator) Transform(ctx context.Context, input *wfcompose.Str
 		}
 	}
 
-	_ = compose.ProcessState(ctx, func(ctx context.Context, state nodes.IntermediateResultStore) error {
+	_ = einobridge.ProcessState(ctx, func(ctx context.Context, state nodes.IntermediateResultStore) error {
 		state.SetIntermediateResult(v.nodeKey, groupToChoice)
 		return nil
 	})
@@ -557,7 +556,7 @@ const streamMarker streamMarkerType = "<Stream Data...>"
 func (v *VariableAggregator) ToCallbackInput(ctx context.Context, input map[string]any) (
 	*nodes.StructuredCallbackInput, error) {
 	var resolvedSources map[string]*schema2.SourceInfo
-	_ = compose.ProcessState(ctx, func(_ context.Context, state nodes.DynamicStreamContainer) error {
+	_ = einobridge.ProcessState(ctx, func(_ context.Context, state nodes.DynamicStreamContainer) error {
 		resolvedSources = state.GetFullSources(v.nodeKey)
 		return nil
 	})

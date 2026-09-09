@@ -17,12 +17,12 @@
 package variableassigner
 
 import (
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	"context"
 	"errors"
 	"fmt"
 	"strings"
 
-	"github.com/cloudwego/eino/compose"
 
 	"github.com/superagent-ai/superagent-base/backend/domain/workflow/entity"
 	"github.com/superagent-ai/superagent-base/backend/domain/workflow/entity/vo"
@@ -58,7 +58,7 @@ func (c *Config) Adapt(ctx context.Context, n *vo.Node, opts ...nodes.AdaptOptio
 			return nil, fmt.Errorf("variable assigner node's param left or input is nil")
 		}
 
-		leftSources, err := convert.CanvasBlockInputToFieldInfo(param.Left, compose.FieldPath{fmt.Sprintf("left_%d", i)}, n.Parent())
+		leftSources, err := convert.CanvasBlockInputToFieldInfo(param.Left, einobridge.FieldPath{fmt.Sprintf("left_%d", i)}, n.Parent())
 		if err != nil {
 			return nil, err
 		}
@@ -116,7 +116,7 @@ func (c *Config) Build(_ context.Context, _ *schema.NodeSchema, _ ...schema.Buil
 
 type Pair struct {
 	Left  vo.Reference
-	Right compose.FieldPath
+	Right einobridge.FieldPath
 }
 
 func (v *VariableAssigner) Invoke(ctx context.Context, in map[string]any) (map[string]any, error) {

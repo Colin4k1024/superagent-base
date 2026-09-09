@@ -24,7 +24,6 @@ import (
 	"sync"
 	"unicode/utf8"
 
-	"github.com/cloudwego/eino/compose"
 	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	"golang.org/x/sync/errgroup"
 
@@ -64,21 +63,21 @@ func (k *knowledgeSVC) Retrieve(ctx context.Context, request *RetrieveRequest) (
 	if len(retrieveContext.Documents) == 0 {
 		return &knowledgeModel.RetrieveResponse{}, nil
 	}
-	chain := compose.NewChain[*RetrieveContext, []*knowledgeModel.RetrieveSlice]()
-	rewriteNode := compose.InvokableLambda(k.queryRewriteNode)
+	chain := einobridge.NewChain[*RetrieveContext, []*knowledgeModel.RetrieveSlice]()
+	rewriteNode := einobridge.InvokableLambda(k.queryRewriteNode)
 	// vectorized recall
-	vectorRetrieveNode := compose.InvokableLambda(k.vectorRetrieveNode)
+	vectorRetrieveNode := einobridge.InvokableLambda(k.vectorRetrieveNode)
 	// ES recall
-	EsRetrieveNode := compose.InvokableLambda(k.esRetrieveNode)
+	EsRetrieveNode := einobridge.InvokableLambda(k.esRetrieveNode)
 	// Nl2Sql recall
-	Nl2SqlRetrieveNode := compose.InvokableLambda(k.nl2SqlRetrieveNode)
+	Nl2SqlRetrieveNode := einobridge.InvokableLambda(k.nl2SqlRetrieveNode)
 	// pass user query Node
-	passRequestContextNode := compose.InvokableLambda(k.passRequestContext)
+	passRequestContextNode := einobridge.InvokableLambda(k.passRequestContext)
 	// reRank Node
-	reRankNode := compose.InvokableLambda(k.reRankNode)
+	reRankNode := einobridge.InvokableLambda(k.reRankNode)
 	// Pack Result Interface
-	packResult := compose.InvokableLambda(k.packResults)
-	parallelNode := compose.NewParallel().
+	packResult := einobridge.InvokableLambda(k.packResults)
+	parallelNode := einobridge.NewParallel().
 		AddLambda("vectorRetrieveNode", vectorRetrieveNode).
 		AddLambda("esRetrieveNode", EsRetrieveNode).
 		AddLambda("nl2SqlRetrieveNode", Nl2SqlRetrieveNode).

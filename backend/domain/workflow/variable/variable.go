@@ -17,10 +17,10 @@
 package variable
 
 import (
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	"context"
 	"fmt"
 
-	"github.com/cloudwego/eino/compose"
 
 	"github.com/superagent-ai/superagent-base/backend/domain/workflow/entity/vo"
 )
@@ -37,7 +37,7 @@ type Handler struct {
 	AppVarStore    Store
 }
 
-func (v *Handler) Get(ctx context.Context, t vo.GlobalVarType, path compose.FieldPath, opts ...OptionFn) (any, error) {
+func (v *Handler) Get(ctx context.Context, t vo.GlobalVarType, path einobridge.FieldPath, opts ...OptionFn) (any, error) {
 	switch t {
 	case vo.GlobalUser:
 		return v.UserVarStore.Get(ctx, path, opts...)
@@ -50,7 +50,7 @@ func (v *Handler) Get(ctx context.Context, t vo.GlobalVarType, path compose.Fiel
 	}
 }
 
-func (v *Handler) Set(ctx context.Context, t vo.GlobalVarType, path compose.FieldPath, value any, opts ...OptionFn) error {
+func (v *Handler) Set(ctx context.Context, t vo.GlobalVarType, path einobridge.FieldPath, value any, opts ...OptionFn) error {
 	switch t {
 	case vo.GlobalUser:
 		return v.UserVarStore.Set(ctx, path, value, opts...)
@@ -101,8 +101,8 @@ func WithStoreInfo(info StoreInfo) OptionFn {
 //go:generate mockgen -destination varmock/var_mock.go --package mockvar -source variable.go
 type Store interface {
 	Init(ctx context.Context)
-	Get(ctx context.Context, path compose.FieldPath, opts ...OptionFn) (any, error)
-	Set(ctx context.Context, path compose.FieldPath, value any, opts ...OptionFn) error
+	Get(ctx context.Context, path einobridge.FieldPath, opts ...OptionFn) (any, error)
+	Set(ctx context.Context, path einobridge.FieldPath, value any, opts ...OptionFn) error
 }
 
 var variablesMetaGetterImpl VariablesMetaGetter

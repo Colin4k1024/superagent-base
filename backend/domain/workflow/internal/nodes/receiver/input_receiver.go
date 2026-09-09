@@ -17,13 +17,13 @@
 package receiver
 
 import (
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	"context"
 	"errors"
 	"fmt"
 	"strings"
 
 	"github.com/bytedance/sonic"
-	"github.com/cloudwego/eino/compose"
 
 	workflow0 "github.com/superagent-ai/superagent-base/backend/api/model/workflow"
 	workflowModel "github.com/superagent-ai/superagent-base/backend/crossdomain/workflow/model"
@@ -109,14 +109,14 @@ func (i *InputReceiver) Invoke(ctx context.Context, _ map[string]any) (map[strin
 		err        error
 	)
 
-	_ = compose.ProcessState(ctx, func(_ context.Context, s nodes.InterruptEventStore) error {
+	_ = einobridge.ProcessState(ctx, func(_ context.Context, s nodes.InterruptEventStore) error {
 		resumeData, resumed = s.GetAndClearResumeData(i.nodeKey)
 		return nil
 	})
 
 	if !resumed {
 		var previouslyInterrupted bool
-		_ = compose.ProcessState(ctx, func(_ context.Context, state nodes.IntermediateResultStore) error {
+		_ = einobridge.ProcessState(ctx, func(_ context.Context, state nodes.IntermediateResultStore) error {
 			irs := state.GetIntermediateResult(i.nodeKey)
 			if len(irs) > 0 {
 				_, previouslyInterrupted = irs[interruptedKey]
@@ -128,14 +128,14 @@ func (i *InputReceiver) Invoke(ctx context.Context, _ map[string]any) (map[strin
 		})
 
 		if previouslyInterrupted {
-			return nil, compose.InterruptAndRerun
+			return nil, einobridge.InterruptAndRerun
 		}
 
 		eventID, err := workflow.GetRepository().GenID(ctx)
 		if err != nil {
 			return nil, vo.WrapError(errno.ErrIDGenError, err)
 		}
-		return nil, compose.NewInterruptAndRerunErr(&entity.InterruptEvent{
+		return nil, einobridge.NewInterruptAndRerunErr(&entity.InterruptEvent{
 			ID:            eventID,
 			NodeKey:       i.nodeKey,
 			NodeType:      entity.NodeTypeInputReceiver,

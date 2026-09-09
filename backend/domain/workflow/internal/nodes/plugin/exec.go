@@ -16,10 +16,10 @@
 package plugin
 
 import (
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	"context"
 	"fmt"
 
-	"github.com/cloudwego/eino/compose"
 
 	workflow3 "github.com/superagent-ai/superagent-base/backend/api/model/workflow"
 	crossplugin "github.com/superagent-ai/superagent-base/backend/crossdomain/plugin"
@@ -68,7 +68,7 @@ func ExecutePlugin(ctx context.Context, input map[string]any, pe *vo.PluginEntit
 
 	r, err := crossplugin.DefaultSVC().ExecuteTool(ctx, req, execOpts...)
 	if err != nil {
-		if extra, ok := compose.IsInterruptRerunError(err); ok {
+		if extra, ok := einobridge.IsInterruptRerunError(err); ok {
 			pluginTIE, ok := extra.(*model.ToolInterruptEvent)
 			if !ok {
 				return nil, vo.WrapError(errno.ErrPluginAPIErr, fmt.Errorf("expects ToolInterruptEvent, got %T", extra))

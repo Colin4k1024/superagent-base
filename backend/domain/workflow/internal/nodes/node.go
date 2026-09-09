@@ -17,12 +17,12 @@
 package nodes
 
 import (
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	"context"
 	"fmt"
 
 	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose"
 
-	"github.com/cloudwego/eino/compose"
 
 	"github.com/superagent-ai/superagent-base/backend/domain/workflow/entity"
 	"github.com/superagent-ai/superagent-base/backend/domain/workflow/entity/vo"
@@ -190,6 +190,6 @@ func GetBranchAdaptor(et entity.NodeType) (BranchAdaptor, bool) {
 }
 
 type StreamGenerator interface {
-	FieldStreamType(path compose.FieldPath, ns *schema.NodeSchema,
+	FieldStreamType(path einobridge.FieldPath, ns *schema.NodeSchema,
 		sc *schema.WorkflowSchema) (schema.FieldStreamType, error)
 }

@@ -17,6 +17,7 @@
 package nodes
 
 import (
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	"context"
 	"errors"
 	"fmt"
@@ -24,7 +25,6 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/cloudwego/eino/compose"
 
 	crossmessage "github.com/superagent-ai/superagent-base/backend/crossdomain/message"
 	"github.com/superagent-ai/superagent-base/backend/domain/workflow/entity/vo"
@@ -36,7 +36,7 @@ import (
 
 // TakeMapValue extracts the value for specified path from input map.
 // Returns false if map key not exist for specified path.
-func TakeMapValue(m map[string]any, path compose.FieldPath) (any, bool) {
+func TakeMapValue(m map[string]any, path einobridge.FieldPath) (any, bool) {
 	if m == nil {
 		return nil, false
 	}
@@ -56,7 +56,7 @@ func TakeMapValue(m map[string]any, path compose.FieldPath) (any, bool) {
 	return nil, false
 }
 
-func SetMapValue(m map[string]any, path compose.FieldPath, v any) {
+func SetMapValue(m map[string]any, path einobridge.FieldPath, v any) {
 	container := m
 	for _, p := range path[:len(path)-1] {
 		if _, ok := container[p]; !ok {

@@ -17,10 +17,10 @@
 package nodes
 
 import (
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	"context"
 	"strings"
 
-	"github.com/cloudwego/eino/compose"
 
 	"github.com/superagent-ai/superagent-base/backend/domain/workflow/entity/vo"
 	"github.com/superagent-ai/superagent-base/backend/domain/workflow/internal/schema"
@@ -35,7 +35,7 @@ func TrimKeyFinishedMarker(s string) string {
 type DynamicStreamContainer interface {
 	GetDynamicStreamType(nodeKey vo.NodeKey, group string) (schema.FieldStreamType, error)
 	GetAllDynamicStreamTypes(nodeKey vo.NodeKey) (map[string]schema.FieldStreamType, error)
-	GetSourceForPath(nodeKey vo.NodeKey, path compose.FieldPath) *schema.SourceInfo
+	GetSourceForPath(nodeKey vo.NodeKey, path einobridge.FieldPath) *schema.SourceInfo
 	GetFullSources(nodeKey vo.NodeKey) map[string]*schema.SourceInfo
 }
 
@@ -125,7 +125,7 @@ type NodeExecuteStatusAware interface {
 	NodeExecuted(key vo.NodeKey) bool
 }
 
-func IsStreamingField(s *schema.NodeSchema, path compose.FieldPath,
+func IsStreamingField(s *schema.NodeSchema, path einobridge.FieldPath,
 	sc *schema.WorkflowSchema) (schema.FieldStreamType, error) {
 	sg, ok := s.Configs.(StreamGenerator)
 	if !ok {

@@ -17,10 +17,10 @@
 package variableassigner
 
 import (
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	"context"
 	"fmt"
 
-	einoCompose "github.com/cloudwego/eino/compose"
 
 	"github.com/superagent-ai/superagent-base/backend/domain/workflow/entity"
 	"github.com/superagent-ai/superagent-base/backend/domain/workflow/entity/vo"
@@ -52,7 +52,7 @@ func (i *InLoopConfig) Adapt(ctx context.Context, n *vo.Node, opts ...nodes.Adap
 			return nil, fmt.Errorf("loop set variable node's param left or right is nil")
 		}
 
-		leftSources, err := convert.CanvasBlockInputToFieldInfo(param.Left, einoCompose.FieldPath{fmt.Sprintf("left_%d", i)}, n.Parent())
+		leftSources, err := convert.CanvasBlockInputToFieldInfo(param.Left, einobridge.FieldPath{fmt.Sprintf("left_%d", i)}, n.Parent())
 		if err != nil {
 			return nil, err
 		}

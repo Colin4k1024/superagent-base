@@ -23,7 +23,6 @@ import (
 	"strings"
 
 	"github.com/bytedance/sonic"
-	"github.com/cloudwego/eino/compose"
 
 	workflow2 "github.com/superagent-ai/superagent-base/backend/api/model/workflow"
 	"github.com/superagent-ai/superagent-base/backend/domain/workflow/entity"
@@ -334,7 +333,7 @@ const outputKey = "output"
 func (e *OutputEmitter) Transform(ctx context.Context, in *wfcompose.StreamReader[map[string]any]) (out *wfcompose.StreamReader[map[string]any], err error) {
 	einoIn := einobridge.UnwrapStreamReader[map[string]any](in)
 	var resolvedSources map[string]*schema2.SourceInfo
-	_ = compose.ProcessState(ctx, func(_ context.Context, state nodes.DynamicStreamContainer) error {
+	_ = einobridge.ProcessState(ctx, func(_ context.Context, state nodes.DynamicStreamContainer) error {
 		resolvedSources = state.GetFullSources(e.NodeKey)
 		return nil
 	})
@@ -519,7 +518,7 @@ func (e *OutputEmitter) Transform(ctx context.Context, in *wfcompose.StreamReade
 
 func (e *OutputEmitter) Invoke(ctx context.Context, in map[string]any) (output map[string]any, err error) {
 	var resolvedSources map[string]*schema2.SourceInfo
-	_ = compose.ProcessState(ctx, func(_ context.Context, state nodes.DynamicStreamContainer) error {
+	_ = einobridge.ProcessState(ctx, func(_ context.Context, state nodes.DynamicStreamContainer) error {
 		resolvedSources = state.GetFullSources(e.NodeKey)
 		return nil
 	})

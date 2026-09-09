@@ -17,11 +17,11 @@
 package test
 
 import (
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	"context"
 	"fmt"
 	"testing"
 
-	"github.com/cloudwego/eino/compose"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/superagent-ai/superagent-base/backend/domain/workflow/entity"
@@ -58,32 +58,32 @@ func TestBatch(t *testing.T) {
 	lambdaNode1 := &schema.NodeSchema{
 		Key:    "lambda",
 		Type:   entity.NodeTypeLambda,
-		Lambda: compose.InvokableLambda(lambda1),
+		Lambda: einobridge.InvokableLambda(lambda1),
 		InputSources: []*vo.FieldInfo{
 			{
-				Path: compose.FieldPath{"index"},
+				Path: einobridge.FieldPath{"index"},
 				Source: vo.FieldSource{
 					Ref: &vo.Reference{
 						FromNodeKey: "batch_node_key",
-						FromPath:    compose.FieldPath{"index"},
+						FromPath:    einobridge.FieldPath{"index"},
 					},
 				},
 			},
 			{
-				Path: compose.FieldPath{"array_1"},
+				Path: einobridge.FieldPath{"array_1"},
 				Source: vo.FieldSource{
 					Ref: &vo.Reference{
 						FromNodeKey: "batch_node_key",
-						FromPath:    compose.FieldPath{"array_1"},
+						FromPath:    einobridge.FieldPath{"array_1"},
 					},
 				},
 			},
 			{
-				Path: compose.FieldPath{"from_parent_wf"},
+				Path: einobridge.FieldPath{"from_parent_wf"},
 				Source: vo.FieldSource{
 					Ref: &vo.Reference{
 						FromNodeKey: "parent_predecessor_1",
-						FromPath:    compose.FieldPath{"success"},
+						FromPath:    einobridge.FieldPath{"success"},
 					},
 				},
 			},
@@ -92,14 +92,14 @@ func TestBatch(t *testing.T) {
 	lambdaNode2 := &schema.NodeSchema{
 		Key:    "index",
 		Type:   entity.NodeTypeLambda,
-		Lambda: compose.InvokableLambda(lambda2),
+		Lambda: einobridge.InvokableLambda(lambda2),
 		InputSources: []*vo.FieldInfo{
 			{
-				Path: compose.FieldPath{"index"},
+				Path: einobridge.FieldPath{"index"},
 				Source: vo.FieldSource{
 					Ref: &vo.Reference{
 						FromNodeKey: "batch_node_key",
-						FromPath:    compose.FieldPath{"index"},
+						FromPath:    einobridge.FieldPath{"index"},
 					},
 				},
 			},
@@ -109,28 +109,28 @@ func TestBatch(t *testing.T) {
 	lambdaNode3 := &schema.NodeSchema{
 		Key:    "consumer",
 		Type:   entity.NodeTypeLambda,
-		Lambda: compose.InvokableLambda(lambda3),
+		Lambda: einobridge.InvokableLambda(lambda3),
 		InputSources: []*vo.FieldInfo{
 			{
-				Path: compose.FieldPath{"consumer_1"},
+				Path: einobridge.FieldPath{"consumer_1"},
 				Source: vo.FieldSource{
 					Ref: &vo.Reference{
 						FromNodeKey: "lambda",
-						FromPath:    compose.FieldPath{"output_1"},
+						FromPath:    einobridge.FieldPath{"output_1"},
 					},
 				},
 			},
 			{
-				Path: compose.FieldPath{"array_2"},
+				Path: einobridge.FieldPath{"array_2"},
 				Source: vo.FieldSource{
 					Ref: &vo.Reference{
 						FromNodeKey: "batch_node_key",
-						FromPath:    compose.FieldPath{"array_2"},
+						FromPath:    einobridge.FieldPath{"array_2"},
 					},
 				},
 			},
 			{
-				Path: compose.FieldPath{"static_source"},
+				Path: einobridge.FieldPath{"static_source"},
 				Source: vo.FieldSource{
 					Val: "this is a const",
 				},
@@ -150,31 +150,31 @@ func TestBatch(t *testing.T) {
 		Configs: &batch.Config{},
 		InputSources: []*vo.FieldInfo{
 			{
-				Path: compose.FieldPath{"array_1"},
+				Path: einobridge.FieldPath{"array_1"},
 				Source: vo.FieldSource{
 					Ref: &vo.Reference{
 						FromNodeKey: entryN.Key,
-						FromPath:    compose.FieldPath{"array_1"},
+						FromPath:    einobridge.FieldPath{"array_1"},
 					},
 				},
 			},
 			{
-				Path: compose.FieldPath{"array_2"},
+				Path: einobridge.FieldPath{"array_2"},
 				Source: vo.FieldSource{
 					Ref: &vo.Reference{
 						FromNodeKey: entryN.Key,
-						FromPath:    compose.FieldPath{"array_2"},
+						FromPath:    einobridge.FieldPath{"array_2"},
 					},
 				},
 			},
 			{
-				Path: compose.FieldPath{batch.ConcurrentSizeKey},
+				Path: einobridge.FieldPath{batch.ConcurrentSizeKey},
 				Source: vo.FieldSource{
 					Val: int64(2),
 				},
 			},
 			{
-				Path: compose.FieldPath{batch.MaxBatchSizeKey},
+				Path: einobridge.FieldPath{batch.MaxBatchSizeKey},
 				Source: vo.FieldSource{
 					Val: int64(5),
 				},
@@ -196,20 +196,20 @@ func TestBatch(t *testing.T) {
 		},
 		OutputSources: []*vo.FieldInfo{
 			{
-				Path: compose.FieldPath{"assembled_output_1"},
+				Path: einobridge.FieldPath{"assembled_output_1"},
 				Source: vo.FieldSource{
 					Ref: &vo.Reference{
 						FromNodeKey: "lambda",
-						FromPath:    compose.FieldPath{"output_1"},
+						FromPath:    einobridge.FieldPath{"output_1"},
 					},
 				},
 			},
 			{
-				Path: compose.FieldPath{"assembled_output_2"},
+				Path: einobridge.FieldPath{"assembled_output_2"},
 				Source: vo.FieldSource{
 					Ref: &vo.Reference{
 						FromNodeKey: "index",
-						FromPath:    compose.FieldPath{"index"},
+						FromPath:    einobridge.FieldPath{"index"},
 					},
 				},
 			},
@@ -224,20 +224,20 @@ func TestBatch(t *testing.T) {
 		},
 		InputSources: []*vo.FieldInfo{
 			{
-				Path: compose.FieldPath{"assembled_output_1"},
+				Path: einobridge.FieldPath{"assembled_output_1"},
 				Source: vo.FieldSource{
 					Ref: &vo.Reference{
 						FromNodeKey: "batch_node_key",
-						FromPath:    compose.FieldPath{"assembled_output_1"},
+						FromPath:    einobridge.FieldPath{"assembled_output_1"},
 					},
 				},
 			},
 			{
-				Path: compose.FieldPath{"assembled_output_2"},
+				Path: einobridge.FieldPath{"assembled_output_2"},
 				Source: vo.FieldSource{
 					Ref: &vo.Reference{
 						FromNodeKey: "batch_node_key",
-						FromPath:    compose.FieldPath{"assembled_output_2"},
+						FromPath:    einobridge.FieldPath{"assembled_output_2"},
 					},
 				},
 			},
@@ -251,7 +251,7 @@ func TestBatch(t *testing.T) {
 	parentLambdaNode := &schema.NodeSchema{
 		Key:    "parent_predecessor_1",
 		Type:   entity.NodeTypeLambda,
-		Lambda: compose.InvokableLambda(parentLambda),
+		Lambda: einobridge.InvokableLambda(parentLambda),
 	}
 
 	ws := &schema.WorkflowSchema{

@@ -24,7 +24,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/cloudwego/eino/compose"
 	"github.com/cloudwego/eino/flow/agent/react"
 	"golang.org/x/exp/maps"
 
@@ -284,7 +283,7 @@ func (c *Config) Adapt(_ context.Context, n *vo.Node, _ ...nodes.AdaptOption) (*
 	c.AssociateStartNodeUserInputFields = make(map[string]struct{})
 	for _, info := range ns.InputSources {
 		if len(info.Path) == 1 && info.Source.Ref != nil && info.Source.Ref.FromNodeKey == entity.EntryNodeKey {
-			if compose.FromFieldPath(info.Source.Ref.FromPath).Equals(compose.FromField(vo.UserInputKey)) {
+			if einobridge.FromFieldPath(info.Source.Ref.FromPath).Equals(einobridge.FromField(vo.UserInputKey)) {
 				c.AssociateStartNodeUserInputFields[info.Path[0]] = struct{}{}
 			}
 		}
@@ -562,8 +561,8 @@ func (c *Config) Build(ctx context.Context, ns *schema2.NodeSchema, _ ...schema2
 		}
 	}
 
-	g := compose.NewGraph[map[string]any, map[string]any](
-		compose.WithGenLocalState(func(ctx context.Context) (state llmState) {
+	g := einobridge.NewGraph[map[string]any, map[string]any](
+		einobridge.WithGenLocalState(func(ctx context.Context) (state llmState) {
 			return llmState{}
 		}))
 
@@ -622,7 +621,7 @@ func (c *Config) Build(ctx context.Context, ns *schema2.NodeSchema, _ ...schema2
 		templateWithChatHistory := newPromptsWithChatHistory(template, c.ChatHistorySetting, modelWithInfo)
 
 		_ = g.AddChatTemplateNode(templateNodeKey, templateWithChatHistory,
-			compose.WithStatePreHandler(func(ctx context.Context, in map[string]any, state llmState) (map[string]any, error) {
+			einobridge.WithStatePreHandler(func(ctx context.Context, in map[string]any, state llmState) (map[string]any, error) {
 				for k, v := range state {
 					in[k] = v
 				}
@@ -638,7 +637,7 @@ func (c *Config) Build(ctx context.Context, ns *schema2.NodeSchema, _ ...schema2
 
 		_ = g.AddChatTemplateNode(templateNodeKey, templateWithChatHistory)
 
-		_ = g.AddEdge(compose.START, templateNodeKey)
+		_ = g.AddEdge(einobridge.START, templateNodeKey)
 	}
 
 	if len(tools) > 0 {
@@ -648,7 +647,7 @@ func (c *Config) Build(ctx context.Context, ns *schema2.NodeSchema, _ ...schema2
 		}
 		reactConfig := react.AgentConfig{
 			ToolCallingModel: m,
-			ToolsConfig:      compose.ToolsNodeConfig{Tools: tools},
+			ToolsConfig:      einobridge.ToolsNodeConfig{Tools: tools},
 			ModelNodeName:    agentModelName,
 			GraphName:        reactGraphName,
 		}
@@ -666,7 +665,7 @@ func (c *Config) Build(ctx context.Context, ns *schema2.NodeSchema, _ ...schema2
 		}
 
 		agentNode, opts := reactAgent.ExportGraph()
-		opts = append(opts, compose.WithNodeName(reactGraphName))
+		opts = append(opts, einobridge.WithNodeName(reactGraphName))
 		_ = g.AddGraphNode(llmNodeKey, agentNode, opts...)
 	} else {
 		_ = g.AddChatModelNode(llmNodeKey, modelWithInfo)
@@ -680,7 +679,7 @@ func (c *Config) Build(ctx context.Context, ns *schema2.NodeSchema, _ ...schema2
 			return jsonParse(ctx, msg.Content, ns.OutputTypes)
 		}
 
-		convertNode := compose.InvokableLambda(iConvert)
+		convertNode := einobridge.InvokableLambda(iConvert)
 
 		_ = g.AddLambdaNode(outputConvertNodeKey, convertNode)
 	} else {
@@ -751,7 +750,7 @@ func (c *Config) Build(ctx context.Context, ns *schema2.NodeSchema, _ ...schema2
 			return sr, nil
 		}
 
-		convertNode, err := compose.AnyLambda(iConvert, nil, nil, tConvert)
+		convertNode, err := einobridge.AnyLambda(iConvert, nil, nil, tConvert)
 		if err != nil {
 			return nil, err
 		}
@@ -760,15 +759,15 @@ func (c *Config) Build(ctx context.Context, ns *schema2.NodeSchema, _ ...schema2
 	}
 
 	_ = g.AddEdge(llmNodeKey, outputConvertNodeKey)
-	_ = g.AddEdge(outputConvertNodeKey, compose.END)
+	_ = g.AddEdge(outputConvertNodeKey, einobridge.END)
 
 	requireCheckpoint := c.RequireCheckpoint()
 
-	var compileOpts []compose.GraphCompileOption
+	var compileOpts []einobridge.GraphCompileOption
 	if requireCheckpoint {
-		compileOpts = append(compileOpts, compose.WithCheckPointStore(workflow.GetRepository()))
+		compileOpts = append(compileOpts, einobridge.WithCheckPointStore(workflow.GetRepository()))
 	}
-	compileOpts = append(compileOpts, compose.WithGraphName("workflow_llm_node_graph"))
+	compileOpts = append(compileOpts, einobridge.WithGraphName("workflow_llm_node_graph"))
 
 	r, err := g.Compile(ctx, compileOpts...)
 	if err != nil {
@@ -806,7 +805,7 @@ func (c *Config) RequireCheckpoint() bool {
 	return false
 }
 
-func (c *Config) FieldStreamType(path compose.FieldPath, ns *schema2.NodeSchema,
+func (c *Config) FieldStreamType(path einobridge.FieldPath, ns *schema2.NodeSchema,
 	sc *schema2.WorkflowSchema) (schema2.FieldStreamType, error) {
 	if !sc.RequireStreaming() {
 		return schema2.FieldNotStream, nil
@@ -868,7 +867,7 @@ func toRetrievalSearchType(s int64) (knowledge.SearchType, error) {
 }
 
 type LLM struct {
-	r                  compose.Runnable[map[string]any, map[string]any]
+	r                  einobridge.Runnable[map[string]any, map[string]any]
 	outputFormat       Format
 	requireCheckpoint  bool
 	fullSources        map[string]*schema2.SourceInfo
@@ -929,7 +928,7 @@ type llmState = map[string]any
 const agentModelName = "agent_model"
 
 func (l *LLM) prepare(ctx context.Context, _ map[string]any, opts ...nodes.NodeOption) (
-	composeOpts []compose.Option, resumingEvent *entity.InterruptEvent, err error) {
+	composeOpts []einobridge.Option, resumingEvent *entity.InterruptEvent, err error) {
 	c := execute.GetExeCtx(ctx)
 	if c != nil {
 		resumingEvent = c.NodeCtx.ResumingEvent
@@ -939,7 +938,7 @@ func (l *LLM) prepare(ctx context.Context, _ map[string]any, opts ...nodes.NodeO
 		// check if we are not resuming, but previously interrupted. Interrupt immediately.
 		if resumingEvent == nil {
 			var previouslyInterrupted bool
-			err = compose.ProcessState(ctx, func(ctx context.Context, state nodes.IntermediateResultStore) error {
+			err = einobridge.ProcessState(ctx, func(ctx context.Context, state nodes.IntermediateResultStore) error {
 				previousToolES := state.GetIntermediateResult(c.NodeKey)
 				previouslyInterrupted = len(previousToolES) > 0
 				return nil
@@ -949,7 +948,7 @@ func (l *LLM) prepare(ctx context.Context, _ map[string]any, opts ...nodes.NodeO
 			}
 
 			if previouslyInterrupted {
-				err = compose.InterruptAndRerun
+				err = einobridge.InterruptAndRerun
 				return
 			}
 		}
@@ -957,7 +956,7 @@ func (l *LLM) prepare(ctx context.Context, _ map[string]any, opts ...nodes.NodeO
 
 	if l.requireCheckpoint && c != nil {
 		checkpointID := fmt.Sprintf("%d_%s", c.RootCtx.RootExecuteID, c.NodeCtx.NodeKey)
-		composeOpts = append(composeOpts, compose.WithCheckPointID(checkpointID))
+		composeOpts = append(composeOpts, einobridge.WithCheckPointID(checkpointID))
 	}
 
 	options := nodes.GetCommonOptions(&nodes.NodeOptions{}, opts...)
@@ -970,7 +969,7 @@ func (l *LLM) prepare(ctx context.Context, _ map[string]any, opts ...nodes.NodeO
 			allIEs     map[string]int64
 		)
 
-		_ = compose.ProcessState(ctx, func(_ context.Context, state nodes.IntermediateResultStore) error {
+		_ = einobridge.ProcessState(ctx, func(_ context.Context, state nodes.IntermediateResultStore) error {
 			existingIEs := state.GetIntermediateResult(l.nodeKey)
 			allIEs = make(map[string]int64, len(existingIEs))
 			for toolCallID, exeID := range existingIEs {
@@ -980,13 +979,13 @@ func (l *LLM) prepare(ctx context.Context, _ map[string]any, opts ...nodes.NodeO
 			state.SetIntermediateResult(l.nodeKey, existingIEs)
 			return nil
 		})
-		_ = compose.ProcessState(ctx, func(ctx context.Context, state nodes.InterruptEventStore) error {
+		_ = einobridge.ProcessState(ctx, func(ctx context.Context, state nodes.InterruptEventStore) error {
 			resumeData, _ = state.GetAndClearResumeData(c.NodeKey)
 			return nil
 		})
 
-		composeOpts = append(composeOpts, compose.WithToolsNodeOption(
-			compose.WithToolOption(
+		composeOpts = append(composeOpts, einobridge.WithToolsNodeOption(
+			einobridge.WithToolOption(
 				execute.WithResume(&entity.ResumeRequest{
 					ExecuteID:  resumingEvent.ToolInterruptEvent.ExecuteID,
 					EventID:    resumingEvent.ToolInterruptEvent.ID,
@@ -1024,22 +1023,22 @@ func (l *LLM) prepare(ctx context.Context, _ map[string]any, opts ...nodes.NodeO
 			},
 		}).Handler()
 
-		composeOpts = append(composeOpts, compose.WithCallbacks(chatModelHandler))
+		composeOpts = append(composeOpts, einobridge.WithCallbacks(chatModelHandler))
 	}
 
 	if c != nil {
 		exeCfg := c.ExeCfg
-		composeOpts = append(composeOpts, compose.WithToolsNodeOption(compose.WithToolOption(execute.WithExecuteConfig(exeCfg))))
+		composeOpts = append(composeOpts, einobridge.WithToolsNodeOption(einobridge.WithToolOption(execute.WithExecuteConfig(exeCfg))))
 	}
 
 	llmOpts := nodes.GetImplSpecificOptions(&llmOptions{}, opts...)
 	if container := llmOpts.toolWorkflowContainer; container != nil {
-		composeOpts = append(composeOpts, compose.WithToolsNodeOption(compose.WithToolOption(
+		composeOpts = append(composeOpts, einobridge.WithToolsNodeOption(einobridge.WithToolOption(
 			execute.WithParentStreamContainer(container))))
 	}
 
 	var resolvedSources map[string]*schema2.SourceInfo
-	err = compose.ProcessState(ctx, func(_ context.Context, state nodes.DynamicStreamContainer) error {
+	err = einobridge.ProcessState(ctx, func(_ context.Context, state nodes.DynamicStreamContainer) error {
 		resolvedSources = state.GetFullSources(l.nodeKey)
 		return nil
 	})
@@ -1057,7 +1056,7 @@ func (l *LLM) prepare(ctx context.Context, _ map[string]any, opts ...nodes.NodeO
 }
 
 func (l *LLM) handleInterrupt(ctx context.Context, err error, resumingEvent *entity.InterruptEvent) error {
-	info, ok := compose.ExtractInterruptInfo(err)
+	info, ok := einobridge.ExtractInterruptInfo(err)
 	if !ok {
 		return err
 	}
@@ -1069,7 +1068,7 @@ func (l *LLM) handleInterrupt(ctx context.Context, err error, resumingEvent *ent
 		break
 	}
 
-	toolsNodeExtra, ok := extra.(*compose.ToolsInterruptAndRerunExtra)
+	toolsNodeExtra, ok := extra.(*einobridge.ToolsInterruptAndRerunExtra)
 	if !ok {
 		return fmt.Errorf("llm rerun node extra type expected to be ToolsInterruptAndRerunExtra, actual: %T", extra)
 	}
@@ -1124,7 +1123,7 @@ func (l *LLM) handleInterrupt(ctx context.Context, err error, resumingEvent *ent
 	for i := range toolIEs {
 		callID2ExeID[toolIEs[i].ToolCallID] = toolIEs[i].ExecuteID
 	}
-	_ = compose.ProcessState(ctx, func(ctx context.Context, state nodes.IntermediateResultStore) error {
+	_ = einobridge.ProcessState(ctx, func(ctx context.Context, state nodes.IntermediateResultStore) error {
 		previous := state.GetIntermediateResult(l.nodeKey)
 		for k, v := range previous {
 			if _, ok := callID2ExeID[k]; !ok {
@@ -1135,7 +1134,7 @@ func (l *LLM) handleInterrupt(ctx context.Context, err error, resumingEvent *ent
 		return nil
 	})
 
-	return compose.NewInterruptAndRerunErr(ie)
+	return einobridge.NewInterruptAndRerunErr(ie)
 }
 
 func (l *LLM) Invoke(ctx context.Context, in map[string]any, opts ...nodes.NodeOption) (out map[string]any, err error) {
@@ -1168,7 +1167,7 @@ func (l *LLM) Stream(ctx context.Context, in map[string]any, opts ...nodes.NodeO
 	return einobridge.WrapStreamReader[map[string]any](einoOut), nil
 }
 
-func injectKnowledgeTool(_ context.Context, g *compose.Graph[map[string]any, map[string]any], userPrompt string, cfg *KnowledgeRecallConfig) error {
+func injectKnowledgeTool(_ context.Context, g *einobridge.Graph[map[string]any, map[string]any], userPrompt string, cfg *KnowledgeRecallConfig) error {
 	selectedKwDetails, err := sonic.MarshalString(cfg.SelectedKnowledgeDetails)
 	if err != nil {
 		return err
@@ -1176,7 +1175,7 @@ func injectKnowledgeTool(_ context.Context, g *compose.Graph[map[string]any, map
 	_ = g.AddChatTemplateNode(knowledgeTemplateKey,
 		einobridge.PromptFromMessages(einobridge.Jinja2,
 			einobridge.SystemMessage(fmt.Sprintf(knowledgeIntentPrompt, selectedKwDetails, userPrompt)),
-		), compose.WithStatePreHandler(func(ctx context.Context, in map[string]any, state llmState) (map[string]any, error) {
+		), einobridge.WithStatePreHandler(func(ctx context.Context, in map[string]any, state llmState) (map[string]any, error) {
 			for k, v := range in {
 				state[k] = v
 			}
@@ -1184,7 +1183,7 @@ func injectKnowledgeTool(_ context.Context, g *compose.Graph[map[string]any, map
 		}))
 	_ = g.AddChatModelNode(knowledgeChatModelKey, cfg.ChatModel)
 
-	_ = g.AddLambdaNode(knowledgeLambdaKey, compose.InvokableLambda(func(ctx context.Context, input *einobridge.Message) (output map[string]any, err error) {
+	_ = g.AddLambdaNode(knowledgeLambdaKey, einobridge.InvokableLambda(func(ctx context.Context, input *einobridge.Message) (output map[string]any, err error) {
 		modelPredictionIDs := strings.Split(input.Content, ",")
 		selectKwIDs := slices.ToMap(cfg.SelectedKnowledgeDetails, func(e *knowledge.KnowledgeDetail) (string, int64) {
 			return strconv.Itoa(int(e.ID)), e.ID
@@ -1230,7 +1229,7 @@ func injectKnowledgeTool(_ context.Context, g *compose.Graph[map[string]any, map
 
 		return output, nil
 	}))
-	_ = g.AddEdge(compose.START, knowledgeTemplateKey)
+	_ = g.AddEdge(einobridge.START, knowledgeTemplateKey)
 	_ = g.AddEdge(knowledgeTemplateKey, knowledgeChatModelKey)
 	_ = g.AddEdge(knowledgeChatModelKey, knowledgeLambdaKey)
 	return nil

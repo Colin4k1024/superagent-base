@@ -17,6 +17,7 @@
 package tool
 
 import (
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	"bytes"
 	"context"
 	"fmt"
@@ -26,7 +27,6 @@ import (
 	"strings"
 
 	"github.com/bytedance/sonic"
-	"github.com/cloudwego/eino/compose"
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/go-resty/resty/v2"
 	"github.com/tidwall/sjson"
@@ -75,7 +75,7 @@ func (h *httpCallImpl) Do(ctx context.Context, args *InvocationArgs) (request st
 			},
 		}
 
-		return "", "", compose.NewInterruptAndRerunErr(event)
+		return "", "", einobridge.NewInterruptAndRerunErr(event)
 	}
 
 	var reqBodyBytes []byte

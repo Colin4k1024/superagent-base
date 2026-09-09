@@ -17,13 +17,13 @@
 package variable
 
 import (
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	"context"
 	"errors"
 	"fmt"
 	"strconv"
 
 	"github.com/bytedance/sonic"
-	"github.com/cloudwego/eino/compose"
 
 	"github.com/superagent-ai/superagent-base/backend/api/model/data/variable/kvmemory"
 	"github.com/superagent-ai/superagent-base/backend/api/model/data/variable/project_memory"
@@ -68,7 +68,7 @@ func newSystemVarStore() Store {
 func (v *varStore) Init(ctx context.Context) {
 }
 
-func (v *varStore) Get(ctx context.Context, path compose.FieldPath, opts ...OptionFn) (any, error) {
+func (v *varStore) Get(ctx context.Context, path einobridge.FieldPath, opts ...OptionFn) (any, error) {
 	opt := &StoreConfig{}
 	for _, o := range opts {
 		o(opt)
@@ -187,7 +187,7 @@ func (v *varStore) Get(ctx context.Context, path compose.FieldPath, opts ...Opti
 	return value, nil
 }
 
-func (v *varStore) Set(ctx context.Context, path compose.FieldPath, value any, opts ...OptionFn) (err error) {
+func (v *varStore) Set(ctx context.Context, path einobridge.FieldPath, value any, opts ...OptionFn) (err error) {
 	opt := &StoreConfig{}
 	for _, o := range opts {
 		o(opt)

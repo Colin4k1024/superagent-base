@@ -17,9 +17,9 @@
 package _break
 
 import (
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	"context"
 
-	"github.com/cloudwego/eino/compose"
 
 	"github.com/superagent-ai/superagent-base/backend/domain/workflow/entity"
 	"github.com/superagent-ai/superagent-base/backend/domain/workflow/entity/vo"
@@ -52,7 +52,7 @@ func (c *Config) Build(_ context.Context, _ *schema.NodeSchema, _ ...schema.Buil
 const BreakKey = "$break"
 
 func (b *Break) Invoke(ctx context.Context, _ map[string]any) (map[string]any, error) {
-	err := b.parentIntermediateStore.Set(ctx, compose.FieldPath{BreakKey}, true)
+	err := b.parentIntermediateStore.Set(ctx, einobridge.FieldPath{BreakKey}, true)
 	if err != nil {
 		return nil, err
 	}

@@ -17,13 +17,13 @@
 package database
 
 import (
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	"context"
 	"fmt"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/cloudwego/eino/compose"
 
 	database "github.com/superagent-ai/superagent-base/backend/crossdomain/database/model"
 	workflowModel "github.com/superagent-ai/superagent-base/backend/crossdomain/workflow/model"
@@ -357,7 +357,7 @@ func convertClauseGroupToConditionGroup(_ context.Context, clauseGroup *database
 	if clauseGroup.Single != nil {
 		clause := clauseGroup.Single
 		if !notNeedTakeMapValue(clause.Operator) {
-			rightValue, ok = nodes.TakeMapValue(input, compose.FieldPath{"__condition_right_0"})
+			rightValue, ok = nodes.TakeMapValue(input, einobridge.FieldPath{"__condition_right_0"})
 			if !ok {
 				return nil, fmt.Errorf("cannot take single clause from input")
 			}
@@ -378,7 +378,7 @@ func convertClauseGroupToConditionGroup(_ context.Context, clauseGroup *database
 		multiSelect := clauseGroup.Multi
 		for idx, clause := range multiSelect.Clauses {
 			if !notNeedTakeMapValue(clause.Operator) {
-				rightValue, ok = nodes.TakeMapValue(input, compose.FieldPath{fmt.Sprintf("__condition_right_%d", idx)})
+				rightValue, ok = nodes.TakeMapValue(input, einobridge.FieldPath{fmt.Sprintf("__condition_right_%d", idx)})
 				if !ok {
 					return nil, fmt.Errorf("cannot take multi clause from input")
 				}
