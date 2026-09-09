@@ -109,7 +109,7 @@ export interface ReloadResult {
 
 export const agentsApi = {
   async list(): Promise<Agent[]> {
-    const res = await fetch(`${API_BASE}/agents`, { headers: authHeaders() })
+    const res = await fetch(`${API_BASE}/agents`, { headers: authHeaders(), credentials: 'include' })
     handleAuthError(res)
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
     const data = await res.json()
@@ -119,7 +119,7 @@ export const agentsApi = {
 
 export const adminApi = {
   async getStatus(): Promise<AdminStatus> {
-    const res = await fetch(`${API_BASE}/admin/status`, { headers: authHeaders() })
+    const res = await fetch(`${API_BASE}/admin/status`, { headers: authHeaders(), credentials: 'include' })
     handleAuthError(res)
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
     return res.json()
@@ -129,6 +129,7 @@ export const adminApi = {
     const res = await fetch(`${API_BASE}/admin/reload`, {
       method: 'POST',
       headers: authHeaders(),
+      credentials: 'include',
     })
     handleAuthError(res)
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
@@ -146,13 +147,13 @@ export interface AgentDetail {
 
 export const agentAdminApi = {
   list: async (): Promise<{ agents: AgentDetail[] }> => {
-    const res = await fetch(`${API_BASE}/admin/agents`, { headers: authHeaders() })
+    const res = await fetch(`${API_BASE}/admin/agents`, { headers: authHeaders(), credentials: 'include' })
     handleAuthError(res)
     if (!res.ok) throw new Error(await res.text())
     return res.json()
   },
   get: async (name: string): Promise<{ agent: unknown; yaml: string }> => {
-    const res = await fetch(`${API_BASE}/admin/agents/${name}`, { headers: authHeaders() })
+    const res = await fetch(`${API_BASE}/admin/agents/${name}`, { headers: authHeaders(), credentials: 'include' })
     handleAuthError(res)
     if (!res.ok) throw new Error(await res.text())
     return res.json()
@@ -161,6 +162,7 @@ export const agentAdminApi = {
     const res = await fetch(`${API_BASE}/admin/agents`, {
       method: 'POST',
       headers: authHeaders(),
+      credentials: 'include',
       body: JSON.stringify({ yaml }),
     })
     handleAuthError(res)
@@ -171,6 +173,7 @@ export const agentAdminApi = {
     const res = await fetch(`${API_BASE}/admin/agents/${name}`, {
       method: 'PUT',
       headers: authHeaders(),
+      credentials: 'include',
       body: JSON.stringify({ yaml }),
     })
     handleAuthError(res)
@@ -181,6 +184,7 @@ export const agentAdminApi = {
     const res = await fetch(`${API_BASE}/admin/agents/${name}`, {
       method: 'DELETE',
       headers: authHeaders(),
+      credentials: 'include',
     })
     handleAuthError(res)
     if (!res.ok) throw new Error(await res.text())
@@ -190,6 +194,7 @@ export const agentAdminApi = {
     const res = await fetch(`${API_BASE}/admin/agents/validate`, {
       method: 'POST',
       headers: authHeaders(),
+      credentials: 'include',
       body: JSON.stringify({ yaml }),
     })
     handleAuthError(res)
@@ -221,13 +226,13 @@ export interface SkillInfo {
 
 export const skillsApi = {
   list: async (): Promise<{ skills: SkillInfo[] }> => {
-    const res = await fetch(`${API_BASE}/skills`, { headers: authHeaders() })
+    const res = await fetch(`${API_BASE}/skills`, { headers: authHeaders(), credentials: 'include' })
     handleAuthError(res)
     if (!res.ok) throw new Error('Failed to fetch skills')
     return res.json()
   },
   search: async (query: string): Promise<{ skills: SkillInfo[] }> => {
-    const res = await fetch(`${API_BASE}/skills/search?q=${encodeURIComponent(query)}`, { headers: authHeaders() })
+    const res = await fetch(`${API_BASE}/skills/search?q=${encodeURIComponent(query)}`, { headers: authHeaders(), credentials: 'include' })
     handleAuthError(res)
     if (!res.ok) throw new Error('Search failed')
     return res.json()
@@ -236,6 +241,7 @@ export const skillsApi = {
     const res = await fetch(`${API_BASE}/skills/install`, {
       method: 'POST',
       headers: authHeaders(),
+      credentials: 'include',
       body: JSON.stringify({ name, version }),
     })
     handleAuthError(res)
@@ -246,6 +252,7 @@ export const skillsApi = {
     const res = await fetch(`${API_BASE}/skills/${name}`, {
       method: 'DELETE',
       headers: authHeaders(),
+      credentials: 'include',
     })
     handleAuthError(res)
     if (!res.ok) throw new Error(await res.text())
@@ -294,7 +301,7 @@ export interface ModelRecord {
 
 export const modelConfigApi = {
   list: async (): Promise<ModelRecord[]> => {
-    const res = await fetch('/api/admin/config/model/list', { headers: authHeaders() })
+    const res = await fetch('/api/admin/config/model/list', { headers: authHeaders(), credentials: 'include' })
     handleAuthError(res)
     if (!res.ok) throw new Error('Failed to fetch models')
     const data = await res.json()
@@ -333,6 +340,7 @@ export const modelConfigApi = {
     const res = await fetch('/api/admin/config/model/create', {
       method: 'POST',
       headers: authHeaders(),
+      credentials: 'include',
       body: JSON.stringify(payload),
     })
     handleAuthError(res)
@@ -343,6 +351,7 @@ export const modelConfigApi = {
     const res = await fetch('/api/admin/config/model/delete', {
       method: 'POST',
       headers: authHeaders(),
+      credentials: 'include',
       body: JSON.stringify({ id: modelId }),
     })
     handleAuthError(res)
@@ -370,7 +379,7 @@ export interface McpConnectRequest {
 
 export const mcpAdminApi = {
   list: async (): Promise<McpServerItem[]> => {
-    const res = await fetch(`${API_BASE}/admin/mcp/servers`, { headers: authHeaders() })
+    const res = await fetch(`${API_BASE}/admin/mcp/servers`, { headers: authHeaders(), credentials: 'include' })
     handleAuthError(res)
     if (!res.ok) throw new Error('Failed to fetch MCP servers')
     const data = await res.json()
@@ -380,6 +389,7 @@ export const mcpAdminApi = {
     const res = await fetch(`${API_BASE}/admin/mcp/servers`, {
       method: 'POST',
       headers: authHeaders(),
+      credentials: 'include',
       body: JSON.stringify(req),
     })
     handleAuthError(res)
@@ -390,13 +400,14 @@ export const mcpAdminApi = {
     const res = await fetch(`${API_BASE}/admin/mcp/servers/${encodeURIComponent(name)}`, {
       method: 'DELETE',
       headers: authHeaders(),
+      credentials: 'include',
     })
     handleAuthError(res)
     if (!res.ok) throw new Error(await res.text())
     return res.json()
   },
   listTools: async (name: string): Promise<any[]> => {
-    const res = await fetch(`${API_BASE}/admin/mcp/servers/${encodeURIComponent(name)}/tools`, { headers: authHeaders() })
+    const res = await fetch(`${API_BASE}/admin/mcp/servers/${encodeURIComponent(name)}/tools`, { headers: authHeaders(), credentials: 'include' })
     handleAuthError(res)
     if (!res.ok) throw new Error(await res.text())
     const data = await res.json()
@@ -523,6 +534,7 @@ export const chatApi = {
         const res = await fetch(`${API_BASE}/chat/stream`, {
           method: 'POST',
           headers: { ...authHeaders(), 'X-A2UI': 'true' },
+        credentials: 'include',
           body: JSON.stringify({ agent_id: agentId, session_id: sessionId, message }),
           signal: controller.signal,
         })
@@ -557,6 +569,7 @@ export const chatApi = {
       await fetch(`${API_BASE}/chat/abort`, {
         method: 'POST',
         headers: authHeaders(),
+      credentials: 'include',
         body: JSON.stringify({ agent_id: agentId, session_id: sessionId }),
       })
     } catch {
@@ -581,6 +594,7 @@ export const chatApi = {
         const res = await fetch(`${API_BASE}/chat/resume`, {
           method: 'POST',
           headers: { ...authHeaders(), 'X-A2UI': 'true' },
+        credentials: 'include',
           body: JSON.stringify({ agent_id: agentId, session_id: sessionId, input }),
           signal: controller.signal,
         })
@@ -607,6 +621,7 @@ export const chatApi = {
     try {
       const res = await fetch(`${API_BASE}/chat/interrupt_state?agent_id=${encodeURIComponent(agentId)}&session_id=${encodeURIComponent(sessionId)}`, {
         headers: authHeaders(),
+      credentials: 'include',
       })
       if (!res.ok) return { interrupted: false }
       return res.json()
@@ -641,7 +656,7 @@ export interface GeneItem {
 
 export const evolutionApi = {
   async getStats(): Promise<EvolutionStats> {
-    const res = await fetch(`${API_BASE}/admin/evolution/stats`, { headers: authHeaders() })
+    const res = await fetch(`${API_BASE}/admin/evolution/stats`, { headers: authHeaders(), credentials: 'include' })
     handleAuthError(res)
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
     return res.json()
@@ -652,7 +667,7 @@ export const evolutionApi = {
     if (params?.q) qs.set('q', params.q)
     if (params?.min_confidence !== undefined) qs.set('min_confidence', String(params.min_confidence))
     if (params?.limit !== undefined) qs.set('limit', String(params.limit))
-    const res = await fetch(`${API_BASE}/admin/evolution/genes?${qs}`, { headers: authHeaders() })
+    const res = await fetch(`${API_BASE}/admin/evolution/genes?${qs}`, { headers: authHeaders(), credentials: 'include' })
     handleAuthError(res)
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
     return res.json()
@@ -660,7 +675,7 @@ export const evolutionApi = {
 
   async federatedSearch(q: string, minConfidence = 0.5, limit = 10): Promise<{ results: unknown[]; total: number }> {
     const qs = new URLSearchParams({ q, min_confidence: String(minConfidence), limit: String(limit) })
-    const res = await fetch(`${API_BASE}/admin/evolution/federated?${qs}`, { headers: authHeaders() })
+    const res = await fetch(`${API_BASE}/admin/evolution/federated?${qs}`, { headers: authHeaders(), credentials: 'include' })
     handleAuthError(res)
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
     return res.json()
