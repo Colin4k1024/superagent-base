@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-// Package eino provides an adapter that bridges eino's adk.ChatModelAgent
+// Package eino provides an adapter that bridges eino's einobridge.AdkChatModelAgent
 // and adk.Runner to the framework-agnostic pkg/agent.AgentRuntime interface.
 package eino
 
@@ -23,7 +23,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/cloudwego/eino/adk"
 	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 
 	"github.com/superagent-ai/superagent-base/backend/pkg/agent"
@@ -31,17 +30,17 @@ import (
 	einollm "github.com/superagent-ai/superagent-base/backend/pkg/llm/eino"
 )
 
-// AgentAdapter wraps an eino adk.ChatModelAgent as an agent.AgentRuntime.
+// AgentAdapter wraps an eino einobridge.AdkChatModelAgent as an agent.AgentRuntime.
 type AgentAdapter struct {
 	name        string
 	description string
-	agent       *adk.ChatModelAgent
-	store       adk.CheckPointStore
+	agent       *einobridge.AdkChatModelAgent
+	store       einobridge.AdkCheckPointStore
 }
 
 // NewAgentAdapter creates an agent.AgentRuntime from an eino ChatModelAgent.
 // store may be nil (no interrupt/resume persistence).
-func NewAgentAdapter(a *adk.ChatModelAgent, name, description string, store adk.CheckPointStore) *AgentAdapter {
+func NewAgentAdapter(a *einobridge.AdkChatModelAgent, name, description string, store einobridge.AdkCheckPointStore) *AgentAdapter {
 	return &AgentAdapter{
 		name:        name,
 		description: description,
@@ -57,7 +56,7 @@ func (a *AgentAdapter) Description() string { return a.description }
 func (a *AgentAdapter) Run(ctx context.Context, input *agent.AgentInput) (*agent.EventIterator, error) {
 	einoMsgs := einollm.ToEinoMessages(input.Messages)
 
-	iter := a.agent.Run(ctx, &adk.AgentInput{
+	iter := a.agent.Run(ctx, &einobridge.AdkAgentInput{
 		Messages:       einoMsgs,
 		EnableStreaming: input.EnableStreaming,
 	})
@@ -70,7 +69,7 @@ func (a *AgentAdapter) Resume(ctx context.Context, input *agent.ResumeInput) (*a
 	msgs := []*llm.Message{llm.UserMessage(input.UserMessage)}
 	einoMsgs := einollm.ToEinoMessages(msgs)
 
-	iter := a.agent.Run(ctx, &adk.AgentInput{
+	iter := a.agent.Run(ctx, &einobridge.AdkAgentInput{
 		Messages:       einoMsgs,
 		EnableStreaming: true,
 	})
@@ -78,8 +77,8 @@ func (a *AgentAdapter) Resume(ctx context.Context, input *agent.ResumeInput) (*a
 	return adaptIterator(iter), nil
 }
 
-// adaptIterator converts an eino adk.AsyncIterator to agent.EventIterator.
-func adaptIterator(iter *adk.AsyncIterator[*adk.AgentEvent]) *agent.EventIterator {
+// adaptIterator converts an eino einobridge.AdkAsyncIterator to agent.EventIterator.
+func adaptIterator(iter *einobridge.AdkAsyncIterator[*einobridge.AdkAgentEvent]) *agent.EventIterator {
 	return agent.NewEventIterator(
 		func() (*agent.AgentEvent, bool) {
 			event, ok := iter.Next()
@@ -92,8 +91,8 @@ func adaptIterator(iter *adk.AsyncIterator[*adk.AgentEvent]) *agent.EventIterato
 	)
 }
 
-// fromEinoEvent converts an eino adk.AgentEvent to agent.AgentEvent.
-func fromEinoEvent(event *adk.AgentEvent) *agent.AgentEvent {
+// fromEinoEvent converts an eino einobridge.AdkAgentEvent to agent.AgentEvent.
+func fromEinoEvent(event *einobridge.AdkAgentEvent) *agent.AgentEvent {
 	if event == nil {
 		return nil
 	}
@@ -149,7 +148,7 @@ func adaptMessageStream(stream *einobridge.StreamReader[*einobridge.Message]) *l
 }
 
 // drainIterator consumes remaining events to allow internal goroutines to exit.
-func drainIterator(iter *adk.AsyncIterator[*adk.AgentEvent]) {
+func drainIterator(iter *einobridge.AdkAsyncIterator[*einobridge.AdkAgentEvent]) {
 	go func() {
 		for {
 			if _, ok := iter.Next(); !ok {
