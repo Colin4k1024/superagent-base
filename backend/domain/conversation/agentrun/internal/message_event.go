@@ -26,7 +26,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cloudwego/eino/schema"
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	"github.com/mohae/deepcopy"
 
 	crossmessage "github.com/superagent-ai/superagent-base/backend/crossdomain/message"
@@ -78,29 +78,29 @@ func (e *Event) buildStreamDoneEvent() *entity.AgentRunResponse {
 	}
 }
 
-func (e *Event) SendRunEvent(runEvent entity.RunEvent, runItem *entity.ChunkRunItem, sw *schema.StreamWriter[*entity.AgentRunResponse]) {
+func (e *Event) SendRunEvent(runEvent entity.RunEvent, runItem *entity.ChunkRunItem, sw *einobridge.StreamWriter[*entity.AgentRunResponse]) {
 	resp := e.buildRunEvent(runEvent, runItem)
 	sw.Send(resp, nil)
 }
 
-func (e *Event) SendMsgEvent(runEvent entity.RunEvent, messageItem *entity.ChunkMessageItem, sw *schema.StreamWriter[*entity.AgentRunResponse]) {
+func (e *Event) SendMsgEvent(runEvent entity.RunEvent, messageItem *entity.ChunkMessageItem, sw *einobridge.StreamWriter[*entity.AgentRunResponse]) {
 	resp := e.buildMessageEvent(runEvent, messageItem)
 	sw.Send(resp, nil)
 }
 
-func (e *Event) SendErrEvent(runEvent entity.RunEvent, sw *schema.StreamWriter[*entity.AgentRunResponse], err *entity.RunError) {
+func (e *Event) SendErrEvent(runEvent entity.RunEvent, sw *einobridge.StreamWriter[*entity.AgentRunResponse], err *entity.RunError) {
 	resp := e.buildErrEvent(runEvent, err)
 	sw.Send(resp, nil)
 }
 
-func (e *Event) SendStreamDoneEvent(sw *schema.StreamWriter[*entity.AgentRunResponse]) {
+func (e *Event) SendStreamDoneEvent(sw *einobridge.StreamWriter[*entity.AgentRunResponse]) {
 	resp := e.buildStreamDoneEvent()
 	sw.Send(resp, nil)
 }
 
 type MessageEventHandler struct {
 	messageEvent *Event
-	sw           *schema.StreamWriter[*entity.AgentRunResponse]
+	sw           *einobridge.StreamWriter[*entity.AgentRunResponse]
 }
 
 func (mh *MessageEventHandler) handlerErr(_ context.Context, err error) {
@@ -239,8 +239,8 @@ func (mh *MessageEventHandler) handlerAnswer(ctx context.Context, msg *entity.Ch
 		msg.Ext[string(msgEntity.MessageExtKeyTimeCost)] = fmt.Sprintf("%.1f", float64(time.Since(rtDependence.GetStartTime()).Milliseconds())/1000.00)
 	}
 
-	buildModelContent := &schema.Message{
-		Role:    schema.Assistant,
+	buildModelContent := &einobridge.Message{
+		Role:    einobridge.Assistant,
 		Content: msg.Content,
 	}
 

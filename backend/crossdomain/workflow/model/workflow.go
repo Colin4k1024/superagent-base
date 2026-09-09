@@ -17,7 +17,7 @@
 package model
 
 import (
-	"github.com/cloudwego/eino/schema"
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 
 	"github.com/superagent-ai/superagent-base/backend/api/model/workflow"
 	crossmessage "github.com/superagent-ai/superagent-base/backend/crossdomain/message"
@@ -51,9 +51,9 @@ type ExecuteConfig struct {
 	RoundID                           *int64 // if workflow is chat flow, conversation round id is required
 	InitRoundID                       *int64 // if workflow is chat flow, init conversation round id is required
 	ConversationID                    *int64 // if workflow is chat flow, conversation id is required
-	UserMessage                       *schema.Message
+	UserMessage                       *einobridge.Message
 	ConversationHistory               []*crossmessage.WfMessage
-	ConversationHistorySchemaMessages []*schema.Message
+	ConversationHistorySchemaMessages []*einobridge.Message
 	SectionID                         *int64
 	MaxHistoryRounds                  *int32
 	InputFileFields                   map[string]*FileInfo

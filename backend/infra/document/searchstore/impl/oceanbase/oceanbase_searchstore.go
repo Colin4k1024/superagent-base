@@ -25,7 +25,7 @@ import (
 
 	"github.com/cloudwego/eino/components/indexer"
 	"github.com/cloudwego/eino/components/retriever"
-	"github.com/cloudwego/eino/schema"
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 
 	"github.com/superagent-ai/superagent-base/backend/infra/oceanbase"
 	"github.com/superagent-ai/superagent-base/backend/pkg/lang/ptr"
@@ -38,7 +38,7 @@ type oceanbaseSearchStore struct {
 	tableName      string
 }
 
-func (s *oceanbaseSearchStore) Store(ctx context.Context, docs []*schema.Document, opts ...indexer.Option) ([]string, error) {
+func (s *oceanbaseSearchStore) Store(ctx context.Context, docs []*einobridge.Document, opts ...indexer.Option) ([]string, error) {
 	if len(docs) == 0 {
 		return []string{}, nil
 	}
@@ -96,7 +96,7 @@ func (s *oceanbaseSearchStore) Store(ctx context.Context, docs []*schema.Documen
 	return ids, nil
 }
 
-func (s *oceanbaseSearchStore) Retrieve(ctx context.Context, query string, opts ...retriever.Option) ([]*schema.Document, error) {
+func (s *oceanbaseSearchStore) Retrieve(ctx context.Context, query string, opts ...retriever.Option) ([]*einobridge.Document, error) {
 	startTime := time.Now()
 	defer func() {
 		logs.CtxInfof(ctx, "Retrieve operation completed in %v", time.Since(startTime))
@@ -126,7 +126,7 @@ func (s *oceanbaseSearchStore) Retrieve(ctx context.Context, query string, opts 
 
 	logs.CtxInfof(ctx, "OceanBase returned %d results", len(results))
 
-	documents := make([]*schema.Document, 0, len(results))
+	documents := make([]*einobridge.Document, 0, len(results))
 	for _, result := range results {
 		metadata, err := JSONToMetadata(result.Metadata)
 		if err != nil {
@@ -134,7 +134,7 @@ func (s *oceanbaseSearchStore) Retrieve(ctx context.Context, query string, opts 
 			metadata = make(map[string]interface{})
 		}
 
-		doc := &schema.Document{
+		doc := &einobridge.Document{
 			ID:       result.VectorID,
 			Content:  result.Content,
 			MetaData: metadata,
@@ -317,7 +317,7 @@ func (s *oceanbaseSearchStore) deleteBatch(ctx context.Context, ids []string) er
 	return nil
 }
 
-func (s *oceanbaseSearchStore) normalizeScores(documents []*schema.Document) {
+func (s *oceanbaseSearchStore) normalizeScores(documents []*einobridge.Document) {
 	if len(documents) == 0 {
 		return
 	}

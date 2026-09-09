@@ -21,14 +21,14 @@ import (
 	"io"
 
 	"github.com/cloudwego/eino/components/document/parser"
-	"github.com/cloudwego/eino/schema"
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	"github.com/xuri/excelize/v2"
 
 	contract "github.com/superagent-ai/superagent-base/backend/infra/document/parser"
 )
 
 func ParseXLSX(config *contract.Config) ParseFn {
-	return func(ctx context.Context, reader io.Reader, opts ...parser.Option) (docs []*schema.Document, err error) {
+	return func(ctx context.Context, reader io.Reader, opts ...parser.Option) (docs []*einobridge.Document, err error) {
 		f, err := excelize.OpenReader(reader)
 		if err != nil {
 			return nil, err

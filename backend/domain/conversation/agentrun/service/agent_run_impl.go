@@ -21,7 +21,7 @@ import (
 	"runtime/debug"
 	"time"
 
-	"github.com/cloudwego/eino/schema"
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 
 	"github.com/superagent-ai/superagent-base/backend/domain/conversation/agentrun/entity"
 	"github.com/superagent-ai/superagent-base/backend/domain/conversation/agentrun/internal"
@@ -46,8 +46,8 @@ func NewService(c *Components) Run {
 	}
 }
 
-func (c *runImpl) AgentRun(ctx context.Context, arm *entity.AgentRunMeta) (*schema.StreamReader[*entity.AgentRunResponse], error) {
-	sr, sw := schema.Pipe[*entity.AgentRunResponse](20)
+func (c *runImpl) AgentRun(ctx context.Context, arm *entity.AgentRunMeta) (*einobridge.StreamReader[*entity.AgentRunResponse], error) {
+	sr, sw := einobridge.Pipe[*entity.AgentRunResponse](20)
 
 	defer func() {
 		if pe := recover(); pe != nil {

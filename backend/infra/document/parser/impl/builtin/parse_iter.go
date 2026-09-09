@@ -20,7 +20,7 @@ import (
 	"encoding/json"
 
 	"github.com/cloudwego/eino/components/document/parser"
-	"github.com/cloudwego/eino/schema"
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 
 	"github.com/superagent-ai/superagent-base/backend/infra/document"
 	contract "github.com/superagent-ai/superagent-base/backend/infra/document/parser"
@@ -31,7 +31,7 @@ type rowIterator interface {
 }
 
 func parseByRowIterator(iter rowIterator, config *contract.Config, opts ...parser.Option) (
-	docs []*schema.Document, err error) {
+	docs []*einobridge.Document, err error) {
 
 	ps := config.ParsingStrategy
 	options := parser.GetCommonOptions(&parser.Options{}, opts...)
@@ -132,7 +132,7 @@ func parseByRowIterator(iter rowIterator, config *contract.Config, opts ...parse
 
 	if len(expData) == 0 {
 		// return a special document with columns only if there is no data
-		doc := &schema.Document{
+		doc := &einobridge.Document{
 			MetaData: map[string]any{
 				document.MetaDataKeyColumns:     expColumns,
 				document.MetaDataKeyColumnsOnly: struct{}{},
@@ -141,7 +141,7 @@ func parseByRowIterator(iter rowIterator, config *contract.Config, opts ...parse
 		for k, v := range options.ExtraMeta {
 			doc.MetaData[k] = v
 		}
-		return []*schema.Document{doc}, nil
+		return []*einobridge.Document{doc}, nil
 	}
 
 	for j := range expData {
@@ -153,7 +153,7 @@ func parseByRowIterator(iter rowIterator, config *contract.Config, opts ...parse
 		if err != nil {
 			return nil, err
 		}
-		doc := &schema.Document{
+		doc := &einobridge.Document{
 			Content: string(b), // set for tables in text
 			MetaData: map[string]any{
 				document.MetaDataKeyColumns:    expColumns,

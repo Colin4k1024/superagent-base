@@ -25,7 +25,7 @@ import (
 	"time"
 
 	"github.com/apache/rocketmq-client-go/v2/primitive"
-	"github.com/cloudwego/eino/schema"
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 	"gorm.io/gorm"
@@ -552,6 +552,6 @@ type mockNL2SQL struct {
 	tableName string
 }
 
-func (m *mockNL2SQL) NL2SQL(ctx context.Context, messages []*schema.Message, tables []*document.TableSchema, opts ...nl2sql.Option) (sql string, err error) {
+func (m *mockNL2SQL) NL2SQL(ctx context.Context, messages []*einobridge.Message, tables []*document.TableSchema, opts ...nl2sql.Option) (sql string, err error) {
 	return fmt.Sprintf("select * from %s", m.tableName), nil
 }

@@ -24,7 +24,7 @@ import (
 	"strings"
 
 	"github.com/cloudwego/eino/adk"
-	"github.com/cloudwego/eino/schema"
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 
 	"github.com/superagent-ai/superagent-base/backend/pkg/agent"
 	"github.com/superagent-ai/superagent-base/backend/pkg/llm"
@@ -128,8 +128,8 @@ func fromEinoEvent(event *adk.AgentEvent) *agent.AgentEvent {
 	return result
 }
 
-// adaptMessageStream wraps an eino schema.StreamReader as llm.StreamReader.
-func adaptMessageStream(stream *schema.StreamReader[*schema.Message]) *llm.StreamReader {
+// adaptMessageStream wraps an eino einobridge.StreamReader as llm.StreamReader.
+func adaptMessageStream(stream *einobridge.StreamReader[*einobridge.Message]) *llm.StreamReader {
 	if stream == nil {
 		return nil
 	}

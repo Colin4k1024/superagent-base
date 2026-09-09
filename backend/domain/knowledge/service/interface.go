@@ -19,7 +19,7 @@ package service
 import (
 	"context"
 
-	"github.com/cloudwego/eino/schema"
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 
 	"github.com/superagent-ai/superagent-base/backend/bizpkg/llm/modelbuilder"
 	knowledge "github.com/superagent-ai/superagent-base/backend/crossdomain/knowledge/model"
@@ -207,7 +207,7 @@ type RetrieveContext struct {
 	Ctx              context.Context
 	OriginQuery      string                   // Original query
 	RewrittenQuery   *string                  // The rewritten query, if not rewritten, is nil, which will be added during execution
-	ChatHistory      []*schema.Message        // Nil if there is no dialogue history or no history is required
+	ChatHistory      []*einobridge.Message        // Nil if there is no dialogue history or no history is required
 	KnowledgeIDs     sets.Set[int64]          // The knowledge base ID involved in this search
 	KnowledgeInfoMap map[int64]*KnowledgeInfo // Mapping of Knowledge Base IDs to Document IDs
 	// recall strategy

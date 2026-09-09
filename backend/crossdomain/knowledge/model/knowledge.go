@@ -19,7 +19,7 @@ package model
 import (
 	"github.com/bytedance/sonic"
 
-	"github.com/cloudwego/eino/schema"
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 
 	"github.com/superagent-ai/superagent-base/backend/infra/document"
 	"github.com/superagent-ai/superagent-base/backend/infra/document/parser"
@@ -100,7 +100,7 @@ const (
 
 type RetrieveRequest struct {
 	Query       string
-	ChatHistory []*schema.Message
+	ChatHistory []*einobridge.Message
 
 	// Recall from the specified knowledge base and documentation
 	KnowledgeIDs []int64

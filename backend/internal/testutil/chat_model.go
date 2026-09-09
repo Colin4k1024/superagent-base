@@ -25,7 +25,7 @@ import (
 	"github.com/cloudwego/eino/callbacks"
 	"github.com/cloudwego/eino/components"
 	"github.com/cloudwego/eino/components/model"
-	"github.com/cloudwego/eino/schema"
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 
 	"github.com/superagent-ai/superagent-base/backend/api/model/admin/config"
 	"github.com/superagent-ai/superagent-base/backend/api/model/app/developer_api"
@@ -34,15 +34,15 @@ import (
 )
 
 type UTChatModel struct {
-	InvokeResultProvider func(index int, in []*schema.Message) (*schema.Message, error)
-	StreamResultProvider func(index int, in []*schema.Message) (*schema.StreamReader[*schema.Message], error)
+	InvokeResultProvider func(index int, in []*einobridge.Message) (*einobridge.Message, error)
+	StreamResultProvider func(index int, in []*einobridge.Message) (*einobridge.StreamReader[*einobridge.Message], error)
 	Modals               *developer_api.ModelAbility
 	Index                int
 	ModelType            string
 	mu                   sync.Mutex
 }
 
-func (q *UTChatModel) Generate(ctx context.Context, in []*schema.Message, _ ...model.Option) (*schema.Message, error) {
+func (q *UTChatModel) Generate(ctx context.Context, in []*einobridge.Message, _ ...model.Option) (*einobridge.Message, error) {
 	ctx = callbacks.EnsureRunInfo(ctx, "ut_chat_model", components.ComponentOfChatModel)
 	ctx = callbacks.OnStart(ctx, in)
 	defer func() {
@@ -88,7 +88,7 @@ func (q *UTChatModel) Generate(ctx context.Context, in []*schema.Message, _ ...m
 	return msg, nil
 }
 
-func (q *UTChatModel) Stream(ctx context.Context, in []*schema.Message, _ ...model.Option) (*schema.StreamReader[*schema.Message], error) {
+func (q *UTChatModel) Stream(ctx context.Context, in []*einobridge.Message, _ ...model.Option) (*einobridge.StreamReader[*einobridge.Message], error) {
 	ctx = callbacks.EnsureRunInfo(ctx, "ut_chat_model", components.ComponentOfChatModel)
 	ctx = callbacks.OnStart(ctx, in)
 	defer func() {
@@ -115,7 +115,7 @@ func (q *UTChatModel) Stream(ctx context.Context, in []*schema.Message, _ ...mod
 		return nil, err
 	}
 
-	callbackStream := schema.StreamReaderWithConvert(outS, func(t *schema.Message) (*model.CallbackOutput, error) {
+	callbackStream := einobridge.StreamReaderWithConvert(outS, func(t *einobridge.Message) (*model.CallbackOutput, error) {
 		callbackOut := &model.CallbackOutput{
 			Message: t,
 		}
@@ -134,12 +134,12 @@ func (q *UTChatModel) Stream(ctx context.Context, in []*schema.Message, _ ...mod
 		return callbackOut, nil
 	})
 	_, s := callbacks.OnEndWithStreamOutput(ctx, callbackStream)
-	return schema.StreamReaderWithConvert(s, func(t *model.CallbackOutput) (*schema.Message, error) {
+	return einobridge.StreamReaderWithConvert(s, func(t *model.CallbackOutput) (*einobridge.Message, error) {
 		return t.Message, nil
 	}), nil
 }
 
-func (q *UTChatModel) WithTools(tools []*schema.ToolInfo) (model.ToolCallingChatModel, error) {
+func (q *UTChatModel) WithTools(tools []*einobridge.ToolInfo) (model.ToolCallingChatModel, error) {
 	return q, nil
 }
 

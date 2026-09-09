@@ -1,4 +1,20 @@
 /*
+ * Copyright 2025 coze-dev Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+/*
  * Copyright 2025 superagent-ai Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -43,7 +59,7 @@ import (
 	"sync"
 
 	"github.com/cloudwego/eino/compose"
-	"github.com/cloudwego/eino/schema"
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 )
 
 // GraphFactory builds and compiles a single Eino graph runnable.
@@ -51,10 +67,10 @@ import (
 // agent build (at startup or hot-reload) and the result is cached for the
 // lifetime of the agent.
 //
-// The standard graph type is []*schema.Message → *schema.Message, which maps
+// The standard graph type is []*einobridge.Message → *einobridge.Message, which maps
 // naturally to the Agent.Chat interface.  Use CompileGraph to wrap the
 // *compose.Graph builder function Eino Dev generates.
-type GraphFactory func(ctx context.Context) (compose.Runnable[[]*schema.Message, *schema.Message], error)
+type GraphFactory func(ctx context.Context) (compose.Runnable[[]*einobridge.Message, *einobridge.Message], error)
 
 var (
 	mu       sync.RWMutex
@@ -98,16 +114,16 @@ func List() []string {
 // Usage:
 //
 //	// Eino Dev generated:
-//	func BuildMyFlow(ctx context.Context) (*compose.Graph[[]*schema.Message, *schema.Message], error) { ... }
+//	func BuildMyFlow(ctx context.Context) (*compose.Graph[[]*einobridge.Message, *einobridge.Message], error) { ... }
 //
 //	// Register it:
 //	func init() {
 //	    graphs.Register("my-flow", graphs.CompileGraph(BuildMyFlow))
 //	}
 func CompileGraph(
-	build func(ctx context.Context) (*compose.Graph[[]*schema.Message, *schema.Message], error),
+	build func(ctx context.Context) (*compose.Graph[[]*einobridge.Message, *einobridge.Message], error),
 ) GraphFactory {
-	return func(ctx context.Context) (compose.Runnable[[]*schema.Message, *schema.Message], error) {
+	return func(ctx context.Context) (compose.Runnable[[]*einobridge.Message, *einobridge.Message], error) {
 		g, err := build(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("graphs: build graph: %w", err)

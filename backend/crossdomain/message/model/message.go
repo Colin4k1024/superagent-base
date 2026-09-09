@@ -17,7 +17,7 @@
 package model
 
 import (
-	"github.com/cloudwego/eino/schema"
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 
 	"github.com/superagent-ai/superagent-base/backend/api/model/conversation/message"
 )
@@ -32,7 +32,7 @@ type Message struct {
 	MultiContent     []*InputMetaData        `json:"multi_content"`
 	ContentType      ContentType             `json:"content_type"`
 	DisplayContent   string                  `json:"display_content"`
-	Role             schema.RoleType         `json:"role"`
+	Role             einobridge.RoleType         `json:"role"`
 	Name             string                  `json:"name"`
 	Status           MessageStatus           `json:"status"`
 	MessageType      MessageType             `json:"message_type"`

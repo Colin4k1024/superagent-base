@@ -23,7 +23,7 @@ import (
 
 	"github.com/cloudwego/eino/components/prompt"
 	"github.com/cloudwego/eino/compose"
-	"github.com/cloudwego/eino/schema"
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 
 	"github.com/superagent-ai/superagent-base/backend/bizpkg/llm/modelbuilder"
 	"github.com/superagent-ai/superagent-base/backend/infra/document/messages2query"
@@ -38,7 +38,7 @@ type m2q struct {
 	tpl prompt.ChatTemplate
 }
 
-func (m *m2q) MessagesToQuery(ctx context.Context, messages []*schema.Message, opts ...messages2query.Option) (newQuery string, err error) {
+func (m *m2q) MessagesToQuery(ctx context.Context, messages []*einobridge.Message, opts ...messages2query.Option) (newQuery string, err error) {
 	o := &messages2query.Options{ChatModel: m.cm}
 	for _, opt := range opts {
 		opt(o)
@@ -48,8 +48,8 @@ func (m *m2q) MessagesToQuery(ctx context.Context, messages []*schema.Message, o
 		return "", fmt.Errorf("[MessagesToQuery] chat model not configured")
 	}
 
-	ch := compose.NewChain[[]*schema.Message, string]().
-		AppendLambda(compose.InvokableLambda(func(ctx context.Context, input []*schema.Message) (output map[string]any, err error) {
+	ch := compose.NewChain[[]*einobridge.Message, string]().
+		AppendLambda(compose.InvokableLambda(func(ctx context.Context, input []*einobridge.Message) (output map[string]any, err error) {
 			if len(input) == 0 {
 				return nil, fmt.Errorf("no input message")
 			}
@@ -62,7 +62,7 @@ func (m *m2q) MessagesToQuery(ctx context.Context, messages []*schema.Message, o
 		})).
 		AppendChatTemplate(m.tpl).
 		AppendChatModel(o.ChatModel).
-		AppendLambda(compose.InvokableLambda(func(ctx context.Context, input *schema.Message) (output string, err error) {
+		AppendLambda(compose.InvokableLambda(func(ctx context.Context, input *einobridge.Message) (output string, err error) {
 			return input.Content, nil
 		}))
 

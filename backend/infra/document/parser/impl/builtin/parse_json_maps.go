@@ -23,14 +23,14 @@ import (
 	"io"
 
 	"github.com/cloudwego/eino/components/document/parser"
-	"github.com/cloudwego/eino/schema"
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 
 	"github.com/superagent-ai/superagent-base/backend/infra/document"
 	contract "github.com/superagent-ai/superagent-base/backend/infra/document/parser"
 )
 
 func ParseJSONMaps(config *contract.Config) ParseFn {
-	return func(ctx context.Context, reader io.Reader, opts ...parser.Option) (docs []*schema.Document, err error) {
+	return func(ctx context.Context, reader io.Reader, opts ...parser.Option) (docs []*einobridge.Document, err error) {
 		b, err := io.ReadAll(reader)
 		if err != nil {
 			return nil, err

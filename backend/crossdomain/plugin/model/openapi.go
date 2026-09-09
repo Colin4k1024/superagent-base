@@ -23,7 +23,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/cloudwego/eino/schema"
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	"github.com/getkin/kin-openapi/openapi3"
 
 	"github.com/superagent-ai/superagent-base/backend/crossdomain/plugin/consts"
@@ -137,33 +137,33 @@ func (op *Openapi3Operation) Validate(ctx context.Context) (err error) {
 	return nil
 }
 
-func (op *Openapi3Operation) ToEinoSchemaParameterInfo(ctx context.Context) (map[string]*schema.ParameterInfo, error) {
-	convertType := func(openapiType string) schema.DataType {
+func (op *Openapi3Operation) ToEinoSchemaParameterInfo(ctx context.Context) (map[string]*einobridge.ParameterInfo, error) {
+	convertType := func(openapiType string) einobridge.DataType {
 		switch openapiType {
 		case openapi3.TypeString:
-			return schema.String
+			return einobridge.String
 		case openapi3.TypeInteger:
-			return schema.Integer
+			return einobridge.Integer
 		case openapi3.TypeObject:
-			return schema.Object
+			return einobridge.Object
 		case openapi3.TypeArray:
-			return schema.Array
+			return einobridge.Array
 		case openapi3.TypeBoolean:
-			return schema.Boolean
+			return einobridge.Boolean
 		case openapi3.TypeNumber:
-			return schema.Number
+			return einobridge.Number
 		default:
-			return schema.Null
+			return einobridge.Null
 		}
 	}
 
-	var convertReqBody func(sc *openapi3.Schema, isRequired bool) (*schema.ParameterInfo, error)
-	convertReqBody = func(sc *openapi3.Schema, isRequired bool) (*schema.ParameterInfo, error) {
+	var convertReqBody func(sc *openapi3.Schema, isRequired bool) (*einobridge.ParameterInfo, error)
+	convertReqBody = func(sc *openapi3.Schema, isRequired bool) (*einobridge.ParameterInfo, error) {
 		if disabledParam(sc) {
 			return nil, nil
 		}
 
-		paramInfo := &schema.ParameterInfo{
+		paramInfo := &einobridge.ParameterInfo{
 			Type:     convertType(sc.Type),
 			Desc:     sc.Description,
 			Required: isRequired,
@@ -175,7 +175,7 @@ func (op *Openapi3Operation) ToEinoSchemaParameterInfo(ctx context.Context) (map
 				return e, true
 			})
 
-			subParams := make(map[string]*schema.ParameterInfo, len(sc.Properties))
+			subParams := make(map[string]*einobridge.ParameterInfo, len(sc.Properties))
 			for paramName, prop := range sc.Properties {
 				subParam, err := convertReqBody(prop.Value, required[paramName])
 				if err != nil {
@@ -209,7 +209,7 @@ func (op *Openapi3Operation) ToEinoSchemaParameterInfo(ctx context.Context) (map
 		return paramInfo, nil
 	}
 
-	result := make(map[string]*schema.ParameterInfo)
+	result := make(map[string]*einobridge.ParameterInfo)
 
 	for _, prop := range op.Parameters {
 		paramVal := prop.Value
@@ -222,7 +222,7 @@ func (op *Openapi3Operation) ToEinoSchemaParameterInfo(ctx context.Context) (map
 			continue
 		}
 
-		paramInfo := &schema.ParameterInfo{
+		paramInfo := &einobridge.ParameterInfo{
 			Type:     convertType(schemaVal.Type),
 			Desc:     paramVal.Description,
 			Required: paramVal.Required,

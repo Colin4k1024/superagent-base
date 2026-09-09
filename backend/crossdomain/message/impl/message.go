@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/cloudwego/eino/schema"
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 
 	crossagentrun "github.com/superagent-ai/superagent-base/backend/crossdomain/agentrun"
 	crossmessage "github.com/superagent-ai/superagent-base/backend/crossdomain/message"
@@ -124,7 +124,7 @@ func (c *impl) GetMessagesByRunIDs(ctx context.Context, req *crossmessage.GetMes
 	// only returns messages of type user/assistant/system role type
 	messages := make([]*model.Message, 0, len(responseMessages))
 	for _, m := range responseMessages {
-		if m.Role == schema.User || m.Role == schema.System || m.Role == schema.Assistant {
+		if m.Role == einobridge.User || m.Role == einobridge.System || m.Role == einobridge.Assistant {
 			messages = append(messages, m)
 		}
 	}
@@ -174,7 +174,7 @@ func (c *impl) BatchCreate(ctx context.Context, msgs []*entity.Message) ([]*enti
 	return c.DomainSVC.BatchCreate(ctx, msgs)
 }
 
-func extractContentFromCard(content string) *schema.Message {
+func extractContentFromCard(content string) *einobridge.Message {
 	type inputCard struct {
 		CardType     int64             `json:"card_type"`
 		ContentType  int64             `json:"content_type"`
@@ -211,7 +211,7 @@ func extractContentFromCard(content string) *schema.Message {
 	}
 
 	if qaCard.QuestionCardData.Title != "" {
-		return &schema.Message{
+		return &einobridge.Message{
 			Content: qaCard.QuestionCardData.Title,
 		}
 	}
@@ -219,7 +219,7 @@ func extractContentFromCard(content string) *schema.Message {
 	return nil
 }
 
-func buildConvMessage(ctx context.Context, m *entity.Message, multiContent []schema.ChatMessagePart) (*crossmessage.WfMessage, error) {
+func buildConvMessage(ctx context.Context, m *entity.Message, multiContent []einobridge.ChatMessagePart) (*crossmessage.WfMessage, error) {
 	covMsg := &crossmessage.WfMessage{
 		ID:          m.ID,
 		Role:        m.Role,
@@ -236,12 +236,12 @@ func buildConvMessage(ctx context.Context, m *entity.Message, multiContent []sch
 	for _, part := range multiContent {
 		var err error
 		switch part.Type {
-		case schema.ChatMessagePartTypeText:
+		case einobridge.ChatMessagePartTypeText:
 			covMsg.MultiContent = append(covMsg.MultiContent, &crossmessage.Content{
 				Type: model.InputTypeText,
 				Text: ptr.Of(part.Text),
 			})
-		case schema.ChatMessagePartTypeImageURL:
+		case einobridge.ChatMessagePartTypeImageURL:
 			if part.ImageURL != nil {
 				part.ImageURL.URL, err = workflow.GetRepository().GetObjectUrl(ctx, part.ImageURL.URI)
 				if err != nil {
@@ -253,7 +253,7 @@ func buildConvMessage(ctx context.Context, m *entity.Message, multiContent []sch
 					Url:  ptr.Of(part.ImageURL.URL),
 				})
 			}
-		case schema.ChatMessagePartTypeFileURL:
+		case einobridge.ChatMessagePartTypeFileURL:
 			if part.FileURL != nil {
 				part.FileURL.URL, err = workflow.GetRepository().GetObjectUrl(ctx, part.FileURL.URI)
 				if err != nil {
@@ -265,7 +265,7 @@ func buildConvMessage(ctx context.Context, m *entity.Message, multiContent []sch
 					Url:  ptr.Of(part.FileURL.URL),
 				})
 			}
-		case schema.ChatMessagePartTypeAudioURL:
+		case einobridge.ChatMessagePartTypeAudioURL:
 			if part.AudioURL != nil {
 				part.AudioURL.URL, err = workflow.GetRepository().GetObjectUrl(ctx, part.AudioURL.URI)
 				if err != nil {
@@ -277,7 +277,7 @@ func buildConvMessage(ctx context.Context, m *entity.Message, multiContent []sch
 					Url:  ptr.Of(part.AudioURL.URL),
 				})
 			}
-		case schema.ChatMessagePartTypeVideoURL:
+		case einobridge.ChatMessagePartTypeVideoURL:
 			if part.VideoURL != nil {
 				part.VideoURL.URL, err = workflow.GetRepository().GetObjectUrl(ctx, part.VideoURL.URI)
 				if err != nil {
@@ -296,24 +296,24 @@ func buildConvMessage(ctx context.Context, m *entity.Message, multiContent []sch
 	return covMsg, nil
 }
 
-func convertToConvAndSchemaMessage(ctx context.Context, msgs []*entity.Message) ([]*crossmessage.WfMessage, []*schema.Message, error) {
-	messages := make([]*schema.Message, 0, len(msgs))
+func convertToConvAndSchemaMessage(ctx context.Context, msgs []*entity.Message) ([]*crossmessage.WfMessage, []*einobridge.Message, error) {
+	messages := make([]*einobridge.Message, 0, len(msgs))
 	convMessages := make([]*crossmessage.WfMessage, 0, len(msgs))
 
 	for _, m := range msgs {
-		var schemaMsg *schema.Message
+		var schemaMsg *einobridge.Message
 		var err error
 
 		if m.ContentType == model.ContentTypeCard {
 			schemaMsg = extractContentFromCard(m.Content)
 		} else {
-			schemaMsg = &schema.Message{}
+			schemaMsg = &einobridge.Message{}
 			if err = sonic.UnmarshalString(m.ModelContent, schemaMsg); err != nil {
 				return nil, nil, fmt.Errorf("failed to unmarshal message content: %w", err)
 			}
 		}
 
-		var multiContentForUI []schema.ChatMessagePart
+		var multiContentForUI []einobridge.ChatMessagePart
 		if schemaMsg != nil {
 			multiContentForUI = schemaMsg.MultiContent
 		}

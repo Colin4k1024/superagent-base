@@ -25,7 +25,7 @@ import (
 	"fmt"
 
 	"github.com/cloudwego/eino/components/model"
-	"github.com/cloudwego/eino/schema"
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 
 	"github.com/superagent-ai/superagent-base/backend/pkg/llm"
 )
@@ -76,16 +76,16 @@ func (a *ChatModelAdapter) Stream(ctx context.Context, msgs []*llm.Message) (*ll
 }
 
 // BindTools associates tool definitions with the model.
-// This adapter converts llm.Tool to eino schema.ToolInfo via ToolAdapter.Info,
+// This adapter converts llm.Tool to eino einobridge.ToolInfo via ToolAdapter.Info,
 // then calls eino's WithTools which returns a new model instance.
 func (a *ChatModelAdapter) BindTools(tools []llm.Tool) (llm.ChatModel, error) {
-	einoToolInfos := make([]*schema.ToolInfo, 0, len(tools))
+	einoToolInfos := make([]*einobridge.ToolInfo, 0, len(tools))
 	for _, t := range tools {
 		info, err := t.Info(context.Background())
 		if err != nil {
 			return nil, fmt.Errorf("eino adapter: bind tools: get info for %T: %w", t, err)
 		}
-		einoToolInfos = append(einoToolInfos, &schema.ToolInfo{
+		einoToolInfos = append(einoToolInfos, &einobridge.ToolInfo{
 			Name: info.Name,
 			Desc: info.Desc,
 		})
@@ -99,43 +99,43 @@ func (a *ChatModelAdapter) BindTools(tools []llm.Tool) (llm.ChatModel, error) {
 
 // --- Message conversion helpers ---
 
-// ToEinoMessages converts a slice of llm.Message to eino schema.Message.
-func ToEinoMessages(msgs []*llm.Message) []*schema.Message {
-	result := make([]*schema.Message, 0, len(msgs))
+// ToEinoMessages converts a slice of llm.Message to eino einobridge.Message.
+func ToEinoMessages(msgs []*llm.Message) []*einobridge.Message {
+	result := make([]*einobridge.Message, 0, len(msgs))
 	for _, m := range msgs {
 		result = append(result, toEinoMessage(m))
 	}
 	return result
 }
 
-// toEinoMessage converts a single llm.Message to eino schema.Message.
-func toEinoMessage(m *llm.Message) *schema.Message {
+// toEinoMessage converts a single llm.Message to eino einobridge.Message.
+func toEinoMessage(m *llm.Message) *einobridge.Message {
 	if m == nil {
 		return nil
 	}
 	switch m.Role {
 	case llm.RoleSystem:
-		return schema.SystemMessage(m.Content)
+		return einobridge.SystemMessage(m.Content)
 	case llm.RoleUser:
-		return schema.UserMessage(m.Content)
+		return einobridge.UserMessage(m.Content)
 	case llm.RoleAssistant:
-		var toolCalls []schema.ToolCall
+		var toolCalls []einobridge.ToolCall
 		for _, tc := range m.ToolCalls {
-			toolCalls = append(toolCalls, schema.ToolCall{
+			toolCalls = append(toolCalls, einobridge.ToolCall{
 				ID:       tc.ID,
-				Function: schema.FunctionCall{Name: tc.Name, Arguments: tc.ArgsJSON},
+				Function: einobridge.FunctionCall{Name: tc.Name, Arguments: tc.ArgsJSON},
 			})
 		}
-		return schema.AssistantMessage(m.Content, toolCalls)
+		return einobridge.AssistantMessage(m.Content, toolCalls)
 	case llm.RoleTool:
-		return schema.ToolMessage(m.Content, m.ToolCallID)
+		return einobridge.ToolMessage(m.Content, m.ToolCallID)
 	default:
-		return &schema.Message{Role: schema.RoleType(m.Role), Content: m.Content}
+		return &einobridge.Message{Role: einobridge.RoleType(m.Role), Content: m.Content}
 	}
 }
 
-// FromEinoMessage converts an eino schema.Message to llm.Message.
-func FromEinoMessage(m *schema.Message) *llm.Message {
+// FromEinoMessage converts an eino einobridge.Message to llm.Message.
+func FromEinoMessage(m *einobridge.Message) *llm.Message {
 	if m == nil {
 		return nil
 	}

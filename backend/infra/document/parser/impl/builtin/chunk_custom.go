@@ -23,7 +23,7 @@ import (
 	"strings"
 
 	"github.com/cloudwego/eino/components/document/parser"
-	"github.com/cloudwego/eino/schema"
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 
 	contract "github.com/superagent-ai/superagent-base/backend/infra/document/parser"
 )
@@ -34,7 +34,7 @@ var (
 	emailRegex = regexp.MustCompile(`[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}`)
 )
 
-func ChunkCustom(_ context.Context, text string, config *contract.Config, opts ...parser.Option) (docs []*schema.Document, err error) {
+func ChunkCustom(_ context.Context, text string, config *contract.Config, opts ...parser.Option) (docs []*einobridge.Document, err error) {
 	cs := config.ChunkingStrategy
 	if cs.Overlap >= cs.ChunkSize {
 		return nil, fmt.Errorf("[ChunkCustom] invalid param, overlap >= chunk_size")
@@ -65,7 +65,7 @@ func ChunkCustom(_ context.Context, text string, config *contract.Config, opts .
 		if len(buffer) == 0 {
 			return
 		}
-		doc := &schema.Document{
+		doc := &einobridge.Document{
 			Content:  string(buffer),
 			MetaData: map[string]any{},
 		}

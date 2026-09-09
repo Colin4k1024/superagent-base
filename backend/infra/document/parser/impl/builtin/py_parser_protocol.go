@@ -27,7 +27,7 @@ import (
 	"strings"
 
 	"github.com/cloudwego/eino/components/document/parser"
-	"github.com/cloudwego/eino/schema"
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 
 	"github.com/superagent-ai/superagent-base/backend/infra/document"
 	"github.com/superagent-ai/superagent-base/backend/infra/document/ocr"
@@ -74,7 +74,7 @@ func (p *pyPDFTableIterator) NextRow() (row []string, end bool, err error) {
 }
 
 func ParseByPython(config *contract.Config, storage storage.Storage, ocr ocr.OCR, pyPath, scriptPath string) ParseFn {
-	return func(ctx context.Context, reader io.Reader, opts ...parser.Option) (docs []*schema.Document, err error) {
+	return func(ctx context.Context, reader io.Reader, opts ...parser.Option) (docs []*einobridge.Document, err error) {
 		pr, pw, err := os.Pipe()
 		if err != nil {
 			return nil, fmt.Errorf("[ParseByPython] create rpipe failed, %w", err)
@@ -154,7 +154,7 @@ func ParseByPython(config *contract.Config, storage storage.Storage, ocr ocr.OCR
 				}
 
 				if i == len(result.Content)-1 || result.Content[i+1].Type != "text" {
-					doc := &schema.Document{
+					doc := &einobridge.Document{
 						Content:  label,
 						MetaData: map[string]any{},
 					}
@@ -197,7 +197,7 @@ func ParseByPython(config *contract.Config, storage storage.Storage, ocr ocr.OCR
 	}
 }
 
-func formatTablesInDocument(input []*schema.Document) (output []*schema.Document, err error) {
+func formatTablesInDocument(input []*einobridge.Document) (output []*einobridge.Document, err error) {
 	const (
 		maxSize              = 65535
 		tableStart, tableEnd = "<table>", "</table>"
@@ -205,14 +205,14 @@ func formatTablesInDocument(input []*schema.Document) (output []*schema.Document
 
 	var (
 		buffer   strings.Builder
-		firstDoc *schema.Document
+		firstDoc *einobridge.Document
 	)
 
 	endSize := len(tableEnd)
 	buffer.WriteString(tableStart)
 
 	push := func() {
-		newDoc := &schema.Document{
+		newDoc := &einobridge.Document{
 			Content:  buffer.String() + tableEnd,
 			MetaData: map[string]any{},
 		}

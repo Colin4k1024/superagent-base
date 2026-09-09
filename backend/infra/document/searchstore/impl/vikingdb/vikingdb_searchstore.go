@@ -25,7 +25,7 @@ import (
 
 	"github.com/cloudwego/eino/components/indexer"
 	"github.com/cloudwego/eino/components/retriever"
-	"github.com/cloudwego/eino/schema"
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	"github.com/volcengine/volc-sdk-golang/service/vikingdb"
 
 	"github.com/superagent-ai/superagent-base/backend/infra/document"
@@ -42,7 +42,7 @@ type vkSearchStore struct {
 	index      *vikingdb.Index
 }
 
-func (v *vkSearchStore) Store(ctx context.Context, docs []*schema.Document, opts ...indexer.Option) (ids []string, err error) {
+func (v *vkSearchStore) Store(ctx context.Context, docs []*einobridge.Document, opts ...indexer.Option) (ids []string, err error) {
 	if len(docs) == 0 {
 		return nil, nil
 	}
@@ -80,12 +80,12 @@ func (v *vkSearchStore) Store(ctx context.Context, docs []*schema.Document, opts
 		}
 	}
 
-	ids = slices.Transform(docs, func(a *schema.Document) string { return a.ID })
+	ids = slices.Transform(docs, func(a *einobridge.Document) string { return a.ID })
 
 	return
 }
 
-func (v *vkSearchStore) Retrieve(ctx context.Context, query string, opts ...retriever.Option) (docs []*schema.Document, err error) {
+func (v *vkSearchStore) Retrieve(ctx context.Context, query string, opts ...retriever.Option) (docs []*einobridge.Document, err error) {
 	indexClient := v.index
 	if indexClient == nil {
 		foundIndex := false
@@ -159,7 +159,7 @@ func (v *vkSearchStore) Delete(ctx context.Context, ids []string) error {
 	return nil
 }
 
-func (v *vkSearchStore) document2DataWithoutVector(doc *schema.Document) (data vikingdb.Data, err error) {
+func (v *vkSearchStore) document2DataWithoutVector(doc *einobridge.Document) (data vikingdb.Data, err error) {
 	creatorID, err := document.GetDocumentCreatorID(doc)
 	if err != nil {
 		return data, err
@@ -227,11 +227,11 @@ func (v *vkSearchStore) addEmbedding(ctx context.Context, rows []vikingdb.Data, 
 	return rows, nil
 }
 
-func (v *vkSearchStore) parseSearchResult(result []*vikingdb.Data) ([]*schema.Document, error) {
-	docs := make([]*schema.Document, 0, len(result))
+func (v *vkSearchStore) parseSearchResult(result []*vikingdb.Data) ([]*einobridge.Document, error) {
+	docs := make([]*einobridge.Document, 0, len(result))
 	for _, data := range result {
 		ext := make(map[string]any)
-		doc := document.WithDocumentExternalStorage(&schema.Document{MetaData: map[string]any{}}, ext).
+		doc := document.WithDocumentExternalStorage(&einobridge.Document{MetaData: map[string]any{}}, ext).
 			WithScore(data.Score)
 
 		for field, val := range data.Fields {

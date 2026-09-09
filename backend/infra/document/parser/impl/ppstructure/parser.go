@@ -28,7 +28,7 @@ import (
 	"strings"
 
 	"github.com/cloudwego/eino/components/document/parser"
-	"github.com/cloudwego/eino/schema"
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 
 	"github.com/superagent-ai/superagent-base/backend/infra/document/ocr"
 	contract "github.com/superagent-ai/superagent-base/backend/infra/document/parser"
@@ -99,7 +99,7 @@ type ppstructureMarkdown struct {
 	IsEnd   *bool             `json:"isEnd"`
 }
 
-func (p *ppstructureParser) Parse(ctx context.Context, reader io.Reader, opts ...parser.Option) (docs []*schema.Document, err error) {
+func (p *ppstructureParser) Parse(ctx context.Context, reader io.Reader, opts ...parser.Option) (docs []*einobridge.Document, err error) {
 	// TODO(Bobholamovic): Current chunking strategy is rather naive; we should
 	// implement a more sophisticated one that at least takes tables and text
 	// extracted from the images into consideration.
@@ -208,7 +208,7 @@ func (p *ppstructureParser) Parse(ctx context.Context, reader io.Reader, opts ..
 					label += strings.Join(texts, "\n")
 				}
 
-				doc := &schema.Document{
+				doc := &einobridge.Document{
 					Content:  label,
 					MetaData: map[string]any{},
 				}

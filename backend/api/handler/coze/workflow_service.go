@@ -26,7 +26,7 @@ import (
 	"net/url"
 	"strconv"
 
-	"github.com/cloudwego/eino/schema"
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/protocol/consts"
 	"github.com/cloudwego/hertz/pkg/protocol/sse"
@@ -945,7 +945,7 @@ func convertStreamRunData(msg *workflow.OpenAPIStreamRunFlowResponse) *streamRun
 	}
 }
 
-func sendStreamRunSSE(ctx context.Context, w *sse.Writer, sr *schema.StreamReader[*workflow.OpenAPIStreamRunFlowResponse]) {
+func sendStreamRunSSE(ctx context.Context, w *sse.Writer, sr *einobridge.StreamReader[*workflow.OpenAPIStreamRunFlowResponse]) {
 	defer func() {
 		_ = w.Close()
 		sr.Close()
@@ -1116,7 +1116,7 @@ func OpenAPIChatFlowRun(ctx context.Context, c *app.RequestContext) {
 
 }
 
-func sendChatFlowStreamRunSSE(ctx context.Context, w *sse.Writer, sr *schema.StreamReader[[]*workflow.ChatFlowRunResponse]) {
+func sendChatFlowStreamRunSSE(ctx context.Context, w *sse.Writer, sr *einobridge.StreamReader[[]*workflow.ChatFlowRunResponse]) {
 	defer func() {
 		_ = w.Close()
 		sr.Close()

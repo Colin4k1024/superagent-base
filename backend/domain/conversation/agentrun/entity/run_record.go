@@ -17,7 +17,7 @@
 package entity
 
 import (
-	"github.com/cloudwego/eino/schema"
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 
 	"github.com/superagent-ai/superagent-base/backend/api/model/conversation/common"
 	message2 "github.com/superagent-ai/superagent-base/backend/api/model/conversation/message"
@@ -129,7 +129,7 @@ type AgentRunMeta struct {
 }
 
 type AdditionalMessage struct {
-	Role        schema.RoleType          `json:"role"`
+	Role        einobridge.RoleType          `json:"role"`
 	Type        message.MessageType      `json:"type"`
 	Content     []*message.InputMetaData `json:"content"`
 	ContentType message.ContentType      `json:"content_type"`
@@ -156,19 +156,19 @@ type AgentRunResponse struct {
 type AgentRespEvent struct {
 	EventType message.MessageType `json:"event_type"`
 
-	ToolMidAnswer *schema.StreamReader[*schema.Message]
-	ToolAsAnswer  *schema.StreamReader[*schema.Message]
-	ModelAnswer   *schema.StreamReader[*schema.Message]
-	ToolsMessage  []*schema.Message
-	FuncCall      *schema.Message
-	Suggest       *schema.Message
-	Knowledge     []*schema.Document
+	ToolMidAnswer *einobridge.StreamReader[*einobridge.Message]
+	ToolAsAnswer  *einobridge.StreamReader[*einobridge.Message]
+	ModelAnswer   *einobridge.StreamReader[*einobridge.Message]
+	ToolsMessage  []*einobridge.Message
+	FuncCall      *einobridge.Message
+	Suggest       *einobridge.Message
+	Knowledge     []*einobridge.Document
 	Interrupt     *singleagent.InterruptInfo
 	Err           error
 }
 
 type ModelAnswerEvent struct {
-	Message *schema.Message
+	Message *einobridge.Message
 	Err     error
 }
 

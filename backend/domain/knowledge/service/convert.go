@@ -22,7 +22,7 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/cloudwego/eino/schema"
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 
 	knowledge "github.com/superagent-ai/superagent-base/backend/crossdomain/knowledge/model"
 	"github.com/superagent-ai/superagent-base/backend/domain/knowledge/entity"
@@ -36,9 +36,9 @@ const fieldNameDocumentID = "document_id"
 
 type fieldMappingFn func(doc *entity.Document, enableCompactTable bool) []*searchstore.Field
 
-type slice2DocumentFn func(ctx context.Context, slice *entity.Slice, columns []*entity.TableColumn, enableCompactTable bool) (*schema.Document, error)
+type slice2DocumentFn func(ctx context.Context, slice *entity.Slice, columns []*entity.TableColumn, enableCompactTable bool) (*einobridge.Document, error)
 
-type document2SliceFn func(doc *schema.Document, knowledgeID, documentID, creatorID int64) (*entity.Slice, error)
+type document2SliceFn func(doc *einobridge.Document, knowledgeID, documentID, creatorID int64) (*entity.Slice, error)
 
 var fMapping = map[knowledge.DocumentType]fieldMappingFn{
 	knowledge.DocumentTypeText: func(doc *entity.Document, enableCompactTable bool) []*searchstore.Field {
@@ -127,8 +127,8 @@ var fMapping = map[knowledge.DocumentType]fieldMappingFn{
 }
 
 var s2dMapping = map[knowledge.DocumentType]slice2DocumentFn{
-	knowledge.DocumentTypeText: func(ctx context.Context, slice *entity.Slice, columns []*entity.TableColumn, enableCompactTable bool) (doc *schema.Document, err error) {
-		doc = &schema.Document{
+	knowledge.DocumentTypeText: func(ctx context.Context, slice *entity.Slice, columns []*entity.TableColumn, enableCompactTable bool) (doc *einobridge.Document, err error) {
+		doc = &einobridge.Document{
 			ID:      strconv.FormatInt(slice.ID, 10),
 			Content: slice.GetSliceContent(),
 			MetaData: map[string]any{
@@ -141,12 +141,12 @@ var s2dMapping = map[knowledge.DocumentType]slice2DocumentFn{
 
 		return doc, nil
 	},
-	knowledge.DocumentTypeTable: func(ctx context.Context, slice *entity.Slice, columns []*entity.TableColumn, enableCompactTable bool) (doc *schema.Document, err error) {
+	knowledge.DocumentTypeTable: func(ctx context.Context, slice *entity.Slice, columns []*entity.TableColumn, enableCompactTable bool) (doc *einobridge.Document, err error) {
 		ext := map[string]any{
 			fieldNameDocumentID: slice.DocumentID,
 		}
 
-		doc = &schema.Document{
+		doc = &einobridge.Document{
 			ID:      strconv.FormatInt(slice.ID, 10),
 			Content: "",
 			MetaData: map[string]any{
@@ -188,8 +188,8 @@ var s2dMapping = map[knowledge.DocumentType]slice2DocumentFn{
 
 		return doc, nil
 	},
-	knowledge.DocumentTypeImage: func(ctx context.Context, slice *entity.Slice, columns []*entity.TableColumn, enableCompactTable bool) (*schema.Document, error) {
-		doc := &schema.Document{
+	knowledge.DocumentTypeImage: func(ctx context.Context, slice *entity.Slice, columns []*entity.TableColumn, enableCompactTable bool) (*einobridge.Document, error) {
+		doc := &einobridge.Document{
 			ID:      strconv.FormatInt(slice.ID, 10),
 			Content: slice.GetSliceContent(),
 			MetaData: map[string]any{
@@ -205,7 +205,7 @@ var s2dMapping = map[knowledge.DocumentType]slice2DocumentFn{
 }
 
 var d2sMapping = map[knowledge.DocumentType]document2SliceFn{
-	knowledge.DocumentTypeText: func(doc *schema.Document, knowledgeID, documentID, creatorID int64) (*entity.Slice, error) {
+	knowledge.DocumentTypeText: func(doc *einobridge.Document, knowledgeID, documentID, creatorID int64) (*entity.Slice, error) {
 		slice := &entity.Slice{
 			Info:        knowledge.Info{},
 			KnowledgeID: knowledgeID,
@@ -245,7 +245,7 @@ var d2sMapping = map[knowledge.DocumentType]document2SliceFn{
 
 		return slice, nil
 	},
-	knowledge.DocumentTypeTable: func(doc *schema.Document, knowledgeID, documentID, creatorID int64) (*entity.Slice, error) {
+	knowledge.DocumentTypeTable: func(doc *einobridge.Document, knowledgeID, documentID, creatorID int64) (*entity.Slice, error) {
 		// NOTICE: The original data source of table type needs to be checked in rdb
 		slice := &entity.Slice{
 			Info:        knowledge.Info{},
@@ -287,7 +287,7 @@ var d2sMapping = map[knowledge.DocumentType]document2SliceFn{
 
 		return slice, nil
 	},
-	knowledge.DocumentTypeImage: func(doc *schema.Document, knowledgeID, documentID, creatorID int64) (*entity.Slice, error) {
+	knowledge.DocumentTypeImage: func(doc *einobridge.Document, knowledgeID, documentID, creatorID int64) (*entity.Slice, error) {
 		slice := &entity.Slice{
 			Info:        knowledge.Info{},
 			KnowledgeID: knowledgeID,

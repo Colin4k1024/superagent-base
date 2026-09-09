@@ -29,7 +29,7 @@ import (
 	context "context"
 	reflect "reflect"
 
-	schema "github.com/cloudwego/eino/schema"
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	entity "github.com/superagent-ai/superagent-base/backend/domain/conversation/agentrun/entity"
 	gomock "go.uber.org/mock/gomock"
 )
@@ -59,10 +59,10 @@ func (m *MockRun) EXPECT() *MockRunMockRecorder {
 }
 
 // AgentRun mocks base method.
-func (m *MockRun) AgentRun(ctx context.Context, req *entity.AgentRunMeta) (*schema.StreamReader[*entity.AgentRunResponse], error) {
+func (m *MockRun) AgentRun(ctx context.Context, req *entity.AgentRunMeta) (*einobridge.StreamReader[*entity.AgentRunResponse], error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "AgentRun", ctx, req)
-	ret0, _ := ret[0].(*schema.StreamReader[*entity.AgentRunResponse])
+	ret0, _ := ret[0].(*einobridge.StreamReader[*entity.AgentRunResponse])
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }

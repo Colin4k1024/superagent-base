@@ -22,7 +22,7 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/cloudwego/eino/schema"
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 
@@ -185,7 +185,7 @@ func Test_toConversationMessage(t *testing.T) {
 			messageType: messageentity.MessageTypeQuestion,
 			setupMock:   func() {},
 			expected: &messageentity.Message{
-				Role:           schema.User,
+				Role:           einobridge.User,
 				ConversationID: cid,
 				AgentID:        bizID,
 				RunID:          roundID,
@@ -206,7 +206,7 @@ func Test_toConversationMessage(t *testing.T) {
 			messageType: messageentity.MessageTypeQuestion,
 			setupMock:   func() {},
 			expected: &messageentity.Message{
-				Role:           schema.User,
+				Role:           einobridge.User,
 				MessageType:    messageentity.MessageTypeQuestion,
 				ConversationID: cid,
 				AgentID:        bizID,
@@ -234,7 +234,7 @@ func Test_toConversationMessage(t *testing.T) {
 				}, nil)
 			},
 			expected: &messageentity.Message{
-				Role:           schema.User,
+				Role:           einobridge.User,
 				MessageType:    messageentity.MessageTypeQuestion,
 				ConversationID: cid,
 				AgentID:        bizID,
@@ -330,7 +330,7 @@ func Test_toSchemaMessage(t *testing.T) {
 		name      string
 		msg       *workflow.EnterMessage
 		setupMock func()
-		expected  *schema.Message
+		expected  *einobridge.Message
 		expectErr bool
 	}{
 		{
@@ -340,8 +340,8 @@ func Test_toSchemaMessage(t *testing.T) {
 				Content:     "hello",
 			},
 			setupMock: func() {},
-			expected: &schema.Message{
-				Role:    schema.User,
+			expected: &einobridge.Message{
+				Role:    einobridge.User,
 				Content: "hello",
 			},
 			expectErr: false,
@@ -353,10 +353,10 @@ func Test_toSchemaMessage(t *testing.T) {
 				Content:     `[{"type": "text", "text": "hello"}]`,
 			},
 			setupMock: func() {},
-			expected: &schema.Message{
-				Role: schema.User,
-				MultiContent: []schema.ChatMessagePart{
-					{Type: schema.ChatMessagePartTypeText, Text: "hello"},
+			expected: &einobridge.Message{
+				Role: einobridge.User,
+				MultiContent: []einobridge.ChatMessagePart{
+					{Type: einobridge.ChatMessagePartTypeText, Text: "hello"},
 				},
 			},
 			expectErr: false,
@@ -372,12 +372,12 @@ func Test_toSchemaMessage(t *testing.T) {
 					File: &uploadentity.File{Url: "https://example.com/image.png"},
 				}, nil)
 			},
-			expected: &schema.Message{
-				Role: schema.User,
-				MultiContent: []schema.ChatMessagePart{
+			expected: &einobridge.Message{
+				Role: einobridge.User,
+				MultiContent: []einobridge.ChatMessagePart{
 					{
-						Type:     schema.ChatMessagePartTypeImageURL,
-						ImageURL: &schema.ChatMessageImageURL{URL: "https://example.com/image.png"},
+						Type:     einobridge.ChatMessagePartTypeImageURL,
+						ImageURL: &einobridge.ChatMessageImageURL{URL: "https://example.com/image.png"},
 					},
 				},
 			},
@@ -394,12 +394,12 @@ func Test_toSchemaMessage(t *testing.T) {
 				mockUpload.EXPECT().GetFile(gomock.Any(), &service.GetFileRequest{ID: 2}).Return(&service.GetFileResponse{File: &uploadentity.File{Url: "https://example.com/audio"}}, nil)
 				mockUpload.EXPECT().GetFile(gomock.Any(), &service.GetFileRequest{ID: 3}).Return(&service.GetFileResponse{File: &uploadentity.File{Url: "https://example.com/video"}}, nil)
 			},
-			expected: &schema.Message{
-				Role: schema.User,
-				MultiContent: []schema.ChatMessagePart{
-					{Type: schema.ChatMessagePartTypeFileURL, FileURL: &schema.ChatMessageFileURL{URL: "https://example.com/file"}},
-					{Type: schema.ChatMessagePartTypeAudioURL, AudioURL: &schema.ChatMessageAudioURL{URL: "https://example.com/audio"}},
-					{Type: schema.ChatMessagePartTypeVideoURL, VideoURL: &schema.ChatMessageVideoURL{URL: "https://example.com/video"}},
+			expected: &einobridge.Message{
+				Role: einobridge.User,
+				MultiContent: []einobridge.ChatMessagePart{
+					{Type: einobridge.ChatMessagePartTypeFileURL, FileURL: &einobridge.ChatMessageFileURL{URL: "https://example.com/file"}},
+					{Type: einobridge.ChatMessagePartTypeAudioURL, AudioURL: &einobridge.ChatMessageAudioURL{URL: "https://example.com/audio"}},
+					{Type: einobridge.ChatMessagePartTypeVideoURL, VideoURL: &einobridge.ChatMessageVideoURL{URL: "https://example.com/video"}},
 				},
 			},
 			expectErr: false,
@@ -504,7 +504,7 @@ func Test_makeChatFlowHistoryMessages(t *testing.T) {
 			},
 			expected: []*messageentity.Message{
 				{
-					Role:           schema.User,
+					Role:           einobridge.User,
 					ConversationID: conversationID,
 					AgentID:        bizID,
 					RunID:          100,
@@ -528,7 +528,7 @@ func Test_makeChatFlowHistoryMessages(t *testing.T) {
 			},
 			expected: []*messageentity.Message{
 				{
-					Role:           schema.User,
+					Role:           einobridge.User,
 					ConversationID: conversationID,
 					AgentID:        bizID,
 					RunID:          100,
@@ -539,7 +539,7 @@ func Test_makeChatFlowHistoryMessages(t *testing.T) {
 					SectionID:      sectionID,
 				},
 				{
-					Role:           schema.User,
+					Role:           einobridge.User,
 					ConversationID: conversationID,
 					AgentID:        bizID,
 					RunID:          100,
