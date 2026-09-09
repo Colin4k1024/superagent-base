@@ -55,7 +55,7 @@ type NodePath = nativecompose.NodePath
 type StateModifier = func(ctx context.Context, path NodePath, state any) error
 type WorkflowAddInputOpt = nativecompose.NewGraphOption
 type WorkflowBranch = nativecompose.GraphBranch
-type WorkflowNode = nativecompose.Lambda
+type WorkflowNode = nativecompose.WorkflowNode
 type GraphCompileCallback = func(ctx context.Context, info any) error
 type GraphInfo = nativecompose.GraphInfo
 type GraphNodeInfo = nativecompose.GraphNodeInfo
@@ -105,7 +105,7 @@ var (
 // ---------------------------------------------------------------------------
 
 func NewWorkflow[I, O any](opts ...NewGraphOption) *Workflow[I, O] {
-	return nativecompose.NewWorkflow[I, O]()
+	return nativecompose.NewWorkflow[I, O](opts...)
 }
 
 func NewChain[I, O any](opts ...NewGraphOption) *Chain[I, O] {
