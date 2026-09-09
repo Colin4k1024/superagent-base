@@ -522,7 +522,7 @@ func (cg *compiledGraph) Stream(ctx context.Context, input any, opts ...wfcompos
 
 	// Execute the graph starting from the entry node
 	// For now, support linear execution: follow edges from entry to exit
-	result, err := cg.executeGraph(ctx, entryKeys[0], input)
+	result, err := cg.executeGraph(ctx, input)
 	if err != nil {
 		return nil, err
 	}
@@ -677,11 +677,11 @@ func (cg *compiledGraph) executeValue(ctx context.Context, input any) (any, erro
 	if len(entryKeys) == 0 {
 		return nil, fmt.Errorf("compose: no entry node")
 	}
-	return cg.executeGraph(ctx, entryKeys[0], input)
+	return cg.executeGraph(ctx, input)
 }
 
 // executeGraph runs the full DAG using BFS, handling branches and convergence.
-func (cg *compiledGraph) executeGraph(ctx context.Context, entryKey string, input any) (any, error) {
+func (cg *compiledGraph) executeGraph(ctx context.Context, input any) (any, error) {
 	// Create state once for the entire graph execution
 	if cg.genLocalState != nil {
 		state := cg.genLocalState(ctx)
@@ -704,24 +704,21 @@ func (cg *compiledGraph) executeGraph(ctx context.Context, entryKey string, inpu
 	nodeOutputs := make(map[string]any)
 	executed := make(map[string]bool)
 
-	// Execute entry node
-	output, err := cg.executeNode(ctx, entryKey, input)
-	if err != nil {
-		return nil, err
-	}
-	nodeOutputs[entryKey] = output
-	executed[entryKey] = true
-	cg.markExecuted(ctx, entryKey)
+	// Store raw input under START so field mappings with fromKey=START can resolve
+	nodeOutputs[START] = input
+	executed[START] = true
 
-	// BFS queue
+	// BFS queue: all nodes directly connected from START
 	queue := make([]string, 0)
-	for _, next := range cg.outEdges[entryKey] {
+	for _, next := range cg.outEdges[START] {
 		if next != END {
 			queue = append(queue, next)
 		}
 	}
 
-	var lastOutput any = output
+	var lastOutput any = input
+	var output any
+	var err error
 	maxIterations := 10000
 
 	for len(queue) > 0 && maxIterations > 0 {
@@ -869,6 +866,13 @@ func (cg *compiledGraph) executeGraph(ctx context.Context, entryKey string, inpu
 		}
 
 		queue = deferred
+	}
+
+	// If END has field mappings, resolve and return collected outputs
+	if cg.fieldMappings != nil {
+		if _, ok := cg.fieldMappings[END]; ok {
+			return cg.resolveAllInputs(END, nodeOutputs, inEdges), nil
+		}
 	}
 
 	// Return output of the node that connects to END

@@ -320,9 +320,11 @@ func (w *Workflow) Compile(ctx context.Context, opts ...einobridge.GraphCompileO
 		if w.entry == nil {
 			return nil, fmt.Errorf("entry node is not set")
 		}
-
 		w.entry.AddInput(einobridge.START)
 		w.End().AddInput(entity.ExitNodeKey)
+	} else if w.entry != nil {
+		// Inner workflow with explicit entry node: connect to START
+		w.entry.AddInput(einobridge.START)
 	}
 
 	return w.workflow.Compile(ctx, opts...)
