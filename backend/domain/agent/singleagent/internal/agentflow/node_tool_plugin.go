@@ -21,7 +21,6 @@ import (
 	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	"context"
 
-	"github.com/cloudwego/eino/components/tool"
 
 	"github.com/superagent-ai/superagent-base/backend/api/model/app/bot_common"
 	crossplugin "github.com/superagent-ai/superagent-base/backend/crossdomain/plugin"
@@ -42,7 +41,7 @@ type toolConfig struct {
 	conversationID int64
 }
 
-func newPluginTools(ctx context.Context, conf *toolConfig) ([]tool.InvokableTool, error) {
+func newPluginTools(ctx context.Context, conf *toolConfig) ([]einobridge.InvokableTool, error) {
 	req := &model.MGetAgentToolsRequest{
 		SpaceID: conf.spaceID,
 		AgentID: conf.agentIdentity.AgentID,
@@ -68,7 +67,7 @@ func newPluginTools(ctx context.Context, conf *toolConfig) ([]tool.InvokableTool
 		ConnectorID:    conf.agentIdentity.ConnectorID,
 	}
 
-	tools := make([]tool.InvokableTool, 0, len(agentTools))
+	tools := make([]einobridge.InvokableTool, 0, len(agentTools))
 	for _, ti := range agentTools {
 		tools = append(tools, &pluginInvokableTool{
 			userID:      conf.userID,
@@ -116,7 +115,7 @@ func (p *pluginInvokableTool) Info(ctx context.Context) (*einobridge.ToolInfo, e
 	}, nil
 }
 
-func (p *pluginInvokableTool) InvokableRun(ctx context.Context, argumentsInJSON string, _ ...tool.Option) (string, error) {
+func (p *pluginInvokableTool) InvokableRun(ctx context.Context, argumentsInJSON string, _ ...einobridge.ToolOption) (string, error) {
 	req := &model.ExecuteToolRequest{
 		UserID:          p.userID,
 		PluginID:        p.toolInfo.PluginID,

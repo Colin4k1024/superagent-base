@@ -18,10 +18,10 @@ package builtin
 
 import (
 	"bytes"
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	"context"
 	"testing"
 
-	"github.com/cloudwego/eino/components/document/parser"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/superagent-ai/superagent-base/backend/infra/document"
@@ -86,7 +86,7 @@ func TestParseTableCustomContent(t *testing.T) {
 	}
 
 	pfn := ParseJSONMaps(config)
-	docs, err := pfn(ctx, reader, parser.WithExtraMeta(map[string]any{
+	docs, err := pfn(ctx, reader, einobridge.WithExtraMeta(map[string]any{
 		"document_id":  int64(123),
 		"knowledge_id": int64(456),
 	}))

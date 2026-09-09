@@ -21,7 +21,6 @@ import (
 	"context"
 	"regexp"
 
-	"github.com/cloudwego/eino/components/prompt"
 	"github.com/cloudwego/eino/compose"
 	einoCompose "github.com/cloudwego/eino/compose"
 
@@ -75,7 +74,7 @@ func NewSuggester(chatModel modelbuilder.BaseChatModel) (workflow.Suggester, err
 			output["persona_input"] = *input.PersonaInput
 		}
 		return
-	})).AppendChatTemplate(prompt.FromMessages(einobridge.Jinja2, einobridge.SystemMessage(SUGGESTION_PROMPT))).AppendChatModel(chatModel,
+	})).AppendChatTemplate(einobridge.PromptFromMessages(einobridge.Jinja2, einobridge.SystemMessage(SUGGESTION_PROMPT))).AppendChatModel(chatModel,
 		compose.WithStatePreHandler(func(ctx context.Context, in []*einobridge.Message, state *state) ([]*einobridge.Message, error) {
 			return append(in, []*einobridge.Message{state.userMessage, state.answer}...), nil
 		})).AppendLambda(einoCompose.InvokableLambda(func(ctx context.Context, input *einobridge.Message) (output []string, err error) {

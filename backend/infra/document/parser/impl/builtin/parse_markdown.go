@@ -26,7 +26,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cloudwego/eino/components/document/parser"
 	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	"github.com/yuin/goldmark"
 	"github.com/yuin/goldmark/ast"
@@ -39,8 +38,8 @@ import (
 )
 
 func ParseMarkdown(config *contract.Config, storage storage.Storage, ocr ocr.OCR) ParseFn {
-	return func(ctx context.Context, reader io.Reader, opts ...parser.Option) (docs []*einobridge.Document, err error) {
-		options := parser.GetCommonOptions(&parser.Options{}, opts...)
+	return func(ctx context.Context, reader io.Reader, opts ...einobridge.ParserOption) (docs []*einobridge.Document, err error) {
+		options := einobridge.ParserGetCommonOptions(&einobridge.ParserOptions{}, opts...)
 		mdParser := goldmark.DefaultParser()
 		b, err := io.ReadAll(reader)
 		if err != nil {

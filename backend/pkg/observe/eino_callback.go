@@ -40,8 +40,6 @@ package observe
 import (
 	"context"
 
-	"github.com/cloudwego/eino/components"
-	"github.com/cloudwego/eino/components/model"
 	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 )
 
@@ -70,9 +68,9 @@ func NewEinoObserveCallback() einobridge.Handler {
 func einoToACLRunInfo(info *einobridge.RunInfo) CallbackRunInfo {
 	comp := ComponentOther
 	switch info.Component {
-	case components.ComponentOfChatModel:
+	case einobridge.ComponentOfChatModel:
 		comp = ComponentChatModel
-	case components.ComponentOfTool:
+	case einobridge.ComponentOfTool:
 		comp = ComponentTool
 	}
 	return CallbackRunInfo{Component: comp, Name: info.Name}
@@ -80,7 +78,7 @@ func einoToACLRunInfo(info *einobridge.RunInfo) CallbackRunInfo {
 
 // einoToACLInput converts eino's einobridge.CallbackInput to the ACL CallbackInput.
 func einoToACLInput(input einobridge.CallbackInput) CallbackInput {
-	cbIn := model.ConvCallbackInput(input)
+	cbIn := einobridge.ModelConvCallbackInput(input)
 	if cbIn != nil && cbIn.Messages != nil {
 		msgs := make([]*einoMsg, len(cbIn.Messages))
 		for i, m := range cbIn.Messages {
@@ -93,7 +91,7 @@ func einoToACLInput(input einobridge.CallbackInput) CallbackInput {
 
 // einoToACLOutput converts eino's einobridge.CallbackOutput to the ACL CallbackOutput.
 func einoToACLOutput(output einobridge.CallbackOutput) CallbackOutput {
-	cbOut := model.ConvCallbackOutput(output)
+	cbOut := einobridge.ModelConvCallbackOutput(output)
 	if cbOut != nil && cbOut.Message != nil {
 		out := CallbackOutput{Raw: output}
 		if cbOut.Message.ResponseMeta != nil && cbOut.Message.ResponseMeta.Usage != nil {
@@ -126,7 +124,7 @@ func (c *EinoObserveCallback) OnEndWithStream(ctx context.Context, info *einobri
 				if err != nil {
 					break
 				}
-				cbOut := model.ConvCallbackOutput(chunk)
+				cbOut := einobridge.ModelConvCallbackOutput(chunk)
 				if cbOut != nil && cbOut.Message != nil {
 					if cbOut.Message.ResponseMeta != nil && cbOut.Message.ResponseMeta.Usage != nil {
 						promptTokens = cbOut.Message.ResponseMeta.Usage.PromptTokens

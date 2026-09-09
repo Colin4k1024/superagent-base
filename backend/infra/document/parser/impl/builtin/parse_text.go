@@ -21,14 +21,13 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/cloudwego/eino/components/document/parser"
 	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 
 	contract "github.com/superagent-ai/superagent-base/backend/infra/document/parser"
 )
 
 func ParseText(config *contract.Config) ParseFn {
-	return func(ctx context.Context, reader io.Reader, opts ...parser.Option) (docs []*einobridge.Document, err error) {
+	return func(ctx context.Context, reader io.Reader, opts ...einobridge.ParserOption) (docs []*einobridge.Document, err error) {
 		content, err := io.ReadAll(reader)
 		if err != nil {
 			return nil, err

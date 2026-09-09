@@ -22,7 +22,6 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/cloudwego/eino/components/document/parser"
 	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 
 	"github.com/superagent-ai/superagent-base/backend/bizpkg/llm/modelbuilder"
@@ -32,8 +31,8 @@ import (
 )
 
 func ParseImage(config *contract.Config, model modelbuilder.BaseChatModel) ParseFn {
-	return func(ctx context.Context, reader io.Reader, opts ...parser.Option) (docs []*einobridge.Document, err error) {
-		options := parser.GetCommonOptions(&parser.Options{}, opts...)
+	return func(ctx context.Context, reader io.Reader, opts ...einobridge.ParserOption) (docs []*einobridge.Document, err error) {
+		options := einobridge.ParserGetCommonOptions(&einobridge.ParserOptions{}, opts...)
 		doc := &einobridge.Document{
 			MetaData: map[string]any{},
 		}

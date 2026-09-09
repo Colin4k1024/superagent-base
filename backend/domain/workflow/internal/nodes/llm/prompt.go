@@ -21,7 +21,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/cloudwego/eino/components/prompt"
 
 	"github.com/superagent-ai/superagent-base/backend/api/model/app/developer_api"
 	"github.com/superagent-ai/superagent-base/backend/api/model/workflow"
@@ -352,7 +351,7 @@ func transformMessagePart(part einobridge.ChatMessagePart, supportedModals *deve
 	return part
 }
 
-func (p *prompts) Format(ctx context.Context, vs map[string]any, _ ...prompt.Option) (
+func (p *prompts) Format(ctx context.Context, vs map[string]any, _ ...einobridge.PromptOption) (
 	_ []*einobridge.Message, err error,
 ) {
 	exeCtx := execute.GetExeCtx(ctx)
@@ -397,7 +396,7 @@ func (p *prompts) Format(ctx context.Context, vs map[string]any, _ ...prompt.Opt
 	return []*einobridge.Message{systemMsg, userMsg}, nil
 }
 
-func (p *promptsWithChatHistory) Format(ctx context.Context, vs map[string]any, _ ...prompt.Option) (
+func (p *promptsWithChatHistory) Format(ctx context.Context, vs map[string]any, _ ...einobridge.PromptOption) (
 	[]*einobridge.Message, error) {
 	baseMessages, err := p.prompts.Format(ctx, vs)
 	if err != nil {

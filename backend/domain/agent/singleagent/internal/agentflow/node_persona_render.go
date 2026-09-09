@@ -21,7 +21,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/cloudwego/eino/components/prompt"
 
 	"github.com/superagent-ai/superagent-base/backend/pkg/lang/maps"
 )
@@ -50,7 +49,7 @@ func (p *personaRender) RenderPersona(ctx context.Context, req *AgentRequest) (p
 		variables[name] = ""
 	}
 
-	msgs, err := prompt.FromMessages(einobridge.Jinja2, einobridge.UserMessage(p.persona)).Format(ctx, maps.ToAnyValue(variables))
+	msgs, err := einobridge.PromptFromMessages(einobridge.Jinja2, einobridge.UserMessage(p.persona)).Format(ctx, maps.ToAnyValue(variables))
 	if err != nil {
 		return "", fmt.Errorf("render persona failed, err=%w", err)
 	}

@@ -29,7 +29,6 @@ import (
 
 	"github.com/superagent-ai/superagent-base/backend/pkg/sonic"
 
-	"github.com/cloudwego/eino/components/tool"
 	"github.com/cloudwego/eino/compose"
 
 	workflowModel "github.com/superagent-ai/superagent-base/backend/crossdomain/workflow/model"
@@ -1218,7 +1217,7 @@ const (
 )
 
 func (t *ToolHandler) OnStart(ctx context.Context, info *einobridge.RunInfo,
-	input *tool.CallbackInput,
+	input *einobridge.ToolCallbackInput,
 ) context.Context {
 	if info.Name != t.info.Name {
 		return ctx
@@ -1268,7 +1267,7 @@ func (t *ToolHandler) OnStart(ctx context.Context, info *einobridge.RunInfo,
 }
 
 func (t *ToolHandler) OnEnd(ctx context.Context, info *einobridge.RunInfo,
-	output *tool.CallbackOutput,
+	output *einobridge.ToolCallbackOutput,
 ) context.Context {
 	if info.Name != t.info.Name {
 		return ctx
@@ -1300,7 +1299,7 @@ func (t *ToolHandler) OnEnd(ctx context.Context, info *einobridge.RunInfo,
 }
 
 func (t *ToolHandler) OnEndWithStreamOutput(ctx context.Context, info *einobridge.RunInfo,
-	output *einobridge.StreamReader[*tool.CallbackOutput],
+	output *einobridge.StreamReader[*einobridge.ToolCallbackOutput],
 ) context.Context {
 	if info.Name != t.info.Name {
 		output.Close()

@@ -18,9 +18,9 @@ package modelbuilder
 
 import (
 	"context"
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	"fmt"
 
-	"github.com/cloudwego/eino/components/model"
 
 	"github.com/superagent-ai/superagent-base/backend/api/model/admin/config"
 	"github.com/superagent-ai/superagent-base/backend/api/model/app/bot_common"
@@ -31,9 +31,9 @@ import (
 	"github.com/superagent-ai/superagent-base/backend/pkg/logs"
 )
 
-type BaseChatModel = model.BaseChatModel
+type BaseChatModel = einobridge.BaseChatModel
 
-type ToolCallingChatModel = model.ToolCallingChatModel
+type ToolCallingChatModel = einobridge.ToolCallingChatModel
 
 type Service interface {
 	Build(ctx context.Context, params *LLMParams) (ToolCallingChatModel, error)

@@ -18,7 +18,6 @@ package execute
 
 import (
 	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
-	"github.com/cloudwego/eino/components/tool"
 	"github.com/cloudwego/eino/compose"
 
 	workflowModel "github.com/superagent-ai/superagent-base/backend/crossdomain/workflow/model"
@@ -32,37 +31,37 @@ type workflowToolOption struct {
 	toolCallID2ExecuteID map[string]int64
 }
 
-func WithResume(req *entity.ResumeRequest, all map[string]int64) tool.Option {
-	return tool.WrapImplSpecificOptFn(func(opts *workflowToolOption) {
+func WithResume(req *entity.ResumeRequest, all map[string]int64) einobridge.ToolOption {
+	return einobridge.ToolWrapImplSpecificOptFn(func(opts *workflowToolOption) {
 		opts.resumeReq = req
 		opts.toolCallID2ExecuteID = all
 	})
 }
 
-func WithParentStreamContainer(sc *StreamContainer) tool.Option {
-	return tool.WrapImplSpecificOptFn(func(opts *workflowToolOption) {
+func WithParentStreamContainer(sc *StreamContainer) einobridge.ToolOption {
+	return einobridge.ToolWrapImplSpecificOptFn(func(opts *workflowToolOption) {
 		opts.streamContainer = sc
 	})
 }
 
-func WithExecuteConfig(cfg workflowModel.ExecuteConfig) tool.Option {
-	return tool.WrapImplSpecificOptFn(func(opts *workflowToolOption) {
+func WithExecuteConfig(cfg workflowModel.ExecuteConfig) einobridge.ToolOption {
+	return einobridge.ToolWrapImplSpecificOptFn(func(opts *workflowToolOption) {
 		opts.exeCfg = cfg
 	})
 }
 
-func GetResumeRequest(opts ...tool.Option) (*entity.ResumeRequest, map[string]int64) {
-	opt := tool.GetImplSpecificOptions(&workflowToolOption{}, opts...)
+func GetResumeRequest(opts ...einobridge.ToolOption) (*entity.ResumeRequest, map[string]int64) {
+	opt := einobridge.ToolGetImplSpecificOptions(&workflowToolOption{}, opts...)
 	return opt.resumeReq, opt.toolCallID2ExecuteID
 }
 
-func GetParentStreamContainer(opts ...tool.Option) *StreamContainer {
-	opt := tool.GetImplSpecificOptions(&workflowToolOption{}, opts...)
+func GetParentStreamContainer(opts ...einobridge.ToolOption) *StreamContainer {
+	opt := einobridge.ToolGetImplSpecificOptions(&workflowToolOption{}, opts...)
 	return opt.streamContainer
 }
 
-func GetExecuteConfig(opts ...tool.Option) workflowModel.ExecuteConfig {
-	opt := tool.GetImplSpecificOptions(&workflowToolOption{}, opts...)
+func GetExecuteConfig(opts ...einobridge.ToolOption) workflowModel.ExecuteConfig {
+	opt := einobridge.ToolGetImplSpecificOptions(&workflowToolOption{}, opts...)
 	return opt.exeCfg
 }
 

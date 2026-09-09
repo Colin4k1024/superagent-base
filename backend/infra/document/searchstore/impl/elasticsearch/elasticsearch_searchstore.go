@@ -24,8 +24,6 @@ import (
 	"reflect"
 	"strconv"
 
-	"github.com/cloudwego/eino/components/indexer"
-	"github.com/cloudwego/eino/components/retriever"
 	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 
 	"github.com/superagent-ai/superagent-base/backend/infra/document"
@@ -39,8 +37,8 @@ type esSearchStore struct {
 	indexName string
 }
 
-func (e *esSearchStore) Store(ctx context.Context, docs []*einobridge.Document, opts ...indexer.Option) (ids []string, err error) {
-	implSpecOptions := indexer.GetImplSpecificOptions(&searchstore.IndexerOptions{}, opts...)
+func (e *esSearchStore) Store(ctx context.Context, docs []*einobridge.Document, opts ...einobridge.IndexerOption) (ids []string, err error) {
+	implSpecOptions := einobridge.IndexerGetImplSpecificOptions(&searchstore.IndexerOptions{}, opts...)
 	defer func() {
 		if err != nil {
 			if implSpecOptions.ProgressBar != nil {
@@ -88,13 +86,13 @@ func (e *esSearchStore) Store(ctx context.Context, docs []*einobridge.Document, 
 	return ids, nil
 }
 
-func (e *esSearchStore) Retrieve(ctx context.Context, query string, opts ...retriever.Option) ([]*einobridge.Document, error) {
+func (e *esSearchStore) Retrieve(ctx context.Context, query string, opts ...einobridge.RetrieverOption) ([]*einobridge.Document, error) {
 	var (
 		cli   = e.config.Client
 		index = e.indexName
 
-		options         = retriever.GetCommonOptions(&retriever.Options{TopK: ptr.Of(topK)}, opts...)
-		implSpecOptions = retriever.GetImplSpecificOptions(&searchstore.RetrieverOptions{}, opts...)
+		options         = einobridge.RetrieverGetCommonOptions(&einobridge.RetrieverOptions{TopK: ptr.Of(topK)}, opts...)
+		implSpecOptions = einobridge.RetrieverGetImplSpecificOptions(&searchstore.RetrieverOptions{}, opts...)
 		req             = &es.Request{
 			Query: &es.Query{
 				Bool: &es.BoolQuery{},

@@ -171,3 +171,91 @@ func WithSchemaModifier(modifier SchemaModifierFn) ToolUtilsOption {
 func InferTool[T, D any](toolName, toolDesc string, i toolutils.InvokeFunc[T, D], opts ...ToolUtilsOption) (tool.InvokableTool, error) {
 	return toolutils.InferTool[T, D](toolName, toolDesc, i, opts...)
 }
+
+// ---------------------------------------------------------------------------
+// Generic function wrappers for tool package
+// ---------------------------------------------------------------------------
+
+func ToolGetImplSpecificOptions[T any](base *T, opts ...ToolOption) *T {
+	return tool.GetImplSpecificOptions[T](base, opts...)
+}
+
+func ToolWrapImplSpecificOptFn[T any](optFn func(*T)) ToolOption {
+	return tool.WrapImplSpecificOptFn[T](optFn)
+}
+
+// ---------------------------------------------------------------------------
+// Generic function wrappers for retriever package
+// ---------------------------------------------------------------------------
+
+func RetrieverGetImplSpecificOptions[T any](base *T, opts ...RetrieverOption) *T {
+	return retriever.GetImplSpecificOptions[T](base, opts...)
+}
+
+func RetrieverGetCommonOptions(base *RetrieverOptions, opts ...RetrieverOption) *RetrieverOptions {
+	return retriever.GetCommonOptions(base, opts...)
+}
+
+func RetrieverWrapImplSpecificOptFn[T any](optFn func(*T)) RetrieverOption {
+	return retriever.WrapImplSpecificOptFn[T](optFn)
+}
+
+// ---------------------------------------------------------------------------
+// Generic function wrappers for indexer package
+// ---------------------------------------------------------------------------
+
+func IndexerGetImplSpecificOptions[T any](base *T, opts ...IndexerOption) *T {
+	return indexer.GetImplSpecificOptions[T](base, opts...)
+}
+
+func IndexerWrapImplSpecificOptFn[T any](optFn func(*T)) IndexerOption {
+	return indexer.WrapImplSpecificOptFn[T](optFn)
+}
+
+// ---------------------------------------------------------------------------
+// Generic function wrappers for embedding package
+// ---------------------------------------------------------------------------
+
+func EmbeddingGetImplSpecificOptions[T any](base *T, opts ...EmbeddingOption) *T {
+	return embedding.GetImplSpecificOptions[T](base, opts...)
+}
+
+// ---------------------------------------------------------------------------
+// Generic function wrappers for parser package
+// ---------------------------------------------------------------------------
+
+func ParserGetCommonOptions(base *ParserOptions, opts ...ParserOption) *ParserOptions {
+	return parser.GetCommonOptions(base, opts...)
+}
+
+func ParserGetImplSpecificOptions[T any](base *T, opts ...ParserOption) *T {
+	return parser.GetImplSpecificOptions[T](base, opts...)
+}
+
+// ---------------------------------------------------------------------------
+// Additional wrappers for document parser
+// ---------------------------------------------------------------------------
+
+const MetaKeySource = parser.MetaKeySource
+
+type ExtParser = parser.ExtParser
+type ExtParserConfig = parser.ExtParserConfig
+type TextParser = parser.TextParser
+
+// RetrieverConvCallbackOutput converts a callback output to a retriever callback output.
+func RetrieverConvCallbackOutput(src CallbackOutput) *retriever.CallbackOutput {
+	return retriever.ConvCallbackOutput(src)
+}
+
+func RetrieverConvCallbackInput(src CallbackInput) *retriever.CallbackInput {
+	return retriever.ConvCallbackInput(src)
+}
+
+// EmbeddingConvCallbackOutput converts a callback output to an embedding callback output.
+func EmbeddingConvCallbackOutput(src CallbackOutput) *embedding.CallbackOutput {
+	return embedding.ConvCallbackOutput(src)
+}
+
+func EmbeddingConvCallbackInput(src CallbackInput) *embedding.CallbackInput {
+	return embedding.ConvCallbackInput(src)
+}

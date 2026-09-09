@@ -22,7 +22,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/cloudwego/eino/components/prompt"
 
 	"github.com/superagent-ai/superagent-base/backend/api/model/workflow"
 	"github.com/superagent-ai/superagent-base/backend/domain/workflow/entity/vo"
@@ -32,18 +31,18 @@ import (
 )
 
 type historyChatTemplate struct {
-	basePrompt         prompt.ChatTemplate
+	basePrompt         einobridge.ChatTemplate
 	chatHistorySetting *vo.ChatHistorySetting
 }
 
-func newHistoryChatTemplate(basePrompt prompt.ChatTemplate, chatHistorySetting *vo.ChatHistorySetting) prompt.ChatTemplate {
+func newHistoryChatTemplate(basePrompt einobridge.ChatTemplate, chatHistorySetting *vo.ChatHistorySetting) einobridge.ChatTemplate {
 	return &historyChatTemplate{
 		basePrompt:         basePrompt,
 		chatHistorySetting: chatHistorySetting,
 	}
 }
 
-func (t *historyChatTemplate) Format(ctx context.Context, vs map[string]any, opts ...prompt.Option) ([]*einobridge.Message, error) {
+func (t *historyChatTemplate) Format(ctx context.Context, vs map[string]any, opts ...einobridge.PromptOption) ([]*einobridge.Message, error) {
 	baseMessages, err := t.basePrompt.Format(ctx, vs, opts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to format base prompt: %w", err)

@@ -17,8 +17,7 @@
 package searchstore
 
 import (
-	"github.com/cloudwego/eino/components/indexer"
-	"github.com/cloudwego/eino/components/retriever"
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 
 	"github.com/superagent-ai/superagent-base/backend/infra/document/progressbar"
 )
@@ -41,32 +40,32 @@ type MultiMatch struct {
 	Query  string
 }
 
-func WithIndexerPartitionKey(key string) indexer.Option {
-	return indexer.WrapImplSpecificOptFn(func(o *IndexerOptions) {
+func WithIndexerPartitionKey(key string) einobridge.IndexerOption {
+	return einobridge.IndexerWrapImplSpecificOptFn(func(o *IndexerOptions) {
 		o.PartitionKey = &key
 	})
 }
 
-func WithPartition(partition string) indexer.Option {
-	return indexer.WrapImplSpecificOptFn(func(o *IndexerOptions) {
+func WithPartition(partition string) einobridge.IndexerOption {
+	return einobridge.IndexerWrapImplSpecificOptFn(func(o *IndexerOptions) {
 		o.Partition = &partition
 	})
 }
 
-func WithIndexingFields(fields []string) indexer.Option {
-	return indexer.WrapImplSpecificOptFn(func(o *IndexerOptions) {
+func WithIndexingFields(fields []string) einobridge.IndexerOption {
+	return einobridge.IndexerWrapImplSpecificOptFn(func(o *IndexerOptions) {
 		o.IndexingFields = fields
 	})
 }
 
-func WithProgressBar(progressBar progressbar.ProgressBar) indexer.Option {
-	return indexer.WrapImplSpecificOptFn(func(o *IndexerOptions) {
+func WithProgressBar(progressBar progressbar.ProgressBar) einobridge.IndexerOption {
+	return einobridge.IndexerWrapImplSpecificOptFn(func(o *IndexerOptions) {
 		o.ProgressBar = progressBar
 	})
 }
 
-func WithMultiMatch(fields []string, query string) retriever.Option {
-	return retriever.WrapImplSpecificOptFn(func(o *RetrieverOptions) {
+func WithMultiMatch(fields []string, query string) einobridge.RetrieverOption {
+	return einobridge.RetrieverWrapImplSpecificOptFn(func(o *RetrieverOptions) {
 		o.MultiMatch = &MultiMatch{
 			Fields: fields,
 			Query:  query,
@@ -74,14 +73,14 @@ func WithMultiMatch(fields []string, query string) retriever.Option {
 	})
 }
 
-func WithRetrieverPartitionKey(key string) retriever.Option {
-	return retriever.WrapImplSpecificOptFn(func(o *RetrieverOptions) {
+func WithRetrieverPartitionKey(key string) einobridge.RetrieverOption {
+	return einobridge.RetrieverWrapImplSpecificOptFn(func(o *RetrieverOptions) {
 		o.PartitionKey = &key
 	})
 }
 
-func WithPartitions(partitions []string) retriever.Option {
-	return retriever.WrapImplSpecificOptFn(func(o *RetrieverOptions) {
+func WithPartitions(partitions []string) einobridge.RetrieverOption {
+	return einobridge.RetrieverWrapImplSpecificOptFn(func(o *RetrieverOptions) {
 		o.Partitions = partitions
 	})
 }

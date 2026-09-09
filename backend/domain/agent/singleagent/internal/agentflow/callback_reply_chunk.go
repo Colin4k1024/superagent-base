@@ -22,9 +22,6 @@ import (
 	"errors"
 	"io"
 
-	"github.com/cloudwego/eino/components"
-	"github.com/cloudwego/eino/components/model"
-	"github.com/cloudwego/eino/components/retriever"
 
 	singleagent "github.com/superagent-ai/superagent-base/backend/crossdomain/agent/model"
 	"github.com/superagent-ai/superagent-base/backend/crossdomain/plugin/consts"
@@ -129,7 +126,7 @@ func (r *replyChunkCallback) OnEnd(ctx context.Context, info *einobridge.RunInfo
 	case keyOfKnowledgeRetriever:
 		knowledgeEvent := &entity.AgentEvent{
 			EventType: singleagent.EventTypeOfKnowledge,
-			Knowledge: einobridge.WrapDocumentSlice(retriever.ConvCallbackOutput(output).Docs),
+			Knowledge: einobridge.WrapDocumentSlice(einobridge.RetrieverConvCallbackOutput(output).Docs),
 		}
 
 		if knowledgeEvent.Knowledge != nil {
@@ -181,13 +178,13 @@ func (r *replyChunkCallback) OnEndWithStreamOutput(ctx context.Context, info *ei
 ) context.Context {
 	logs.CtxInfof(ctx, "info-OnEndWithStreamOutput, info=%v, output=%v", conv.DebugJsonToStr(info), conv.DebugJsonToStr(output))
 	switch info.Component {
-	case einobridge.ComponentOfGraph, components.ComponentOfChatModel:
+	case einobridge.ComponentOfGraph, einobridge.ComponentOfChatModel:
 		if info.Name != keyOfReActAgentChatModel && info.Name != keyOfLLM {
 			output.Close()
 			return ctx
 		}
 		sr := einobridge.StreamReaderWithConvert(output, func(t einobridge.CallbackOutput) (*einobridge.Message, error) {
-			cbOut := model.ConvCallbackOutput(t)
+			cbOut := einobridge.ModelConvCallbackOutput(t)
 			return cbOut.Message, nil
 		})
 

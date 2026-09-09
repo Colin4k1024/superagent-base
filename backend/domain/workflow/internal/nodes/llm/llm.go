@@ -24,9 +24,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/cloudwego/eino/components/model"
-	"github.com/cloudwego/eino/components/prompt"
-	"github.com/cloudwego/eino/components/tool"
 	"github.com/cloudwego/eino/compose"
 	"github.com/cloudwego/eino/flow/agent/react"
 	"golang.org/x/exp/maps"
@@ -387,7 +384,7 @@ func (c *Config) Build(ctx context.Context, ns *schema2.NodeSchema, _ ...schema2
 		chatModel, fallbackM  modelbuilder.BaseChatModel
 		info, fallbackI       *modelmgr.Model
 		modelWithInfo         ModelWithInfo
-		tools                 []tool.BaseTool
+		tools                 []einobridge.BaseTool
 		toolsReturnDirectly   map[string]bool
 		knowledgeRecallConfig *KnowledgeRecallConfig
 	)
@@ -503,7 +500,7 @@ func (c *Config) Build(ctx context.Context, ns *schema2.NodeSchema, _ ...schema2
 					pluginToolsInvokableReq[pid] = pluginToolsInfoRequest
 				}
 			}
-			inInvokableTools := make([]tool.BaseTool, 0, len(fcParams.PluginFCParam.PluginList))
+			inInvokableTools := make([]einobridge.BaseTool, 0, len(fcParams.PluginFCParam.PluginList))
 			for _, req := range pluginToolsInvokableReq {
 				toolMap, err := wrapPlugin.GetPluginInvokableTools(ctx, req)
 				if err != nil {
@@ -645,7 +642,7 @@ func (c *Config) Build(ctx context.Context, ns *schema2.NodeSchema, _ ...schema2
 	}
 
 	if len(tools) > 0 {
-		m, ok := modelWithInfo.(model.ToolCallingChatModel)
+		m, ok := modelWithInfo.(einobridge.ToolCallingChatModel)
 		if !ok {
 			return nil, errors.New("requires a ToolCallingChatModel to use with tools")
 		}
@@ -997,7 +994,7 @@ func (l *LLM) prepare(ctx context.Context, _ map[string]any, opts ...nodes.NodeO
 				}, allIEs))))
 
 		chatModelHandler := einobridge.NewHandlerHelper().ChatModel(&einobridge.ModelCallbackHandler{
-			OnStart: func(ctx context.Context, runInfo *einobridge.RunInfo, input *model.CallbackInput) context.Context {
+			OnStart: func(ctx context.Context, runInfo *einobridge.RunInfo, input *einobridge.ModelCallbackInput) context.Context {
 				if runInfo.Name != agentModelName {
 					return ctx
 				}
@@ -1177,7 +1174,7 @@ func injectKnowledgeTool(_ context.Context, g *compose.Graph[map[string]any, map
 		return err
 	}
 	_ = g.AddChatTemplateNode(knowledgeTemplateKey,
-		prompt.FromMessages(einobridge.Jinja2,
+		einobridge.PromptFromMessages(einobridge.Jinja2,
 			einobridge.SystemMessage(fmt.Sprintf(knowledgeIntentPrompt, selectedKwDetails, userPrompt)),
 		), compose.WithStatePreHandler(func(ctx context.Context, in map[string]any, state llmState) (map[string]any, error) {
 			for k, v := range in {

@@ -22,8 +22,6 @@ import (
 	"runtime/debug"
 	"sync"
 
-	"github.com/cloudwego/eino/components"
-	"github.com/cloudwego/eino/components/model"
 	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 
 	"github.com/superagent-ai/superagent-base/backend/api/model/admin/config"
@@ -41,8 +39,8 @@ type UTChatModel struct {
 	mu                   sync.Mutex
 }
 
-func (q *UTChatModel) Generate(ctx context.Context, in []*einobridge.Message, _ ...model.Option) (*einobridge.Message, error) {
-	ctx = einobridge.EnsureRunInfo(ctx, "ut_chat_model", components.ComponentOfChatModel)
+func (q *UTChatModel) Generate(ctx context.Context, in []*einobridge.Message, _ ...einobridge.ModelOption) (*einobridge.Message, error) {
+	ctx = einobridge.EnsureRunInfo(ctx, "ut_chat_model", einobridge.ComponentOfChatModel)
 	ctx = einobridge.OnStart(ctx, in)
 	defer func() {
 		q.mu.Lock()
@@ -68,14 +66,14 @@ func (q *UTChatModel) Generate(ctx context.Context, in []*einobridge.Message, _ 
 		return nil, err
 	}
 
-	callbackOut := &model.CallbackOutput{
+	callbackOut := &einobridge.ModelCallbackOutput{
 		Message: msg,
 	}
 
 	if msg.ResponseMeta != nil {
-		callbackOut.TokenUsage = &model.TokenUsage{
+		callbackOut.TokenUsage = &einobridge.ModelTokenUsage{
 			PromptTokens: msg.ResponseMeta.Usage.PromptTokens,
-			PromptTokenDetails: model.PromptTokenDetails{
+			PromptTokenDetails: einobridge.PromptTokenDetails{
 				CachedTokens: msg.ResponseMeta.Usage.PromptTokenDetails.CachedTokens,
 			},
 			CompletionTokens: msg.ResponseMeta.Usage.CompletionTokens,
@@ -87,8 +85,8 @@ func (q *UTChatModel) Generate(ctx context.Context, in []*einobridge.Message, _ 
 	return msg, nil
 }
 
-func (q *UTChatModel) Stream(ctx context.Context, in []*einobridge.Message, _ ...model.Option) (*einobridge.StreamReader[*einobridge.Message], error) {
-	ctx = einobridge.EnsureRunInfo(ctx, "ut_chat_model", components.ComponentOfChatModel)
+func (q *UTChatModel) Stream(ctx context.Context, in []*einobridge.Message, _ ...einobridge.ModelOption) (*einobridge.StreamReader[*einobridge.Message], error) {
+	ctx = einobridge.EnsureRunInfo(ctx, "ut_chat_model", einobridge.ComponentOfChatModel)
 	ctx = einobridge.OnStart(ctx, in)
 	defer func() {
 		q.mu.Lock()
@@ -114,15 +112,15 @@ func (q *UTChatModel) Stream(ctx context.Context, in []*einobridge.Message, _ ..
 		return nil, err
 	}
 
-	callbackStream := einobridge.StreamReaderWithConvert(outS, func(t *einobridge.Message) (*model.CallbackOutput, error) {
-		callbackOut := &model.CallbackOutput{
+	callbackStream := einobridge.StreamReaderWithConvert(outS, func(t *einobridge.Message) (*einobridge.ModelCallbackOutput, error) {
+		callbackOut := &einobridge.ModelCallbackOutput{
 			Message: t,
 		}
 
 		if t.ResponseMeta != nil {
-			callbackOut.TokenUsage = &model.TokenUsage{
+			callbackOut.TokenUsage = &einobridge.ModelTokenUsage{
 				PromptTokens: t.ResponseMeta.Usage.PromptTokens,
-				PromptTokenDetails: model.PromptTokenDetails{
+				PromptTokenDetails: einobridge.PromptTokenDetails{
 					CachedTokens: t.ResponseMeta.Usage.PromptTokenDetails.CachedTokens,
 				},
 				CompletionTokens: t.ResponseMeta.Usage.CompletionTokens,
@@ -133,12 +131,12 @@ func (q *UTChatModel) Stream(ctx context.Context, in []*einobridge.Message, _ ..
 		return callbackOut, nil
 	})
 	_, s := einobridge.OnEndWithStreamOutput(ctx, callbackStream)
-	return einobridge.StreamReaderWithConvert(s, func(t *model.CallbackOutput) (*einobridge.Message, error) {
+	return einobridge.StreamReaderWithConvert(s, func(t *einobridge.ModelCallbackOutput) (*einobridge.Message, error) {
 		return t.Message, nil
 	}), nil
 }
 
-func (q *UTChatModel) WithTools(tools []*einobridge.ToolInfo) (model.ToolCallingChatModel, error) {
+func (q *UTChatModel) WithTools(tools []*einobridge.ToolInfo) (einobridge.ToolCallingChatModel, error) {
 	return q, nil
 }
 

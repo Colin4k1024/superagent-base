@@ -24,7 +24,6 @@ import (
 	"os"
 	"testing"
 
-	"github.com/cloudwego/eino/components/document/parser"
 	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	"github.com/stretchr/testify/assert"
 
@@ -48,7 +47,7 @@ func TestParseCSV(t *testing.T) {
 		ChunkingStrategy: nil,
 	}
 	p1 := ParseCSV(c1)
-	docs, err := p1(ctx, r1, parser.WithExtraMeta(map[string]any{
+	docs, err := p1(ctx, r1, einobridge.WithExtraMeta(map[string]any{
 		"document_id":  int64(123),
 		"knowledge_id": int64(456),
 	}))
@@ -113,7 +112,7 @@ func TestParseCSV(t *testing.T) {
 		ChunkingStrategy: nil,
 	}
 	p2 := ParseCSV(c2)
-	docs, err = p2(ctx, r2, parser.WithExtraMeta(map[string]any{
+	docs, err = p2(ctx, r2, einobridge.WithExtraMeta(map[string]any{
 		"document_id":  int64(123),
 		"knowledge_id": int64(456),
 	}))

@@ -18,9 +18,9 @@ package wrap
 
 import (
 	"context"
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	"fmt"
 
-	"github.com/cloudwego/eino/components/embedding"
 
 	contract "github.com/superagent-ai/superagent-base/backend/infra/embedding"
 	"github.com/superagent-ai/superagent-base/backend/pkg/lang/slices"
@@ -29,10 +29,10 @@ import (
 type denseOnlyWrap struct {
 	dims      int64
 	batchSize int
-	embedding.Embedder
+	einobridge.Embedder
 }
 
-func (d *denseOnlyWrap) EmbedStrings(ctx context.Context, texts []string, opts ...embedding.Option) ([][]float64, error) {
+func (d *denseOnlyWrap) EmbedStrings(ctx context.Context, texts []string, opts ...einobridge.EmbeddingOption) ([][]float64, error) {
 	resp := make([][]float64, 0, len(texts))
 	for _, part := range slices.Chunks(texts, d.batchSize) {
 		partResult, err := d.Embedder.EmbedStrings(ctx, part, opts...)
@@ -44,7 +44,7 @@ func (d *denseOnlyWrap) EmbedStrings(ctx context.Context, texts []string, opts .
 	return resp, nil
 }
 
-func (d *denseOnlyWrap) EmbedStringsHybrid(ctx context.Context, texts []string, opts ...embedding.Option) ([][]float64, []map[int]float64, error) {
+func (d *denseOnlyWrap) EmbedStringsHybrid(ctx context.Context, texts []string, opts ...einobridge.EmbeddingOption) ([][]float64, []map[int]float64, error) {
 	return nil, nil, fmt.Errorf("[denseOnlyWrap] EmbedStringsHybrid not support")
 }
 

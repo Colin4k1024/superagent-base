@@ -23,7 +23,6 @@ import (
 	"testing"
 
 	"github.com/cloudwego/eino-ext/components/embedding/openai"
-	"github.com/cloudwego/eino/components/retriever"
 	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	"github.com/stretchr/testify/assert"
 	"github.com/volcengine/volc-sdk-golang/service/vikingdb"
@@ -143,10 +142,10 @@ func TestVikingEmbeddingIntegration(t *testing.T) {
 			Field: "creator_id",
 			Value: int64(111),
 		}
-		opts := []retriever.Option{
+		opts := []einobridge.RetrieverOption{
 			searchstore.WithRetrieverPartitionKey("document_id"),
 			searchstore.WithPartitions([]string{"567"}),
-			retriever.WithDSLInfo(dsl.DSL()),
+			einobridge.WithDSLInfo(dsl.DSL()),
 		}
 		resp, err := ss.Retrieve(ctx, "旅游景点推荐", opts...)
 		assert.NoError(t, err)
@@ -273,10 +272,10 @@ func TestBuiltinEmbeddingIntegration(t *testing.T) {
 			Field: "creator_id",
 			Value: int64(111),
 		}
-		opts := []retriever.Option{
+		opts := []einobridge.RetrieverOption{
 			searchstore.WithRetrieverPartitionKey("document_id"),
 			searchstore.WithPartitions([]string{"567"}),
-			retriever.WithDSLInfo(dsl.DSL()),
+			einobridge.WithDSLInfo(dsl.DSL()),
 		}
 		resp, err := ss.Retrieve(ctx, "旅游景点推荐", opts...)
 		assert.NoError(t, err)

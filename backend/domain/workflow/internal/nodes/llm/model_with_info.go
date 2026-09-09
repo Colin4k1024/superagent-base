@@ -21,8 +21,6 @@ import (
 	"context"
 	"errors"
 
-	"github.com/cloudwego/eino/components"
-	"github.com/cloudwego/eino/components/model"
 
 	"github.com/superagent-ai/superagent-base/backend/bizpkg/config/modelmgr"
 	"github.com/superagent-ai/superagent-base/backend/bizpkg/llm/modelbuilder"
@@ -53,7 +51,7 @@ func NewModel(m modelbuilder.BaseChatModel, info *modelmgr.Model) *ModelForLLM {
 			return false
 		},
 
-		modelEnableCallback: components.IsCallbacksEnabled(m),
+		modelEnableCallback: einobridge.IsCallbacksEnabled(m),
 	}
 }
 
@@ -72,12 +70,12 @@ func NewModelWithFallback(m, f modelbuilder.BaseChatModel, info, fInfo *modelmgr
 			return exeCtx.CurrentRetryCount > 0
 		},
 
-		modelEnableCallback:    components.IsCallbacksEnabled(m),
-		fallbackEnableCallback: components.IsCallbacksEnabled(f),
+		modelEnableCallback:    einobridge.IsCallbacksEnabled(m),
+		fallbackEnableCallback: einobridge.IsCallbacksEnabled(f),
 	}
 }
 
-func (m *ModelForLLM) Generate(ctx context.Context, input []*einobridge.Message, opts ...model.Option) (
+func (m *ModelForLLM) Generate(ctx context.Context, input []*einobridge.Message, opts ...einobridge.ModelOption) (
 	output *einobridge.Message, err error,
 ) {
 	if m.UseFallback(ctx) {
@@ -107,7 +105,7 @@ func (m *ModelForLLM) Generate(ctx context.Context, input []*einobridge.Message,
 	return m.Model.Generate(ctx, input, opts...)
 }
 
-func (m *ModelForLLM) Stream(ctx context.Context, input []*einobridge.Message, opts ...model.Option) (
+func (m *ModelForLLM) Stream(ctx context.Context, input []*einobridge.Message, opts ...einobridge.ModelOption) (
 	output *einobridge.StreamReader[*einobridge.Message], err error,
 ) {
 	if m.UseFallback(ctx) {
@@ -137,8 +135,8 @@ func (m *ModelForLLM) Stream(ctx context.Context, input []*einobridge.Message, o
 	return m.Model.Stream(ctx, input, opts...)
 }
 
-func (m *ModelForLLM) WithTools(tools []*einobridge.ToolInfo) (model.ToolCallingChatModel, error) {
-	toolModel, ok := m.Model.(model.ToolCallingChatModel)
+func (m *ModelForLLM) WithTools(tools []*einobridge.ToolInfo) (einobridge.ToolCallingChatModel, error) {
+	toolModel, ok := m.Model.(einobridge.ToolCallingChatModel)
 	if !ok {
 		return nil, errors.New("requires a ToolCallingChatModel to use with tools")
 	}
@@ -149,9 +147,9 @@ func (m *ModelForLLM) WithTools(tools []*einobridge.ToolInfo) (model.ToolCalling
 		return nil, err
 	}
 
-	var fallbackToolModel model.ToolCallingChatModel
+	var fallbackToolModel einobridge.ToolCallingChatModel
 	if m.FallbackModel != nil {
-		fallbackToolModel, ok = m.FallbackModel.(model.ToolCallingChatModel)
+		fallbackToolModel, ok = m.FallbackModel.(einobridge.ToolCallingChatModel)
 		if !ok {
 			return nil, errors.New("requires a ToolCallingChatModel to use with tools")
 		}

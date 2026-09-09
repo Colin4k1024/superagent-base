@@ -23,8 +23,6 @@ import (
 	"sort"
 	"time"
 
-	"github.com/cloudwego/eino/components/indexer"
-	"github.com/cloudwego/eino/components/retriever"
 	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 
 	"github.com/superagent-ai/superagent-base/backend/infra/oceanbase"
@@ -38,7 +36,7 @@ type oceanbaseSearchStore struct {
 	tableName      string
 }
 
-func (s *oceanbaseSearchStore) Store(ctx context.Context, docs []*einobridge.Document, opts ...indexer.Option) ([]string, error) {
+func (s *oceanbaseSearchStore) Store(ctx context.Context, docs []*einobridge.Document, opts ...einobridge.IndexerOption) ([]string, error) {
 	if len(docs) == 0 {
 		return []string{}, nil
 	}
@@ -96,13 +94,13 @@ func (s *oceanbaseSearchStore) Store(ctx context.Context, docs []*einobridge.Doc
 	return ids, nil
 }
 
-func (s *oceanbaseSearchStore) Retrieve(ctx context.Context, query string, opts ...retriever.Option) ([]*einobridge.Document, error) {
+func (s *oceanbaseSearchStore) Retrieve(ctx context.Context, query string, opts ...einobridge.RetrieverOption) ([]*einobridge.Document, error) {
 	startTime := time.Now()
 	defer func() {
 		logs.CtxInfof(ctx, "Retrieve operation completed in %v", time.Since(startTime))
 	}()
 
-	options := retriever.GetCommonOptions(&retriever.Options{TopK: ptr.Of(10)}, opts...)
+	options := einobridge.RetrieverGetCommonOptions(&einobridge.RetrieverOptions{TopK: ptr.Of(10)}, opts...)
 
 	embeddings, err := s.manager.config.Embedding.EmbedStrings(ctx, []string{query})
 	if err != nil {

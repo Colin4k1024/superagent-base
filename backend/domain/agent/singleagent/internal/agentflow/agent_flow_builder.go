@@ -24,7 +24,6 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/cloudwego/eino/components/tool"
 
 	"github.com/superagent-ai/superagent-base/backend/bizpkg/llm/modelbuilder"
 	"github.com/superagent-ai/superagent-base/backend/domain/agent/singleagent/entity"
@@ -118,7 +117,7 @@ func BuildAgent(ctx context.Context, conf *Config) (r *AgentRunner, err error) {
 		return nil, err
 	}
 
-	var dbTools []tool.InvokableTool
+	var dbTools []einobridge.InvokableTool
 	if len(conf.Agent.Database) > 0 {
 		dbTools, err = newDatabaseTools(ctx, &databaseConfig{
 			spaceID:       conf.Agent.SpaceID,
@@ -131,7 +130,7 @@ func BuildAgent(ctx context.Context, conf *Config) (r *AgentRunner, err error) {
 		}
 	}
 
-	var avTools []tool.InvokableTool
+	var avTools []einobridge.InvokableTool
 	if len(avs) > 0 {
 		avTools, err = newAgentVariableTools(ctx, avConf)
 		if err != nil {
@@ -143,16 +142,16 @@ func BuildAgent(ctx context.Context, conf *Config) (r *AgentRunner, err error) {
 	if len(wfTools) > 0 {
 		containWfTool = true
 	}
-	agentTools := make([]tool.BaseTool, 0, len(pluginTools)+len(wfTools)+len(dbTools)+len(avTools))
-	agentTools = append(agentTools, slices.Transform(pluginTools, func(a tool.InvokableTool) tool.BaseTool {
+	agentTools := make([]einobridge.BaseTool, 0, len(pluginTools)+len(wfTools)+len(dbTools)+len(avTools))
+	agentTools = append(agentTools, slices.Transform(pluginTools, func(a einobridge.InvokableTool) einobridge.BaseTool {
 		return a
 	})...)
-	agentTools = append(agentTools, slices.Transform(wfTools, func(a workflow.ToolFromWorkflow) tool.BaseTool { return a.(tool.BaseTool) })...)
-	agentTools = append(agentTools, slices.Transform(dbTools, func(a tool.InvokableTool) tool.BaseTool {
+	agentTools = append(agentTools, slices.Transform(wfTools, func(a workflow.ToolFromWorkflow) einobridge.BaseTool { return a.(einobridge.BaseTool) })...)
+	agentTools = append(agentTools, slices.Transform(dbTools, func(a einobridge.InvokableTool) einobridge.BaseTool {
 		return a
 	})...)
 
-	agentTools = append(agentTools, slices.Transform(avTools, func(a tool.InvokableTool) tool.BaseTool {
+	agentTools = append(agentTools, slices.Transform(avTools, func(a einobridge.InvokableTool) einobridge.BaseTool {
 		return a
 	})...)
 

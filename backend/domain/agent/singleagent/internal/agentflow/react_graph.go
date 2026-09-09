@@ -44,8 +44,6 @@ import (
 	"context"
 	"io"
 
-	"github.com/cloudwego/eino/components/model"
-	"github.com/cloudwego/eino/components/tool"
 )
 
 // reactState is the per-execution state for the self-built ReAct graph.
@@ -73,8 +71,8 @@ type reactGraphResult struct {
 //	                                            ↘ END                         ↘ directReturn → END
 //
 // This faithfully replicates react.NewAgent's graph construction.
-func buildReActGraph(ctx context.Context, chatModel model.ToolCallingChatModel,
-	agentTools []tool.BaseTool, returnDirectlyTools map[string]struct{},
+func buildReActGraph(ctx context.Context, chatModel einobridge.ToolCallingChatModel,
+	agentTools []einobridge.BaseTool, returnDirectlyTools map[string]struct{},
 	modelNodeName, toolsNodeName string) (*reactGraphResult, error) {
 
 	// Generate tool infos.
@@ -88,7 +86,7 @@ func buildReActGraph(ctx context.Context, chatModel model.ToolCallingChatModel,
 	}
 
 	// Bind tools to the chat model (safe, immutable).
-	var chatModelNode model.BaseChatModel
+	var chatModelNode einobridge.BaseChatModel
 	if len(toolInfos) > 0 {
 		var err error
 		chatModelNode, err = chatModel.WithTools(toolInfos)

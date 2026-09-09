@@ -22,7 +22,6 @@ import (
 	"os"
 	"testing"
 
-	"github.com/cloudwego/eino/components/document/parser"
 	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
@@ -56,7 +55,7 @@ func TestParseMarkdown(t *testing.T) {
 
 	f, err := os.Open("test_data/test_markdown.md")
 	assert.NoError(t, err)
-	docs, err := pfn(ctx, f, parser.WithExtraMeta(map[string]any{
+	docs, err := pfn(ctx, f, einobridge.WithExtraMeta(map[string]any{
 		"document_id":  int64(123),
 		"knowledge_id": int64(456),
 	}))

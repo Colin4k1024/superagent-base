@@ -19,7 +19,6 @@ package agentflow
 import (
 	"context"
 
-	"github.com/cloudwego/eino/components/prompt"
 
 	"github.com/superagent-ai/superagent-base/backend/api/model/app/bot_common"
 	"github.com/superagent-ai/superagent-base/backend/bizpkg/llm/modelbuilder"
@@ -53,7 +52,7 @@ func newSuggestGraph(_ context.Context, conf *Config, chatModel modelbuilder.Too
 	if !isNeedGenerateSuggest {
 		return nil, isNeedGenerateSuggest
 	}
-	suggestPrompt := prompt.FromMessages(einobridge.Jinja2,
+	suggestPrompt := einobridge.PromptFromMessages(einobridge.Jinja2,
 		einobridge.SystemMessage(SUGGESTION_PROMPT_JINJA2),
 		einobridge.UserMessage("Based on the contextual information, provide three recommended questions"),
 	)

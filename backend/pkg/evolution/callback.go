@@ -38,8 +38,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/cloudwego/eino/components"
-	"github.com/cloudwego/eino/components/model"
 
 	"github.com/superagent-ai/superagent-base/backend/pkg/observe"
 )
@@ -99,9 +97,9 @@ func (c *evolutionCallback) onError(ctx context.Context, info *einobridge.RunInf
 func einoToEvolutionRunInfo(info *einobridge.RunInfo) observe.CallbackRunInfo {
 	comp := observe.ComponentOther
 	switch info.Component {
-	case components.ComponentOfChatModel:
+	case einobridge.ComponentOfChatModel:
 		comp = observe.ComponentChatModel
-	case components.ComponentOfTool:
+	case einobridge.ComponentOfTool:
 		comp = observe.ComponentTool
 	}
 	return observe.CallbackRunInfo{Component: comp, Name: info.Name}
@@ -120,7 +118,7 @@ func buildSuccessSignal(info observe.CallbackRunInfo, output einobridge.Callback
 		sig.Output = fmt.Sprintf("%v", output)
 	case observe.ComponentChatModel:
 		sig.Type = "model_invoke"
-		if cbOut := model.ConvCallbackOutput(output); cbOut != nil && cbOut.Message != nil {
+		if cbOut := einobridge.ModelConvCallbackOutput(output); cbOut != nil && cbOut.Message != nil {
 			if cbOut.Message.Content != "" {
 				sig.Output = Truncate(cbOut.Message.Content, 200)
 			}

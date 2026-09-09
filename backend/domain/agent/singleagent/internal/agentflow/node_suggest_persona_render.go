@@ -22,7 +22,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/cloudwego/eino/components/prompt"
 )
 
 type suggestPersonaRender struct {
@@ -35,7 +34,7 @@ func (p *suggestPersonaRender) RenderPersona(ctx context.Context, _ []*wfcompose
 		return "", nil
 	}
 
-	msgs, err := prompt.FromMessages(einobridge.Jinja2, einobridge.UserMessage(p.persona)).Format(ctx, nil)
+	msgs, err := einobridge.PromptFromMessages(einobridge.Jinja2, einobridge.UserMessage(p.persona)).Format(ctx, nil)
 	if err != nil {
 		return "", fmt.Errorf("render persona failed, err=%w", err)
 	}

@@ -18,13 +18,12 @@ package agentflow
 
 import (
 	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose"
+	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	"context"
 	"fmt"
 	"reflect"
 	"strconv"
 
-	"github.com/cloudwego/eino/components/tool"
-	"github.com/cloudwego/eino/components/tool/utils"
 	"github.com/eino-contrib/jsonschema"
 
 	"github.com/superagent-ai/superagent-base/backend/api/model/app/bot_common"
@@ -44,7 +43,7 @@ type knowledgeConfig struct {
 	GetHistory      func() []*wfcompose.Message
 }
 
-func newKnowledgeTool(ctx context.Context, conf *knowledgeConfig) (tool.InvokableTool, error) {
+func newKnowledgeTool(ctx context.Context, conf *knowledgeConfig) (einobridge.InvokableTool, error) {
 	kl := &knowledgeTool{
 		knowledgeConfig: conf.knowledgeConfig,
 		Input:           conf.Input,
@@ -77,7 +76,7 @@ func newKnowledgeTool(ctx context.Context, conf *knowledgeConfig) (tool.Invokabl
 		}
 	}
 
-	return utils.InferTool(knowledgeToolName, knowledgeDesc, kl.Retrieve, utils.WithSchemaModifier(customTagsFn))
+	return einobridge.InferTool(knowledgeToolName, knowledgeDesc, kl.Retrieve, einobridge.WithSchemaModifier(customTagsFn))
 }
 
 type RetrieveRequest struct {

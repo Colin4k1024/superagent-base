@@ -29,7 +29,6 @@ import (
 	context "context"
 	reflect "reflect"
 
-	model "github.com/cloudwego/eino/components/model"
 	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 	gomock "go.uber.org/mock/gomock"
 )
@@ -59,7 +58,7 @@ func (m *MockBaseChatModel) EXPECT() *MockBaseChatModelMockRecorder {
 }
 
 // Generate mocks base method.
-func (m *MockBaseChatModel) Generate(ctx context.Context, input []*einobridge.Message, opts ...model.Option) (*einobridge.Message, error) {
+func (m *MockBaseChatModel) Generate(ctx context.Context, input []*einobridge.Message, opts ...einobridge.ModelOption) (*einobridge.Message, error) {
 	m.ctrl.T.Helper()
 	varargs := []any{ctx, input}
 	for _, a := range opts {
@@ -79,7 +78,7 @@ func (mr *MockBaseChatModelMockRecorder) Generate(ctx, input any, opts ...any) *
 }
 
 // Stream mocks base method.
-func (m *MockBaseChatModel) Stream(ctx context.Context, input []*einobridge.Message, opts ...model.Option) (*einobridge.StreamReader[*einobridge.Message], error) {
+func (m *MockBaseChatModel) Stream(ctx context.Context, input []*einobridge.Message, opts ...einobridge.ModelOption) (*einobridge.StreamReader[*einobridge.Message], error) {
 	m.ctrl.T.Helper()
 	varargs := []any{ctx, input}
 	for _, a := range opts {
@@ -137,7 +136,7 @@ func (mr *MockChatModelMockRecorder) BindTools(tools any) *gomock.Call {
 }
 
 // Generate mocks base method.
-func (m *MockChatModel) Generate(ctx context.Context, input []*einobridge.Message, opts ...model.Option) (*einobridge.Message, error) {
+func (m *MockChatModel) Generate(ctx context.Context, input []*einobridge.Message, opts ...einobridge.ModelOption) (*einobridge.Message, error) {
 	m.ctrl.T.Helper()
 	varargs := []any{ctx, input}
 	for _, a := range opts {
@@ -157,7 +156,7 @@ func (mr *MockChatModelMockRecorder) Generate(ctx, input any, opts ...any) *gomo
 }
 
 // Stream mocks base method.
-func (m *MockChatModel) Stream(ctx context.Context, input []*einobridge.Message, opts ...model.Option) (*einobridge.StreamReader[*einobridge.Message], error) {
+func (m *MockChatModel) Stream(ctx context.Context, input []*einobridge.Message, opts ...einobridge.ModelOption) (*einobridge.StreamReader[*einobridge.Message], error) {
 	m.ctrl.T.Helper()
 	varargs := []any{ctx, input}
 	for _, a := range opts {
@@ -201,7 +200,7 @@ func (m *MockToolCallingChatModel) EXPECT() *MockToolCallingChatModelMockRecorde
 }
 
 // Generate mocks base method.
-func (m *MockToolCallingChatModel) Generate(ctx context.Context, input []*einobridge.Message, opts ...model.Option) (*einobridge.Message, error) {
+func (m *MockToolCallingChatModel) Generate(ctx context.Context, input []*einobridge.Message, opts ...einobridge.ModelOption) (*einobridge.Message, error) {
 	m.ctrl.T.Helper()
 	varargs := []any{ctx, input}
 	for _, a := range opts {
@@ -221,7 +220,7 @@ func (mr *MockToolCallingChatModelMockRecorder) Generate(ctx, input any, opts ..
 }
 
 // Stream mocks base method.
-func (m *MockToolCallingChatModel) Stream(ctx context.Context, input []*einobridge.Message, opts ...model.Option) (*einobridge.StreamReader[*einobridge.Message], error) {
+func (m *MockToolCallingChatModel) Stream(ctx context.Context, input []*einobridge.Message, opts ...einobridge.ModelOption) (*einobridge.StreamReader[*einobridge.Message], error) {
 	m.ctrl.T.Helper()
 	varargs := []any{ctx, input}
 	for _, a := range opts {
@@ -241,10 +240,10 @@ func (mr *MockToolCallingChatModelMockRecorder) Stream(ctx, input any, opts ...a
 }
 
 // WithTools mocks base method.
-func (m *MockToolCallingChatModel) WithTools(tools []*einobridge.ToolInfo) (model.ToolCallingChatModel, error) {
+func (m *MockToolCallingChatModel) WithTools(tools []*einobridge.ToolInfo) (einobridge.ToolCallingChatModel, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "WithTools", tools)
-	ret0, _ := ret[0].(model.ToolCallingChatModel)
+	ret0, _ := ret[0].(einobridge.ToolCallingChatModel)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }

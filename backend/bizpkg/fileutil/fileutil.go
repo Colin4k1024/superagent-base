@@ -19,7 +19,6 @@ import (
 	"encoding/json"
 	"os"
 
-	"github.com/cloudwego/eino/components/prompt"
 	"github.com/superagent-ai/superagent-base/backend/pkg/wfcompose/einobridge"
 
 	"github.com/superagent-ai/superagent-base/backend/pkg/logs"
@@ -34,7 +33,7 @@ func GetWorkingDirectory() string {
 	return root
 }
 
-func ReadJinja2PromptTemplate(jsonFilePath string) (prompt.ChatTemplate, error) {
+func ReadJinja2PromptTemplate(jsonFilePath string) (einobridge.ChatTemplate, error) {
 	b, err := os.ReadFile(jsonFilePath)
 	if err != nil {
 		return nil, err
@@ -47,5 +46,5 @@ func ReadJinja2PromptTemplate(jsonFilePath string) (prompt.ChatTemplate, error) 
 	for i := range m2qMessages {
 		tpl[i] = m2qMessages[i]
 	}
-	return prompt.FromMessages(einobridge.Jinja2, tpl...), nil
+	return einobridge.PromptFromMessages(einobridge.Jinja2, tpl...), nil
 }
