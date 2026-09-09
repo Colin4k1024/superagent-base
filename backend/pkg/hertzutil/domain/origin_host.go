@@ -38,6 +38,10 @@ func GetOriginHost(c *app.RequestContext) string {
 
 	host := c.Request.Header.Get(HeaderKeyOfHost)
 	if host != "" {
+		// Strip port from Host header (e.g. localhost:8888 → localhost)
+		if h, err := url.Parse("http://" + host); err == nil {
+			return h.Hostname()
+		}
 		return host
 	}
 
