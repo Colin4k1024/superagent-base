@@ -29,6 +29,14 @@ web/node_modules/
 web/dist/
 web/.next/
 
+# Web environment files — only templates and dev defaults are committed
+web/.env
+web/.env.*
+!web/.env.example
+!web/.env.go
+!web/.env.java
+!web/.env.python
+
 # Docs site
 site/node_modules/
 site/.vitepress/dist/
